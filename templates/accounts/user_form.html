@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}User Accounts{% endblock %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block page_subtitle %}
+Assign roles and manage account access for ranch staff.
+{% endblock %}
+
+{% block content %}
+<div class="form-card">
+    <form method="post" class="standard-form">
+        {% csrf_token %}
+        
+        <div class="form-section">
+            <div class="form-grid">
+                {% for field in form %}
+                    <div class="form-group {% if field.name == 'groups' %}full-width{% endif %}">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.help_text %}
+                            <p class="form-help">{{ field.help_text }}</p>
+                        {% endif %}
+                        {% if field.errors %}
+                            <div class="form-errors">
+                                {{ field.errors }}
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <a href="{% url 'accounts:user_list' %}" class="button button-secondary">Cancel</a>
+            <button type="submit" class="button button-primary">Save User</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
