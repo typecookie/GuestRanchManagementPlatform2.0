@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}Vehicles | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Vehicle Management{% endblock %}
+
+{% block page_title %}Vehicles{% endblock %}
+
+{% block page_subtitle %}
+Manage ranch vehicles, mileage, assignments, maintenance, inspections, and service status.
+{% endblock %}
+
+{% block page_actions %}
+<a href="#" class="button button-primary">Add Vehicle</a>
+{% endblock %}
+
+{% block content %}
+<div class="stat-grid">
+    <div class="stat-card">
+        <span>Total Vehicles</span>
+        <strong>0</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Available</span>
+        <strong>0</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Assigned</span>
+        <strong>0</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Needs Service</span>
+        <strong>0</strong>
+    </div>
+</div>
+
+<div class="page-toolbar">
+    <div class="page-toolbar-main">
+        <form class="search-form" method="get">
+            <input
+                type="search"
+                name="q"
+                class="search-input"
+                placeholder="Search vehicles by name, plate, type, or notes"
+            >
+
+            <select name="status" class="form-select">
+                <option value="">All vehicle statuses</option>
+                <option value="available">Available</option>
+                <option value="assigned">Assigned</option>
+                <option value="maintenance">Maintenance</option>
+                <option value="out_of_service">Out of service</option>
+            </select>
+
+            <button type="submit" class="button button-secondary">Search</button>
+        </form>
+    </div>
+
+    <div class="page-toolbar-actions">
+        <a href="#" class="button button-secondary">Service Log</a>
+        <a href="#" class="button button-primary">Add Vehicle</a>
+    </div>
+</div>
+
+<div class="empty-state">
+    <div class="empty-state-content">
+        <div class="empty-state-icon">🚙</div>
+        <h2>No vehicles yet</h2>
+        <p>
+            Once vehicle management is built, this page will show ranch trucks,
+            vans, trailers, ATVs, mileage, maintenance status, and assignments.
+        </p>
+        <a href="#" class="button button-primary">Create First Vehicle</a>
+    </div>
+</div>
+{% endblock %}

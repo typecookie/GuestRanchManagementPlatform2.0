@@ -1,0 +1,126 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Guest Ranch Management{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/main.css' %}">
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="sidebar">
+            <div>
+                <div class="sidebar-brand">
+                    <span class="brand-icon">◇</span>
+                    <span class="brand-text">Guest Ranch</span>
+                </div>
+
+                <nav class="sidebar-nav" aria-label="Primary navigation">
+                    <a
+                        href="{% url 'core:dashboard' %}"
+                        class="sidebar-link {% if request.resolver_match.namespace == 'core' %}is-active{% endif %}"
+                    >
+                        Dashboard
+                    </a>
+
+                    <a
+                        href="{% url 'clients:contact_dashboard' %}"
+                        class="sidebar-link {% if request.resolver_match.namespace == 'clients' %}is-active{% endif %}"
+                    >
+                        Clients
+                    </a>
+
+                    <a
+                        href="{% url 'reservations:reservation_list' %}"
+                        class="sidebar-link {% if request.resolver_match.namespace == 'reservations' %}is-active{% endif %}"
+                    >
+                        Reservations
+                    </a>
+
+                    <a
+                        href="{% url 'horses:horse_list' %}"
+                        class="sidebar-link {% if request.resolver_match.namespace == 'horses' %}is-active{% endif %}"
+                    >
+                        Horses
+                    </a>
+
+                    <a
+                        href="{% url 'cabins:cabin_list' %}"
+                        class="sidebar-link {% if request.resolver_match.namespace == 'cabins' %}is-active{% endif %}"
+                    >
+                        Cabins
+                    </a>
+
+                    <a
+                        href="{% url 'vehicles:vehicle_list' %}"
+                        class="sidebar-link {% if request.resolver_match.namespace == 'vehicles' %}is-active{% endif %}"
+                    >
+                        Vehicles
+                    </a>
+
+                    <a
+                        href="{% url 'ranch:ranch_operations' %}"
+                        class="sidebar-link {% if request.resolver_match.namespace == 'ranch' %}is-active{% endif %}"
+                    >
+                        Ranch Operations
+                    </a>
+                </nav>
+            </div>
+
+            <div class="sidebar-footer">
+                <a href="/admin/" class="sidebar-admin-link">Django Admin</a>
+                <span class="sidebar-version">Ranch Platform v0.1</span>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="topbar">
+                <div class="page-heading">
+                    <span class="eyebrow">{% block eyebrow %}Operations{% endblock %}</span>
+                    <h1>{% block page_title %}Dashboard{% endblock %}</h1>
+                    <p>{% block page_subtitle %}Guest ranch operations at a glance{% endblock %}</p>
+                </div>
+
+                <div class="topbar-actions">
+                    {% block page_actions %}{% endblock %}
+
+                    <div class="topbar-user">
+                        {% if request.user.is_authenticated %}
+                            <span class="user-pill">{{ request.user.get_username }}</span>
+
+                            <form method="post" action="{% url 'logout' %}" class="logout-form">
+                                {% csrf_token %}
+                                <button type="submit" class="logout-button">Logout</button>
+                            </form>
+                        {% else %}
+                            <a href="{% url 'login' %}" class="logout-button">Login</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </header>
+
+            {% if messages %}
+                <div class="message-stack">
+                    {% for message in messages %}
+                        <div class="message message-{{ message.tags }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <section class="content-panel">
+                {% block content %}{% endblock %}
+            </section>
+
+            <footer class="page-footer">
+                <span>Guest Ranch Management Platform</span>
+                <span>Built for daily ranch operations</span>
+            </footer>
+        </main>
+    </div>
+        <script src="{% static 'js/main.js' %}"></script>
+    </body>
+</html>

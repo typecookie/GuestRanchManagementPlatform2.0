@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block title %}People | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Contact Book{% endblock %}
+
+{% block page_title %}People{% endblock %}
+
+{% block page_subtitle %}
+Manage individual guest records, contact information, riding levels, preferences, and notes.
+{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'clients:contact_dashboard' %}" class="button button-secondary">Contact Book</a>
+<a href="{% url 'clients:household_list' %}" class="button button-secondary">Households</a>
+<a href="{% url 'clients:travel_group_list' %}" class="button button-secondary">Travel Groups</a>
+<a href="{% url 'clients:client_create' %}" class="button button-primary">Add Client</a>
+{% endblock %}
+
+{% block content %}
+<div class="stat-grid">
+    <div class="stat-card">
+        <span>Total Clients</span>
+        <strong>{{ total_clients }}</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Active Clients</span>
+        <strong>{{ active_clients }}</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Inactive Clients</span>
+        <strong>{{ inactive_clients }}</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Current Results</span>
+        <strong>{{ search_result_count }}</strong>
+    </div>
+</div>
+
+<div class="page-toolbar">
+    <div class="page-toolbar-main">
+        <form class="search-form" method="get">
+            <input
+                type="search"
+                name="q"
+                class="search-input"
+                placeholder="Search by name, phone, or email"
+                value="{{ search_query }}"
+            >
+
+            <select name="status" class="form-select">
+                <option value="">All statuses</option>
+                <option value="active" {% if status_filter == "active" %}selected{% endif %}>Active</option>
+                <option value="inactive" {% if status_filter == "inactive" %}selected{% endif %}>Inactive</option>
+            </select>
+
+            <select name="client_type" class="form-select">
+                <option value="">All client types</option>
+                {% for value, label in client_type_choices %}
+                    <option value="{{ value }}" {% if client_type_filter == value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                {% endfor %}
+            </select>
+
+            <select name="riding_level" class="form-select">
+                <option value="">All riding levels</option>
+                {% for value, label in riding_level_choices %}
+                    <option value="{{ value }}" {% if riding_level_filter == value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                {% endfor %}
+            </select>
+
+            <button type="submit" class="button button-secondary">Search</button>
+
+            {% if search_query or status_filter or client_type_filter or riding_level_filter %}
+                <a href="{% url 'clients:client_list' %}" class="button button-secondary">Clear</a>
+            {% endif %}
+        </form>
+    </div>
+
+    <div class="page-toolbar-actions">
+        <a href="{% url 'clients:household_create' %}" class="button button-secondary">Add Household</a>
+        <a href="{% url 'clients:travel_group_create' %}" class="button button-secondary">Add Travel Group</a>
+        <a href="{% url 'clients:client_create' %}" class="button button-primary">Add Client</a>
+    </div>
+</div>
+
+{% if clients %}
+    <div class="table-card">
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Preferred</th>
+                        <th>Type</th>
+                        <th>Riding Level</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Status</th>
+                        <th class="text-right">Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for client in clients %}
+                        <tr>
+                            <td>
+                                <strong>{{ client.full_name }}</strong>
+                            </td>
+
+                            <td>
+                                {% if client.preferred_name %}
+                                    {{ client.preferred_name }}
+                                {% else %}
+                                    <span class="table-muted">—</span>
+                                {% endif %}
+                            </td>
+
+                            <td>{{ client.get_client_type_display }}</td>
+
+                            <td>{{ client.get_riding_level_display }}</td>
+
+                            <td>
+                                {% if client.email %}
+                                    <a href="mailto:{{ client.email }}">{{ client.email }}</a>
+                                {% else %}
+                                    <span class="table-muted">—</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if client.phone %}
+                                    <a href="tel:{{ client.phone }}">{{ client.phone }}</a>
+                                {% else %}
+                                    <span class="table-muted">—</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if client.is_active %}
+                                    <span class="badge badge-success">Active</span>
+                                {% else %}
+                                    <span class="badge badge-neutral">Inactive</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                <div class="table-actions">
+                                    <a href="{% url 'clients:client_detail' client.pk %}" class="button button-small button-secondary">View</a>
+                                    <a href="{% url 'clients:client_update' client.pk %}" class="button button-small button-primary">Edit</a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% else %}
+    <div class="empty-state">
+        <div class="empty-state-content">
+            <div class="empty-state-icon">👥</div>
+
+            {% if search_query or status_filter or client_type_filter or riding_level_filter %}
+                <h2>No clients found</h2>
+                <p>
+                    No client records matched your current search or filters.
+                    Try clearing the filters or searching for a different name, email, or phone number.
+                </p>
+                <a href="{% url 'clients:client_list' %}" class="button button-secondary">Clear Search</a>
+            {% else %}
+                <h2>No clients yet</h2>
+                <p>
+                    Once you add clients, this page will show guest profiles,
+                    contact information, riding levels, dietary notes, and internal notes.
+                </p>
+                <a href="{% url 'clients:client_create' %}" class="button button-primary">Create First Client</a>
+            {% endif %}
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

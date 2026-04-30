@@ -1,0 +1,613 @@
+{% extends "base.html" %}
+
+{% block title %}{{ reservation.reservation_name }} | Reservations{% endblock %}
+
+{% block eyebrow %}Reservation{% endblock %}
+
+{% block page_title %}{{ reservation.reservation_name }}{% endblock %}
+
+{% block page_subtitle %}
+{{ reservation.arrival_date }} to {{ reservation.departure_date }} · {{ reservation.get_status_display }}
+{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'reservations:reservation_list' %}" class="button button-secondary">Back to Reservations</a>
+<a href="{% url 'reservations:reservation_update' reservation.pk %}" class="button button-primary">Edit Reservation</a>
+{% endblock %}
+
+{% block content %}
+<div class="detail-layout">
+    <section class="panel-stack">
+        <div class="detail-card">
+            <h2>Reservation Details</h2>
+
+            <div class="detail-list">
+                <div class="detail-row">
+                    <div class="detail-label">Type</div>
+                    <div class="detail-value">{{ reservation.get_reservation_type_display }}</div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Status</div>
+                    <div class="detail-value">
+                        {% if reservation.status == "confirmed" %}
+                            <span class="badge badge-success">{{ reservation.get_status_display }}</span>
+                        {% elif reservation.status == "penciled" or reservation.status == "inquiry" %}
+                            <span class="badge badge-warning">{{ reservation.get_status_display }}</span>
+                        {% elif reservation.status == "cancelled" %}
+                            <span class="badge badge-danger">{{ reservation.get_status_display }}</span>
+                        {% else %}
+                            <span class="badge badge-info">{{ reservation.get_status_display }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Arrival</div>
+                    <div class="detail-value">{{ reservation.arrival_date }} at {{ reservation.check_in_time }}</div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Departure</div>
+                    <div class="detail-value">{{ reservation.departure_date }} at {{ reservation.check_out_time }}</div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Guests</div>
+                    <div class="detail-value">
+                        {{ reservation.display_guest_count }}
+                        <span class="text-muted">
+                            ({{ reservation.adult_count }} adults, {{ reservation.child_count }} children)
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="detail-card">
+            <div class="section-heading">
+                <div>
+                    <h2>Cabin Assignments</h2>
+                    <p>Add cabins occupied by this reservation.</p>
+                </div>
+            </div>
+
+            <form method="post" action="{% url 'reservations:reservation_cabin_create' reservation.pk %}" class="note-form" novalidate>
+                {% csrf_token %}
+
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label for="{{ cabin_form.cabin.id_for_label }}">Cabin</label>
+                        {{ cabin_form.cabin }}
+                    </div>
+
+                    <div class="form-field">
+                        <label for="{{ cabin_form.arrival_date.id_for_label }}">Arrival Date</label>
+                        {{ cabin_form.arrival_date }}
+                    </div>
+
+                    <div class="form-field">
+                        <label for="{{ cabin_form.departure_date.id_for_label }}">Departure Date</label>
+                        {{ cabin_form.departure_date }}
+                    </div>
+
+                    <div class="form-field form-grid-full">
+                        <label for="{{ cabin_form.notes.id_for_label }}">Notes</label>
+                        {{ cabin_form.notes }}
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="button button-primary">Add Cabin</button>
+                </div>
+            </form>
+
+            <div class="divider"></div>
+
+            {% if cabin_assignments %}
+                <div class="table-card">
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Cabin</th>
+                                    <th>Dates</th>
+                                    <th>Notes</th>
+                                    <th class="text-right">Actions</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                {% for assignment in cabin_assignments %}
+                                    <tr>
+                                        <td>
+                                            <a href="{% url 'cabins:cabin_detail' assignment.cabin.pk %}">
+                                                <strong>{{ assignment.cabin.name }}</strong>
+                                            </a>
+                                        </td>
+
+                                        <td>{{ assignment.arrival_date }} to {{ assignment.departure_date }}</td>
+
+                                        <td>
+                                            {% if assignment.notes %}
+                                                {{ assignment.notes }}
+                                            {% else %}
+                                                <span class="table-muted">—</span>
+                                            {% endif %}
+                                        </td>
+
+                                        <td>
+                                            <div class="table-actions">
+                                                <form method="post" action="{% url 'reservations:reservation_cabin_delete' assignment.pk %}">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="button button-small button-danger">Remove</button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% else %}
+                <p class="text-muted mb-0">No cabins have been assigned to this reservation yet.</p>
+            {% endif %}
+        </div>
+
+        <div class="detail-card">
+            <div class="section-heading">
+                <div>
+                    <h2>Reservation Guests</h2>
+                    <p>Add stay-specific guest information collected from the guest card.</p>
+                </div>
+
+                <div class="button-group">
+                    {% if reservation.household %}
+                        <form method="post" action="{% url 'reservations:reservation_add_household_guests' reservation.pk %}">
+                            {% csrf_token %}
+                            <button type="submit" class="button button-small button-secondary">
+                                Add Household Members
+                            </button>
+                        </form>
+                    {% endif %}
+
+                    {% if reservation.travel_group %}
+                        <form method="post" action="{% url 'reservations:reservation_add_travel_group_guests' reservation.pk %}">
+                            {% csrf_token %}
+                            <button type="submit" class="button button-small button-secondary">
+                                Add Travel Group Members
+                            </button>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+
+            <form method="post" action="{% url 'reservations:reservation_guest_create' reservation.pk %}" class="note-form" novalidate>
+                {% csrf_token %}
+
+                <div class="form-grid">
+                    <div class="form-field form-grid-full">
+                        <label for="{{ guest_form.client.id_for_label }}">Guest</label>
+                        {{ guest_form.client }}
+                    </div>
+
+                    <div class="form-field form-grid-full">
+                        <label for="{{ guest_form.cabin.id_for_label }}">Cabin</label>
+                        {{ guest_form.cabin }}
+                        <span class="form-help">
+                            If this reservation has exactly one cabin, this can be left blank and will auto-fill.
+                        </span>
+                    </div>
+
+                    <div class="form-field">
+                        <label for="{{ guest_form.age_at_stay.id_for_label }}">Age at Stay</label>
+                        {{ guest_form.age_at_stay }}
+                    </div>
+
+                    <div class="form-field">
+                        <label for="{{ guest_form.height.id_for_label }}">Height</label>
+                        {{ guest_form.height }}
+                    </div>
+
+                    <div class="form-field">
+                        <label for="{{ guest_form.weight.id_for_label }}">Weight</label>
+                        {{ guest_form.weight }}
+                    </div>
+
+                    <div class="form-field">
+                        <label for="{{ guest_form.riding_experience.id_for_label }}">Riding Experience</label>
+                        {{ guest_form.riding_experience }}
+                    </div>
+
+                    <div class="form-field checkbox-field">
+                        <label>
+                            {{ guest_form.is_riding }}
+                            Guest will ride
+                        </label>
+                    </div>
+
+                    <div class="form-field form-grid-full">
+                        <label for="{{ guest_form.allergies.id_for_label }}">Allergies</label>
+                        {{ guest_form.allergies }}
+                    </div>
+
+                    <div class="form-field form-grid-full">
+                        <label for="{{ guest_form.food_requests.id_for_label }}">Food Requests</label>
+                        {{ guest_form.food_requests }}
+                    </div>
+
+                    <div class="form-field form-grid-full">
+                        <label for="{{ guest_form.medical_notes.id_for_label }}">Need-to-Know Medical Problems</label>
+                        {{ guest_form.medical_notes }}
+                    </div>
+
+                    <div class="form-field form-grid-full">
+                        <label for="{{ guest_form.notes.id_for_label }}">Additional Notes</label>
+                        {{ guest_form.notes }}
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="button button-primary">Add Guest</button>
+                </div>
+            </form>
+
+            <div class="divider"></div>
+
+            {% if reservation_guests %}
+                <div class="table-card">
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Guest</th>
+                                    <th>Cabin</th>
+                                    <th>Age</th>
+                                    <th>Height</th>
+                                    <th>Weight</th>
+                                    <th>Riding</th>
+                                    <th>Experience</th>
+                                    <th>Alerts</th>
+                                    <th class="text-right">Actions</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                {% for guest in reservation_guests %}
+                                    <tr>
+                                        <td>
+                                            <a href="{% url 'clients:client_detail' guest.client.pk %}">
+                                                <strong>{{ guest.client.display_name }}</strong>
+                                            </a>
+                                        </td>
+
+                                        <td>
+                                            {% if guest.cabin %}
+                                                <a href="{% url 'cabins:cabin_detail' guest.cabin.pk %}">
+                                                    {{ guest.cabin.name }}
+                                                </a>
+                                            {% else %}
+                                                <span class="table-muted">Unassigned</span>
+                                            {% endif %}
+                                        </td>
+
+                                        <td>
+                                            {% if guest.age_at_stay %}
+                                                {{ guest.age_at_stay }}
+                                            {% else %}
+                                                <span class="table-muted">—</span>
+                                            {% endif %}
+                                        </td>
+
+                                        <td>
+                                            {% if guest.height %}
+                                                {{ guest.height }}
+                                            {% else %}
+                                                <span class="table-muted">—</span>
+                                            {% endif %}
+                                        </td>
+
+                                        <td>
+                                            {% if guest.weight %}
+                                                {{ guest.weight }}
+                                            {% else %}
+                                                <span class="table-muted">—</span>
+                                            {% endif %}
+                                        </td>
+
+                                        <td>
+                                            {% if guest.is_riding %}
+                                                <span class="badge badge-success">Riding</span>
+                                            {% else %}
+                                                <span class="badge badge-neutral">Non-Rider</span>
+                                            {% endif %}
+                                        </td>
+
+                                        <td>{{ guest.get_riding_experience_display }}</td>
+
+                                        <td>
+                                            <div class="inline-list">
+                                                {% if guest.allergies %}
+                                                    <span class="badge badge-warning">Allergies</span>
+                                                {% endif %}
+
+                                                {% if guest.medical_notes %}
+                                                    <span class="badge badge-danger">Medical</span>
+                                                {% endif %}
+
+                                                {% if guest.food_requests %}
+                                                    <span class="badge badge-info">Food</span>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+
+                                        <td>
+                                            <div class="table-actions">
+                                                <a href="{% url 'reservations:reservation_guest_update' guest.pk %}" class="button button-small button-primary">
+                                                    Edit
+                                                </a>
+
+                                                <form method="post" action="{% url 'reservations:reservation_guest_delete' guest.pk %}">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="button button-small button-danger">Remove</button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+
+                                    {% if guest.allergies or guest.food_requests or guest.medical_notes or guest.notes %}
+                                        <tr>
+                                            <td colspan="9">
+                                                <div class="guest-note-summary">
+                                                    {% if guest.allergies %}
+                                                        <p><strong>Allergies:</strong> {{ guest.allergies }}</p>
+                                                    {% endif %}
+
+                                                    {% if guest.food_requests %}
+                                                        <p><strong>Food Requests:</strong> {{ guest.food_requests }}</p>
+                                                    {% endif %}
+
+                                                    {% if guest.medical_notes %}
+                                                        <p><strong>Medical:</strong> {{ guest.medical_notes }}</p>
+                                                    {% endif %}
+
+                                                    {% if guest.notes %}
+                                                        <p><strong>Notes:</strong> {{ guest.notes }}</p>
+                                                    {% endif %}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endif %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% else %}
+                <p class="text-muted mb-0">No guest information has been added to this reservation yet.</p>
+            {% endif %}
+        </div>
+
+        <div class="detail-card">
+            <div class="section-heading">
+                <div>
+                    <h2>Cabin Guest Assignment</h2>
+                    <p>Drag guests into the cabins they are staying in.</p>
+                </div>
+            </div>
+
+            <div class="guest-assignment-board">
+                <section
+                    class="guest-assignment-column unassigned-column js-guest-drop-zone"
+                    data-cabin-id=""
+                >
+                    <h3>Unassigned Guests</h3>
+
+                    <div class="guest-assignment-list">
+                        {% if unassigned_guests %}
+                            {% for guest in unassigned_guests %}
+                                <div
+                                    class="guest-assignment-card js-guest-card"
+                                    draggable="true"
+                                    data-guest-id="{{ guest.pk }}"
+                                    data-assign-url="{% url 'reservations:reservation_guest_assign_cabin' guest.pk %}"
+                                    data-unassign-url="{% url 'reservations:reservation_guest_unassign_cabin' guest.pk %}"
+                                >
+                                    <strong>{{ guest.client.display_name }}</strong>
+
+                                    <span>
+                                        {% if guest.age_at_stay %}
+                                            Age {{ guest.age_at_stay }}
+                                        {% else %}
+                                            Age unknown
+                                        {% endif %}
+                                    </span>
+
+                                    <div class="inline-list">
+                                        {% if guest.is_riding %}
+                                            <span class="badge badge-success">Riding</span>
+                                        {% else %}
+                                            <span class="badge badge-neutral">Non-Rider</span>
+                                        {% endif %}
+
+                                        {% if guest.allergies %}
+                                            <span class="badge badge-warning">Allergies</span>
+                                        {% endif %}
+
+                                        {% if guest.medical_notes %}
+                                            <span class="badge badge-danger">Medical</span>
+                                        {% endif %}
+                                    </div>
+
+                                    <form method="post" action="{% url 'reservations:reservation_guest_assign_cabin' guest.pk %}" class="guest-assignment-form" novalidate>
+                                        {% csrf_token %}
+
+                                        <select name="cabin" class="form-select">
+                                            <option value="">Choose cabin</option>
+                                            {% for section in cabin_guest_sections %}
+                                                <option value="{{ section.cabin.pk }}">
+                                                    {{ section.cabin.name }}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+
+                                        <button type="submit" class="button button-small button-primary">Assign</button>
+                                    </form>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted mb-0 empty-drop-message">No unassigned guests.</p>
+                        {% endif %}
+                    </div>
+                </section>
+
+                {% for section in cabin_guest_sections %}
+                    <section
+                        class="guest-assignment-column js-guest-drop-zone"
+                        data-cabin-id="{{ section.cabin.pk }}"
+                    >
+                        <h3>{{ section.cabin.name }}</h3>
+
+                        {% if section.cabin.cabin_number %}
+                            <p class="text-muted mb-2">Cabin #{{ section.cabin.cabin_number }}</p>
+                        {% endif %}
+
+                        <div class="guest-assignment-list">
+                            {% if section.guests %}
+                                {% for guest in section.guests %}
+                                    <div
+                                        class="guest-assignment-card js-guest-card"
+                                        draggable="true"
+                                        data-guest-id="{{ guest.pk }}"
+                                        data-assign-url="{% url 'reservations:reservation_guest_assign_cabin' guest.pk %}"
+                                        data-unassign-url="{% url 'reservations:reservation_guest_unassign_cabin' guest.pk %}"
+                                    >
+                                        <strong>{{ guest.client.display_name }}</strong>
+
+                                        <span>
+                                            {% if guest.age_at_stay %}
+                                                Age {{ guest.age_at_stay }}
+                                            {% else %}
+                                                Age unknown
+                                            {% endif %}
+                                        </span>
+
+                                        <div class="inline-list">
+                                            {% if guest.is_riding %}
+                                                <span class="badge badge-success">Riding</span>
+                                            {% else %}
+                                                <span class="badge badge-neutral">Non-Rider</span>
+                                            {% endif %}
+
+                                            {% if guest.allergies %}
+                                                <span class="badge badge-warning">Allergies</span>
+                                            {% endif %}
+
+                                            {% if guest.medical_notes %}
+                                                <span class="badge badge-danger">Medical</span>
+                                            {% endif %}
+                                        </div>
+
+                                        <form method="post" action="{% url 'reservations:reservation_guest_unassign_cabin' guest.pk %}">
+                                            {% csrf_token %}
+                                            <button type="submit" class="button button-small button-secondary">
+                                                Move to Unassigned
+                                            </button>
+                                        </form>
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                <p class="text-muted mb-0 empty-drop-message">No guests assigned to this cabin.</p>
+                            {% endif %}
+                        </div>
+                    </section>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="detail-card">
+            <h2>Notes</h2>
+
+            {% if reservation.notes %}
+                {{ reservation.notes|linebreaks }}
+            {% else %}
+                <p class="text-muted mb-0">No guest-facing notes have been added.</p>
+            {% endif %}
+        </div>
+
+        <div class="detail-card">
+            <h2>Internal Notes</h2>
+
+            {% if reservation.internal_notes %}
+                {{ reservation.internal_notes|linebreaks }}
+            {% else %}
+                <p class="text-muted mb-0">No internal notes have been added.</p>
+            {% endif %}
+        </div>
+    </section>
+
+    <aside class="panel-stack">
+        <div class="detail-card">
+            <h2>Contact Links</h2>
+
+            <div class="detail-list">
+                <div class="detail-row">
+                    <div class="detail-label">Primary Contact</div>
+                    <div class="detail-value">
+                        {% if reservation.primary_contact %}
+                            <a href="{% url 'clients:client_detail' reservation.primary_contact.pk %}">
+                                {{ reservation.primary_contact.display_name }}
+                            </a>
+                        {% else %}
+                            <span class="text-muted">Not assigned</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Household</div>
+                    <div class="detail-value">
+                        {% if reservation.household %}
+                            <a href="{% url 'clients:household_detail' reservation.household.pk %}">
+                                {{ reservation.household.name }}
+                            </a>
+                        {% else %}
+                            <span class="text-muted">Not assigned</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Travel Group</div>
+                    <div class="detail-value">
+                        {% if reservation.travel_group %}
+                            <a href="{% url 'clients:travel_group_detail' reservation.travel_group.pk %}">
+                                {{ reservation.travel_group.name }}
+                            </a>
+                        {% else %}
+                            <span class="text-muted">Not assigned</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="detail-card">
+            <h2>Record Info</h2>
+
+            <div class="detail-list">
+                <div class="detail-row">
+                    <div class="detail-label">Created</div>
+                    <div class="detail-value">{{ reservation.created_at }}</div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Updated</div>
+                    <div class="detail-value">{{ reservation.updated_at }}</div>
+                </div>
+            </div>
+        </div>
+    </aside>
+</div>
+{% endblock %}

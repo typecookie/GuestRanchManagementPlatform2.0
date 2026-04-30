@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}Reservation Grid | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Booking Platform{% endblock %}
+
+{% block page_title %}{{ month_name }} {{ year }} Cabin Grid{% endblock %}
+
+{% block page_subtitle %}
+Sunday-to-Sunday cabin reservation board. Click an available cabin week to create a booking.
+{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'reservations:reservation_list' %}" class="button button-secondary">Reservation List</a>
+<a href="{% url 'reservations:reservation_create' %}" class="button button-primary">New Reservation</a>
+{% endblock %}
+
+{% block content %}
+<div class="reservation-board-header">
+    <div class="reservation-board-nav">
+        <a
+            href="{% url 'reservations:reservation_grid' %}?year={{ previous_year }}&month={{ previous_month }}"
+            class="button button-secondary"
+        >
+            ← Previous Month
+        </a>
+
+        <div class="reservation-board-title">
+            <strong>{{ month_name }} {{ year }}</strong>
+            <span>Cabin availability by Sunday week</span>
+        </div>
+
+        <a
+            href="{% url 'reservations:reservation_grid' %}?year={{ next_year }}&month={{ next_month }}"
+            class="button button-secondary"
+        >
+            Next Month →
+        </a>
+    </div>
+
+    <div class="reservation-grid-legend">
+        <span class="legend-item">
+            <span class="legend-dot legend-penciled"></span>
+            Penciled In
+        </span>
+
+        <span class="legend-item">
+            <span class="legend-dot legend-confirmed"></span>
+            Confirmed
+        </span>
+
+        <span class="legend-item">
+            <span class="legend-dot legend-checked-in"></span>
+            Checked In
+        </span>
+
+        <span class="legend-item">
+            <span class="legend-dot legend-blocked"></span>
+            Blocked / Other
+        </span>
+
+        <span class="legend-item">
+            <span class="legend-dot legend-available"></span>
+            Available
+        </span>
+    </div>
+</div>
+
+<div class="reservation-grid-card reservation-board">
+    <div class="reservation-grid-scroll">
+        <table class="reservation-grid-table">
+            <thead>
+                <tr>
+                    <th class="reservation-grid-cabin-header">
+                        <span>Cabin</span>
+                    </th>
+
+                    {% for week in weeks %}
+                        <th class="reservation-grid-week-header">
+                            <span class="week-label">{{ week.label }}</span>
+                            <span class="week-subtitle">Sun-Sun</span>
+                        </th>
+                    {% endfor %}
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for row in grid_rows %}
+                    <tr>
+                        <th class="reservation-grid-cabin-name">
+                            <a href="{% url 'cabins:cabin_detail' row.cabin.pk %}">
+                                <span class="cabin-name-main">{{ row.cabin.name }}</span>
+
+                                {% if row.cabin.cabin_number %}
+                                    <span class="cabin-name-sub">#{{ row.cabin.cabin_number }}</span>
+                                {% endif %}
+                            </a>
+                        </th>
+
+                        {% for cell in row.cells %}
+                            {% if cell.is_available %}
+                                <td class="reservation-grid-cell reservation-grid-available">
+                                    <a href="{{ cell.create_url }}" class="reservation-grid-link available-link">
+                                        <span class="available-plus">+</span>
+                                        <span class="available-text">Book</span>
+                                    </a>
+                                </td>
+                            {% else %}
+                                <td class="reservation-grid-cell reservation-grid-booked">
+                                    <div class="reservation-week-track">
+                                        {% for item in cell.assignments %}
+                                            <a
+                                                href="{% url 'reservations:reservation_detail' item.reservation.pk %}"
+                                                class="reservation-grid-link booked-link reservation-status-{{ item.reservation.status }} {% if item.position.is_partial %}is-partial{% endif %}"
+                                                style="left: {{ item.position.left_percent }}%; width: {{ item.position.width_percent }}%;"
+                                            >
+                                                <span class="reservation-cell-name">
+                                                    {{ item.reservation.reservation_name }}
+                                                </span>
+
+                                                <span class="reservation-cell-meta">
+                                                    {{ item.reservation.get_status_display }}
+                                                </span>
+
+                                                <span class="reservation-cell-dates">
+                                                    {{ item.assignment.arrival_date }} → {{ item.assignment.departure_date }}
+                                                </span>
+                                            </a>
+                                        {% endfor %}
+                                    </div>
+                                </td>
+                            {% endif %}
+                        {% endfor %}
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="{{ weeks|length|add:1 }}">
+                            <div class="empty-state">
+                                <div class="empty-state-content">
+                                    <div class="empty-state-icon">🏠</div>
+                                    <h2>No active cabins</h2>
+                                    <p>Create active cabins before using the reservation grid.</p>
+                                    <a href="{% url 'cabins:cabin_create' %}" class="button button-primary">Add Cabin</a>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

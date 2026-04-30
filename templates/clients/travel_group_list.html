@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}Travel Groups | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Contact Book{% endblock %}
+
+{% block page_title %}Travel Groups{% endblock %}
+
+{% block page_subtitle %}
+View and manage multi-family trips, reunions, retreats, weddings, and other connected parties.
+{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'clients:client_list' %}" class="button button-secondary">Clients</a>
+<a href="{% url 'clients:household_list' %}" class="button button-secondary">Households</a>
+<a href="{% url 'clients:travel_group_create' %}" class="button button-primary">Add Travel Group</a>
+{% endblock %}
+
+{% block content %}
+<div class="stat-grid">
+    <div class="stat-card">
+        <span>Total Travel Groups</span>
+        <strong>{{ total_travel_groups }}</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Active</span>
+        <strong>{{ active_travel_groups }}</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Inactive</span>
+        <strong>{{ inactive_travel_groups }}</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Current Results</span>
+        <strong>{{ search_result_count }}</strong>
+    </div>
+</div>
+
+<div class="page-toolbar">
+    <div class="page-toolbar-main">
+        <form class="search-form" method="get">
+            <input
+                type="search"
+                name="q"
+                class="search-input"
+                placeholder="Search group name, primary contact, or notes"
+                value="{{ search_query }}"
+            >
+
+            <select name="status" class="form-select">
+                <option value="">All statuses</option>
+                <option value="active" {% if status_filter == "active" %}selected{% endif %}>Active</option>
+                <option value="inactive" {% if status_filter == "inactive" %}selected{% endif %}>Inactive</option>
+            </select>
+
+            <select name="group_type" class="form-select">
+                <option value="">All group types</option>
+                {% for value, label in group_type_choices %}
+                    <option value="{{ value }}" {% if group_type_filter == value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                {% endfor %}
+            </select>
+
+            <button type="submit" class="button button-secondary">Search</button>
+
+            {% if search_query or status_filter or group_type_filter %}
+                <a href="{% url 'clients:travel_group_list' %}" class="button button-secondary">Clear</a>
+            {% endif %}
+        </form>
+    </div>
+
+    <div class="page-toolbar-actions">
+        <a href="{% url 'clients:travel_group_create' %}" class="button button-primary">Add Travel Group</a>
+    </div>
+</div>
+
+{% if travel_groups %}
+    <div class="table-card">
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Travel Group</th>
+                        <th>Type</th>
+                        <th>Primary Contact</th>
+                        <th>Status</th>
+                        <th class="text-right">Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for travel_group in travel_groups %}
+                        <tr>
+                            <td><strong>{{ travel_group.name }}</strong></td>
+
+                            <td>{{ travel_group.get_group_type_display }}</td>
+
+                            <td>
+                                {% if travel_group.primary_contact %}
+                                    <a href="{% url 'clients:client_detail' travel_group.primary_contact.pk %}">
+                                        {{ travel_group.primary_contact.display_name }}
+                                    </a>
+                                {% else %}
+                                    <span class="table-muted">—</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if travel_group.is_active %}
+                                    <span class="badge badge-success">Active</span>
+                                {% else %}
+                                    <span class="badge badge-neutral">Inactive</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                <div class="table-actions">
+                                    <a href="{% url 'clients:travel_group_detail' travel_group.pk %}" class="button button-small button-secondary">View</a>
+                                    <a href="{% url 'clients:travel_group_update' travel_group.pk %}" class="button button-small button-primary">Edit</a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% else %}
+    <div class="empty-state">
+        <div class="empty-state-content">
+            <div class="empty-state-icon">👨‍👩‍👧‍👦</div>
+
+            {% if search_query or status_filter or group_type_filter %}
+                <h2>No travel groups found</h2>
+                <p>No travel groups matched your current search or filters.</p>
+                <a href="{% url 'clients:travel_group_list' %}" class="button button-secondary">Clear Search</a>
+            {% else %}
+                <h2>No travel groups yet</h2>
+                <p>Create travel groups for reunions, multi-family trips, weddings, retreats, and connected parties.</p>
+                <a href="{% url 'clients:travel_group_create' %}" class="button button-primary">Create First Travel Group</a>
+            {% endif %}
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+
+{% block title %}{{ travel_group.name }} | Travel Groups{% endblock %}
+
+{% block eyebrow %}Travel Group{% endblock %}
+
+{% block page_title %}{{ travel_group.name }}{% endblock %}
+
+{% block page_subtitle %}
+Manage connected households and guests for this multi-family trip, reunion, or related party.
+{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'clients:client_list' %}" class="button button-secondary">Back to Clients</a>
+{% if travel_group and travel_group.pk %}
+    <a href="{% url 'clients:travel_group_update' travel_group.pk %}" class="button button-primary">Edit Travel Group</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="detail-layout">
+    <section class="panel-stack">
+        <div class="detail-card">
+            <h2>Travel Group Details</h2>
+
+            <div class="detail-list">
+                <div class="detail-row">
+                    <div class="detail-label">Name</div>
+                    <div class="detail-value">{{ travel_group.name }}</div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Type</div>
+                    <div class="detail-value">{{ travel_group.get_group_type_display }}</div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Primary Contact</div>
+                    <div class="detail-value">
+                        {% if travel_group.primary_contact %}
+                            <a href="{% url 'clients:client_detail' travel_group.primary_contact.pk %}">
+                                {{ travel_group.primary_contact.display_name }}
+                            </a>
+                        {% else %}
+                            <span class="text-muted">Not assigned</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Status</div>
+                    <div class="detail-value">
+                        {% if travel_group.is_active %}
+                            <span class="badge badge-success">Active</span>
+                        {% else %}
+                            <span class="badge badge-neutral">Inactive</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="detail-card">
+            <div class="section-heading">
+                <div>
+                    <h2>Travel Group Members</h2>
+                    <p>Add households or individual clients connected to this group.</p>
+                </div>
+            </div>
+
+            <form method="post" action="{% url 'clients:travel_group_member_create' travel_group.pk %}" class="note-form">
+                {% csrf_token %}
+
+                {% if member_form.non_field_errors %}
+                    <div class="form-alert">
+                        {{ member_form.non_field_errors }}
+                    </div>
+                {% endif %}
+
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label for="{{ member_form.household.id_for_label }}">Household</label>
+                        {{ member_form.household }}
+                    </div>
+
+                    <div class="form-field">
+                        <label for="{{ member_form.client.id_for_label }}">Individual Client</label>
+                        {{ member_form.client }}
+                    </div>
+
+                    <div class="form-field">
+                        <label for="{{ member_form.role.id_for_label }}">Role</label>
+                        {{ member_form.role }}
+                    </div>
+
+                    <div class="form-field form-grid-full">
+                        <label for="{{ member_form.notes.id_for_label }}">Notes</label>
+                        {{ member_form.notes }}
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="button button-primary">Add Member</button>
+                </div>
+            </form>
+
+            <div class="divider"></div>
+
+            {% if memberships %}
+                <div class="table-card">
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Member</th>
+                                    <th>Member Type</th>
+                                    <th>Role</th>
+                                    <th>Notes</th>
+                                    <th class="text-right">Actions</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                {% for membership in memberships %}
+                                    <tr>
+                                        <td>
+                                            {% if membership.household %}
+                                                <a href="{% url 'clients:household_detail' membership.household.pk %}">
+                                                    <strong>{{ membership.household.name }}</strong>
+                                                </a>
+                                            {% elif membership.client %}
+                                                <a href="{% url 'clients:client_detail' membership.client.pk %}">
+                                                    <strong>{{ membership.client.display_name }}</strong>
+                                                </a>
+                                            {% endif %}
+                                        </td>
+
+                                        <td>
+                                            {% if membership.household %}
+                                                <span class="badge badge-info">Household</span>
+                                            {% else %}
+                                                <span class="badge badge-neutral">Client</span>
+                                            {% endif %}
+                                        </td>
+
+                                        <td>{{ membership.get_role_display }}</td>
+
+                                        <td>
+                                            {% if membership.notes %}
+                                                {{ membership.notes }}
+                                            {% else %}
+                                                <span class="table-muted">—</span>
+                                            {% endif %}
+                                        </td>
+
+                                        <td>
+                                            <div class="table-actions">
+                                                <form method="post" action="{% url 'clients:travel_group_member_delete' membership.pk %}">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="button button-small button-danger">
+                                                        Remove
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% else %}
+                <p class="text-muted mb-0">No households or clients have been added to this travel group yet.</p>
+            {% endif %}
+        </div>
+
+        <div class="detail-card">
+            <h2>Notes</h2>
+
+            {% if travel_group.notes %}
+                {{ travel_group.notes|linebreaks }}
+            {% else %}
+                <p class="text-muted mb-0">No travel group notes have been added.</p>
+            {% endif %}
+        </div>
+    </section>
+
+    <aside class="panel-stack">
+        <div class="detail-card">
+            <h2>Future Reservations</h2>
+            <p class="text-muted mb-0">
+                Reservations for this travel group will appear here once reservations are connected.
+            </p>
+        </div>
+
+        <div class="detail-card">
+            <h2>Record Info</h2>
+
+            <div class="detail-list">
+                <div class="detail-row">
+                    <div class="detail-label">Created</div>
+                    <div class="detail-value">{{ travel_group.created_at }}</div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Updated</div>
+                    <div class="detail-value">{{ travel_group.updated_at }}</div>
+                </div>
+            </div>
+        </div>
+    </aside>
+</div>
+{% endblock %}

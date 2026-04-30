@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}{{ form_title }} | Cabins{% endblock %}
+
+{% block eyebrow %}Lodging Management{% endblock %}
+
+{% block page_title %}{{ form_title }}{% endblock %}
+
+{% block page_subtitle %}
+{{ form_subtitle }}
+{% endblock %}
+
+{% block page_actions %}
+{% if cabin %}
+    <a href="{% url 'cabins:cabin_detail' cabin.pk %}" class="button button-secondary">Cancel</a>
+{% else %}
+    <a href="{% url 'cabins:cabin_list' %}" class="button button-secondary">Cancel</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<form method="post" class="form-card">
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+        <div class="form-alert">
+            {{ form.non_field_errors }}
+        </div>
+    {% endif %}
+
+    <div class="form-grid">
+        <div class="form-field">
+            <label for="{{ form.name.id_for_label }}">Cabin Name</label>
+            {{ form.name }}
+            {% for error in form.name.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.cabin_number.id_for_label }}">Cabin Number</label>
+            {{ form.cabin_number }}
+            {% for error in form.cabin_number.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.capacity.id_for_label }}">Capacity</label>
+            {{ form.capacity }}
+            {% for error in form.capacity.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.sort_order.id_for_label }}">Sort Order</label>
+            {{ form.sort_order }}
+            {% for error in form.sort_order.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field form-grid-full">
+            <label for="{{ form.bed_configuration.id_for_label }}">Bed Configuration</label>
+            {{ form.bed_configuration }}
+            {% for error in form.bed_configuration.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.status.id_for_label }}">Cabin Status</label>
+            {{ form.status }}
+            {% for error in form.status.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.housekeeping_status.id_for_label }}">Housekeeping Status</label>
+            {{ form.housekeeping_status }}
+            {% for error in form.housekeeping_status.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field form-grid-full">
+            <label for="{{ form.description.id_for_label }}">Description</label>
+            {{ form.description }}
+            {% for error in form.description.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field form-grid-full">
+            <label for="{{ form.notes.id_for_label }}">Notes</label>
+            {{ form.notes }}
+            {% for error in form.notes.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field form-grid-full checkbox-field">
+            <label>
+                {{ form.is_active }}
+                Active cabin
+            </label>
+            {% for error in form.is_active.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="form-actions">
+        {% if cabin %}
+            <a href="{% url 'cabins:cabin_detail' cabin.pk %}" class="button button-secondary">Cancel</a>
+        {% else %}
+            <a href="{% url 'cabins:cabin_list' %}" class="button button-secondary">Cancel</a>
+        {% endif %}
+
+        <button type="submit" class="button button-primary">{{ submit_label }}</button>
+    </div>
+</form>
+{% endblock %}

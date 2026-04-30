@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+
+{% block title %}{{ form_title }} | Reservations{% endblock %}
+
+{% block eyebrow %}Booking Platform{% endblock %}
+
+{% block page_title %}{{ form_title }}{% endblock %}
+
+{% block page_subtitle %}
+{{ form_subtitle }}
+{% endblock %}
+
+{% block page_actions %}
+{% if reservation %}
+    <a href="{% url 'reservations:reservation_detail' reservation.pk %}" class="button button-secondary">Cancel</a>
+{% else %}
+    <a href="{% url 'reservations:reservation_list' %}" class="button button-secondary">Cancel</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<form method="post" class="form-card">
+    {% csrf_token %}
+
+    {% if selected_cabin %}
+        <div class="form-notice">
+            This reservation will be assigned to <strong>{{ selected_cabin.name }}</strong>
+            after it is created.
+        </div>
+
+        <input type="hidden" name="grid_cabin_id" value="{{ selected_cabin.pk }}">
+    {% endif %}
+
+    {% if form.non_field_errors %}
+        <div class="form-alert">
+            {{ form.non_field_errors }}
+        </div>
+    {% endif %}
+
+    <div class="form-grid">
+        <div class="form-field form-grid-full">
+            <label for="{{ form.reservation_name.id_for_label }}">Reservation Name</label>
+            {{ form.reservation_name }}
+            {% for error in form.reservation_name.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.reservation_type.id_for_label }}">Reservation Type</label>
+            {{ form.reservation_type }}
+            {% for error in form.reservation_type.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.status.id_for_label }}">Status</label>
+            {{ form.status }}
+            {% for error in form.status.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.primary_contact.id_for_label }}">Primary Contact</label>
+            {{ form.primary_contact }}
+            {% for error in form.primary_contact.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.household.id_for_label }}">Household</label>
+            {{ form.household }}
+            {% for error in form.household.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field form-grid-full">
+            <label for="{{ form.travel_group.id_for_label }}">Travel Group</label>
+            {{ form.travel_group }}
+            {% for error in form.travel_group.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.arrival_date.id_for_label }}">Arrival Date</label>
+            {{ form.arrival_date }}
+            {% for error in form.arrival_date.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.departure_date.id_for_label }}">Departure Date</label>
+            {{ form.departure_date }}
+            {% for error in form.departure_date.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.check_in_time.id_for_label }}">Check-In Time</label>
+            {{ form.check_in_time }}
+            {% for error in form.check_in_time.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.check_out_time.id_for_label }}">Check-Out Time</label>
+            {{ form.check_out_time }}
+            {% for error in form.check_out_time.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.adult_count.id_for_label }}">Adults</label>
+            {{ form.adult_count }}
+            {% for error in form.adult_count.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.child_count.id_for_label }}">Children</label>
+            {{ form.child_count }}
+            {% for error in form.child_count.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.guest_count.id_for_label }}">Total Guest Count</label>
+            {{ form.guest_count }}
+            {% for error in form.guest_count.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field form-grid-full">
+            <label for="{{ form.notes.id_for_label }}">Guest-Facing Notes</label>
+            {{ form.notes }}
+            {% for error in form.notes.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field form-grid-full">
+            <label for="{{ form.internal_notes.id_for_label }}">Internal Notes</label>
+            {{ form.internal_notes }}
+            {% for error in form.internal_notes.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="form-actions">
+        {% if reservation %}
+            <a href="{% url 'reservations:reservation_detail' reservation.pk %}" class="button button-secondary">Cancel</a>
+        {% else %}
+            <a href="{% url 'reservations:reservation_list' %}" class="button button-secondary">Cancel</a>
+        {% endif %}
+
+        <button type="submit" class="button button-primary">{{ submit_label }}</button>
+    </div>
+</form>
+{% endblock %}

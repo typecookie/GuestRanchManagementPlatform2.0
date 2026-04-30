@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Operations{% endblock %}
+
+{% block page_subtitle %}
+Welcome to your guest ranch command center.
+{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'reservations:reservation_create' %}" class="button button-primary">New Reservation</a>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-layout">
+    <section class="dashboard-main">
+        <div class="section-heading">
+            <div>
+                <h2>Management Areas</h2>
+                <p>Open a module to manage daily ranch operations.</p>
+            </div>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="dashboard-card">
+                <div class="dashboard-card-icon">👥</div>
+                <h3>Clients</h3>
+                <p>Manage guest contact records, family groups, notes, and preferences.</p>
+                <a href="{% url 'clients:contact_dashboard' %}" class="card-link">Open Clients</a>
+            </div>
+
+            <div class="dashboard-card">
+                <div class="dashboard-card-icon">📅</div>
+                <h3>Reservations</h3>
+                <p>Track stays, cabin assignments, guest counts, arrivals, and departures.</p>
+                <a href="{% url 'reservations:reservation_list' %}" class="card-link">Open Reservations</a>
+            
+                <a href="{% url 'reservations:reservation_grid' %}" class="card-link">Open Reservation Grid</a>
+            </div>
+
+            <div class="dashboard-card">
+                <div class="dashboard-card-icon">🐴</div>
+                <h3>Horses</h3>
+                <p>View horse availability, health notes, riding levels, and assignments.</p>
+                <a href="{% url 'horses:horse_list' %}" class="card-link">Open Horses</a>
+            </div>
+
+            <div class="dashboard-card">
+                <div class="dashboard-card-icon">🏠</div>
+                <h3>Cabins</h3>
+                <p>Monitor lodging status, capacity, housekeeping, and maintenance needs.</p>
+                <a href="{% url 'cabins:cabin_list' %}" class="card-link">Open Cabins</a>
+            </div>
+
+            <div class="dashboard-card">
+                <div class="dashboard-card-icon">🚙</div>
+                <h3>Vehicles</h3>
+                <p>Manage ranch vehicles, mileage, maintenance status, and assignments.</p>
+                <a href="{% url 'vehicles:vehicle_list' %}" class="card-link">Open Vehicles</a>
+            </div>
+
+            <div class="dashboard-card">
+                <div class="dashboard-card-icon">🌄</div>
+                <h3>Ranch Operations</h3>
+                <p>Plan activities, maintenance tasks, inventory, schedules, and reports.</p>
+                <a href="{% url 'ranch:ranch_operations' %}" class="card-link">Open Operations</a>
+            </div>
+        </div>
+    </section>
+
+    <aside class="dashboard-sidebar">
+        <section class="side-panel">
+            <div class="section-heading compact">
+                <div>
+                    <h2>Today at the Ranch</h2>
+                    <p>Daily operational snapshot.</p>
+                </div>
+            </div>
+
+            <div class="mini-list">
+                <div class="mini-list-item">
+                    <span>Arrivals</span>
+                    <strong>0</strong>
+                </div>
+
+                <div class="mini-list-item">
+                    <span>Departures</span>
+                    <strong>0</strong>
+                </div>
+
+                <div class="mini-list-item">
+                    <span>Scheduled Rides</span>
+                    <strong>0</strong>
+                </div>
+
+                <div class="mini-list-item">
+                    <span>Open Tasks</span>
+                    <strong>0</strong>
+                </div>
+            </div>
+        </section>
+
+        <section class="side-panel">
+            <div class="section-heading compact">
+                <div>
+                    <h2>Needs Attention</h2>
+                    <p>Items to watch as records are added.</p>
+                </div>
+            </div>
+
+            <div class="attention-list">
+                <div class="attention-item">
+                    <span class="badge badge-neutral">Cabins</span>
+                    <p>No maintenance alerts yet.</p>
+                </div>
+
+                <div class="attention-item">
+                    <span class="badge badge-neutral">Horses</span>
+                    <p>No horse care alerts yet.</p>
+                </div>
+
+                <div class="attention-item">
+                    <span class="badge badge-neutral">Vehicles</span>
+                    <p>No service alerts yet.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="side-panel">
+            <div class="section-heading compact">
+                <div>
+                    <h2>Quick Actions</h2>
+                    <p>Common starting points.</p>
+                </div>
+            </div>
+
+            <div class="quick-action-list">
+                <a href="{% url 'clients:client_list' %}" class="quick-action">Add or find a client</a>
+                <a href="{% url 'reservations:reservation_list' %}" class="quick-action">Create reservation</a>
+                <a href="{% url 'cabins:cabin_list' %}" class="quick-action">Check cabin status</a>
+                <a href="{% url 'horses:horse_list' %}" class="quick-action">Check horse availability</a>
+            </div>
+        </section>
+    </aside>
+</div>
+{% endblock %}

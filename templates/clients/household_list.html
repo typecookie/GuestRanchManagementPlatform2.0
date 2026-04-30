@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block title %}Households | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Contact Book{% endblock %}
+
+{% block page_title %}Households{% endblock %}
+
+{% block page_subtitle %}
+View and manage family units, household contacts, billing contacts, and related guests.
+{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'clients:client_list' %}" class="button button-secondary">Clients</a>
+<a href="{% url 'clients:travel_group_list' %}" class="button button-secondary">Travel Groups</a>
+<a href="{% url 'clients:household_create' %}" class="button button-primary">Add Household</a>
+{% endblock %}
+
+{% block content %}
+<div class="stat-grid">
+    <div class="stat-card">
+        <span>Total Households</span>
+        <strong>{{ total_households }}</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Active</span>
+        <strong>{{ active_households }}</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Inactive</span>
+        <strong>{{ inactive_households }}</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Current Results</span>
+        <strong>{{ search_result_count }}</strong>
+    </div>
+</div>
+
+<div class="page-toolbar">
+    <div class="page-toolbar-main">
+        <form class="search-form" method="get">
+            <input
+                type="search"
+                name="q"
+                class="search-input"
+                placeholder="Search household, contact, city, or state"
+                value="{{ search_query }}"
+            >
+
+            <select name="status" class="form-select">
+                <option value="">All statuses</option>
+                <option value="active" {% if status_filter == "active" %}selected{% endif %}>Active</option>
+                <option value="inactive" {% if status_filter == "inactive" %}selected{% endif %}>Inactive</option>
+            </select>
+
+            <button type="submit" class="button button-secondary">Search</button>
+
+            {% if search_query or status_filter %}
+                <a href="{% url 'clients:household_list' %}" class="button button-secondary">Clear</a>
+            {% endif %}
+        </form>
+    </div>
+
+    <div class="page-toolbar-actions">
+        <a href="{% url 'clients:household_create' %}" class="button button-primary">Add Household</a>
+    </div>
+</div>
+
+{% if households %}
+    <div class="table-card">
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Household</th>
+                        <th>Primary Contact</th>
+                        <th>Billing Contact</th>
+                        <th>Location</th>
+                        <th>Status</th>
+                        <th class="text-right">Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for household in households %}
+                        <tr>
+                            <td><strong>{{ household.name }}</strong></td>
+
+                            <td>
+                                {% if household.primary_contact %}
+                                    <a href="{% url 'clients:client_detail' household.primary_contact.pk %}">
+                                        {{ household.primary_contact.display_name }}
+                                    </a>
+                                {% else %}
+                                    <span class="table-muted">—</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if household.billing_contact %}
+                                    <a href="{% url 'clients:client_detail' household.billing_contact.pk %}">
+                                        {{ household.billing_contact.display_name }}
+                                    </a>
+                                {% else %}
+                                    <span class="table-muted">—</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if household.city or household.state %}
+                                    {{ household.city }}{% if household.city and household.state %}, {% endif %}{{ household.state }}
+                                {% else %}
+                                    <span class="table-muted">—</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if household.is_active %}
+                                    <span class="badge badge-success">Active</span>
+                                {% else %}
+                                    <span class="badge badge-neutral">Inactive</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                <div class="table-actions">
+                                    <a href="{% url 'clients:household_detail' household.pk %}" class="button button-small button-secondary">View</a>
+                                    <a href="{% url 'clients:household_update' household.pk %}" class="button button-small button-primary">Edit</a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% else %}
+    <div class="empty-state">
+        <div class="empty-state-content">
+            <div class="empty-state-icon">🏠</div>
+
+            {% if search_query or status_filter %}
+                <h2>No households found</h2>
+                <p>No households matched your current search or filters.</p>
+                <a href="{% url 'clients:household_list' %}" class="button button-secondary">Clear Search</a>
+            {% else %}
+                <h2>No households yet</h2>
+                <p>Create household records for family units and related guests.</p>
+                <a href="{% url 'clients:household_create' %}" class="button button-primary">Create First Household</a>
+            {% endif %}
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

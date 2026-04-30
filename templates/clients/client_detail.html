@@ -1,0 +1,290 @@
+
+{% extends "base.html" %}
+
+{% block title %}{{ client.display_name }} | Clients{% endblock %}
+
+{% block eyebrow %}Client Profile{% endblock %}
+
+{% block page_title %}{{ client.display_name }}{% endblock %}
+
+{% block page_subtitle %}
+View contact details, preferences, household connections, travel groups, and notes.
+{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'clients:client_list' %}" class="button button-secondary">Back to People</a>
+<a href="{% url 'clients:client_update' client.pk %}" class="button button-primary">Edit Client</a>
+{% endblock %}
+
+{% block content %}
+<div class="detail-layout">
+    <section class="panel-stack">
+        <div class="detail-card">
+            <h2>Client Details</h2>
+
+            <div class="detail-list">
+                <div class="detail-row">
+                    <div class="detail-label">Full Name</div>
+                    <div class="detail-value">{{ client.full_name }}</div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Preferred Name</div>
+                    <div class="detail-value">
+                        {% if client.preferred_name %}
+                            {{ client.preferred_name }}
+                        {% else %}
+                            <span class="text-muted">Not provided</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Client Type</div>
+                    <div class="detail-value">{{ client.get_client_type_display }}</div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Riding Level</div>
+                    <div class="detail-value">{{ client.get_riding_level_display }}</div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Date of Birth</div>
+                    <div class="detail-value">
+                        {% if client.date_of_birth %}
+                            {{ client.date_of_birth }}
+                        {% else %}
+                            <span class="text-muted">Not provided</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Status</div>
+                    <div class="detail-value">
+                        {% if client.is_active %}
+                            <span class="badge badge-success">Active</span>
+                        {% else %}
+                            <span class="badge badge-neutral">Inactive</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="detail-card">
+            <h2>Contact Information</h2>
+
+            <div class="detail-list">
+                <div class="detail-row">
+                    <div class="detail-label">Email</div>
+                    <div class="detail-value">
+                        {% if client.email %}
+                            <a href="mailto:{{ client.email }}">{{ client.email }}</a>
+                        {% else %}
+                            <span class="text-muted">Not provided</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Phone</div>
+                    <div class="detail-value">
+                        {% if client.phone %}
+                            <a href="tel:{{ client.phone }}">{{ client.phone }}</a>
+                        {% else %}
+                            <span class="text-muted">Not provided</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Alternate Phone</div>
+                    <div class="detail-value">
+                        {% if client.alternate_phone %}
+                            <a href="tel:{{ client.alternate_phone }}">{{ client.alternate_phone }}</a>
+                        {% else %}
+                            <span class="text-muted">Not provided</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="detail-card">
+            <h2>Guest Notes & Preferences</h2>
+
+            <div class="detail-list">
+                <div class="detail-row">
+                    <div class="detail-label">Dietary Notes</div>
+                    <div class="detail-value">
+                        {% if client.dietary_notes %}
+                            {{ client.dietary_notes|linebreaks }}
+                        {% else %}
+                            <span class="text-muted">No dietary notes.</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Medical Notes</div>
+                    <div class="detail-value">
+                        {% if client.medical_notes %}
+                            {{ client.medical_notes|linebreaks }}
+                        {% else %}
+                            <span class="text-muted">No medical notes.</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">General Notes</div>
+                    <div class="detail-value">
+                        {% if client.general_notes %}
+                            {{ client.general_notes|linebreaks }}
+                        {% else %}
+                            <span class="text-muted">No general notes.</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="detail-card">
+            <div class="section-heading">
+                <div>
+                    <h2>Staff Notes</h2>
+                    <p>Add dated notes for preferences, follow-ups, riding concerns, dietary needs, and internal history.</p>
+                </div>
+            </div>
+
+            <form method="post" action="{% url 'clients:client_note_create' client.pk %}" class="note-form">
+                {% csrf_token %}
+
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label for="{{ note_form.title.id_for_label }}">Title</label>
+                        {{ note_form.title }}
+                    </div>
+
+                    <div class="form-field">
+                        <label for="{{ note_form.note_type.id_for_label }}">Note Type</label>
+                        {{ note_form.note_type }}
+                    </div>
+
+                    <div class="form-field form-grid-full">
+                        <label for="{{ note_form.note.id_for_label }}">Note</label>
+                        {{ note_form.note }}
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="button button-primary">Add Note</button>
+                </div>
+            </form>
+
+            <div class="divider"></div>
+
+            {% if notes %}
+                <div class="panel-stack">
+                    {% for note in notes %}
+                        <div class="note-card">
+                            <div class="note-card-header">
+                                <strong>{{ note.title }}</strong>
+                                <span class="badge badge-info">{{ note.get_note_type_display }}</span>
+                            </div>
+
+                            <div>{{ note.note|linebreaks }}</div>
+
+                            <div class="note-meta">
+                                Added {{ note.created_at }}
+                                {% if note.created_by %}
+                                    by {{ note.created_by.get_username }}
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-muted mb-0">No staff notes have been added for this client yet.</p>
+            {% endif %}
+        </div>
+    </section>
+
+    <aside class="panel-stack">
+        <div class="detail-card">
+            <h2>Households</h2>
+
+            {% if household_memberships %}
+                <div class="side-list">
+                    {% for membership in household_memberships %}
+                        <div class="side-list-item">
+                            <a href="{% url 'clients:household_detail' membership.household.pk %}">
+                                <strong>{{ membership.household.name }}</strong>
+                            </a>
+                            <span>{{ membership.get_relationship_display }}</span>
+
+                            <div class="inline-list">
+                                {% if membership.is_primary_contact %}
+                                    <span class="badge badge-success">Primary Contact</span>
+                                {% endif %}
+
+                                {% if membership.is_billing_contact %}
+                                    <span class="badge badge-info">Billing Contact</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-muted mb-0">This client is not connected to a household yet.</p>
+            {% endif %}
+        </div>
+
+        <div class="detail-card">
+            <h2>Travel Groups</h2>
+
+            {% if travel_group_memberships %}
+                <div class="side-list">
+                    {% for membership in travel_group_memberships %}
+                        <div class="side-list-item">
+                            <a href="{% url 'clients:travel_group_detail' membership.travel_group.pk %}">
+                                <strong>{{ membership.travel_group.name }}</strong>
+                            </a>
+                            <span>{{ membership.get_role_display }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-muted mb-0">This client is not connected to a travel group yet.</p>
+            {% endif %}
+        </div>
+
+        <div class="detail-card">
+            <h2>Future Reservation History</h2>
+            <p class="text-muted mb-0">
+                Reservation history will appear here once the reservation platform is connected.
+            </p>
+        </div>
+
+        <div class="detail-card">
+            <h2>Record Info</h2>
+
+            <div class="detail-list">
+                <div class="detail-row">
+                    <div class="detail-label">Created</div>
+                    <div class="detail-value">{{ client.created_at }}</div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Updated</div>
+                    <div class="detail-value">{{ client.updated_at }}</div>
+                </div>
+            </div>
+        </div>
+    </aside>
+</div>
+{% endblock %}
+</body>
+</html>

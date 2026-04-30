@@ -1,0 +1,86 @@
+
+{% extends "base.html" %}
+
+{% block title %}{{ form_title }} | Travel Groups{% endblock %}
+
+{% block eyebrow %}Travel Groups{% endblock %}
+
+{% block page_title %}{{ form_title }}{% endblock %}
+
+{% block page_subtitle %}
+{{ form_subtitle }}
+{% endblock %}
+
+{% block page_actions %}
+{% if travel_group and travel_group.pk %}
+    <a href="{% url 'clients:travel_group_detail' travel_group.pk %}" class="button button-secondary">Cancel</a>
+{% else %}
+    <a href="{% url 'clients:travel_group_list' %}" class="button button-secondary">Cancel</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<form method="post" class="form-card">
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+        <div class="form-alert">
+            {{ form.non_field_errors }}
+        </div>
+    {% endif %}
+
+    <div class="form-grid">
+        <div class="form-field form-grid-full">
+            <label for="{{ form.name.id_for_label }}">Travel Group Name</label>
+            {{ form.name }}
+            {% for error in form.name.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.group_type.id_for_label }}">Group Type</label>
+            {{ form.group_type }}
+            {% for error in form.group_type.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.primary_contact.id_for_label }}">Primary Contact</label>
+            {{ form.primary_contact }}
+            {% for error in form.primary_contact.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field form-grid-full">
+            <label for="{{ form.notes.id_for_label }}">Notes</label>
+            {{ form.notes }}
+            {% for error in form.notes.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field form-grid-full checkbox-field">
+            <label>
+                {{ form.is_active }}
+                Active travel group
+            </label>
+            {% for error in form.is_active.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="form-actions">
+        {% if travel_group and travel_group.pk %}
+            <a href="{% url 'clients:travel_group_detail' travel_group.pk %}" class="button button-secondary">Cancel</a>
+        {% else %}
+            <a href="{% url 'clients:client_list' %}" class="button button-secondary">Cancel</a>
+        {% endif %}
+
+        <button type="submit" class="button button-primary">{{ submit_label }}</button>
+    </div>
+</form>
+{% endblock %}

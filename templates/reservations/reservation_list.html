@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}Reservations | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Booking Platform{% endblock %}
+
+{% block page_title %}Reservations{% endblock %}
+
+{% block page_subtitle %}
+Track guest stays, cabin assignments, work crew lodging, farrier stays, and reservation status.
+{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'reservations:reservation_grid' %}" class="button button-secondary">Cabin Grid</a>
+<a href="{% url 'reservations:reservation_create' %}" class="button button-primary">New Reservation</a>
+{% endblock %}
+
+{% block content %}
+<div class="stat-grid">
+    <div class="stat-card">
+        <span>Total Reservations</span>
+        <strong>{{ total_reservations }}</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Penciled In</span>
+        <strong>{{ penciled_reservations }}</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Confirmed</span>
+        <strong>{{ confirmed_reservations }}</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Current Results</span>
+        <strong>{{ current_results }}</strong>
+    </div>
+</div>
+
+<div class="page-toolbar">
+    <div class="page-toolbar-main">
+        <form method="get" class="search-form">
+            <input
+                type="search"
+                name="q"
+                class="search-input"
+                placeholder="Search reservations, clients, households, or groups"
+                value="{{ search_query }}"
+            >
+
+            <select name="status" class="form-select">
+                <option value="">All statuses</option>
+                {% for value, label in status_choices %}
+                    <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                {% endfor %}
+            </select>
+
+            <select name="reservation_type" class="form-select">
+                <option value="">All reservation types</option>
+                {% for value, label in reservation_type_choices %}
+                    <option value="{{ value }}" {% if reservation_type_filter == value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                {% endfor %}
+            </select>
+
+            <button type="submit" class="button button-secondary">Search</button>
+
+            {% if search_query or status_filter or reservation_type_filter %}
+                <a href="{% url 'reservations:reservation_list' %}" class="button button-secondary">Clear</a>
+            {% endif %}
+        </form>
+    </div>
+
+    <div class="page-toolbar-actions">
+        <a href="{% url 'reservations:reservation_grid' %}" class="button button-secondary">Cabin Grid</a>
+        <a href="{% url 'reservations:reservation_create' %}" class="button button-primary">New Reservation</a>
+    </div>
+</div>
+
+{% if reservations %}
+    <div class="table-card">
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Reservation</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Dates</th>
+                        <th>Primary Contact</th>
+                        <th>Group</th>
+                        <th>Guests</th>
+                        <th class="text-right">Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for reservation in reservations %}
+                        <tr>
+                            <td><strong>{{ reservation.reservation_name }}</strong></td>
+
+                            <td>{{ reservation.get_reservation_type_display }}</td>
+
+                            <td>
+                                {% if reservation.status == "confirmed" %}
+                                    <span class="badge badge-success">{{ reservation.get_status_display }}</span>
+                                {% elif reservation.status == "penciled" or reservation.status == "inquiry" %}
+                                    <span class="badge badge-warning">{{ reservation.get_status_display }}</span>
+                                {% elif reservation.status == "cancelled" %}
+                                    <span class="badge badge-danger">{{ reservation.get_status_display }}</span>
+                                {% else %}
+                                    <span class="badge badge-info">{{ reservation.get_status_display }}</span>
+                                {% endif %}
+                            </td>
+
+                            <td>{{ reservation.arrival_date }} to {{ reservation.departure_date }}</td>
+
+                            <td>
+                                {% if reservation.primary_contact %}
+                                    <a href="{% url 'clients:client_detail' reservation.primary_contact.pk %}">
+                                        {{ reservation.primary_contact.display_name }}
+                                    </a>
+                                {% else %}
+                                    <span class="table-muted">—</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if reservation.travel_group %}
+                                    <a href="{% url 'clients:travel_group_detail' reservation.travel_group.pk %}">
+                                        {{ reservation.travel_group.name }}
+                                    </a>
+                                {% elif reservation.household %}
+                                    <a href="{% url 'clients:household_detail' reservation.household.pk %}">
+                                        {{ reservation.household.name }}
+                                    </a>
+                                {% else %}
+                                    <span class="table-muted">—</span>
+                                {% endif %}
+                            </td>
+
+                            <td>{{ reservation.display_guest_count }}</td>
+
+                            <td>
+                                <div class="table-actions">
+                                    <a href="{% url 'reservations:reservation_detail' reservation.pk %}" class="button button-small button-secondary">View</a>
+                                    <a href="{% url 'reservations:reservation_update' reservation.pk %}" class="button button-small button-primary">Edit</a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% else %}
+    <div class="empty-state">
+        <div class="empty-state-content">
+            <div class="empty-state-icon">📅</div>
+
+            {% if search_query or status_filter or reservation_type_filter %}
+                <h2>No reservations found</h2>
+                <p>No reservations matched your current search or filters.</p>
+                <a href="{% url 'reservations:reservation_list' %}" class="button button-secondary">Clear Search</a>
+            {% else %}
+                <h2>No reservations yet</h2>
+                <p>Create the first reservation for a guest stay, work crew, farrier visit, or cabin block.</p>
+                <a href="{% url 'reservations:reservation_create' %}" class="button button-primary">Create First Reservation</a>
+            {% endif %}
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

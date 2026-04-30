@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Horses | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Horse Management{% endblock %}
+
+{% block page_title %}Horses{% endblock %}
+
+{% block page_subtitle %}
+Manage horse profiles, availability, riding suitability, care notes, and assignments.
+{% endblock %}
+
+{% block page_actions %}
+<a href="#" class="button button-primary">Add Horse</a>
+{% endblock %}
+
+{% block content %}
+<div class="stat-grid">
+    <div class="stat-card">
+        <span>Total Horses</span>
+        <strong>0</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Available</span>
+        <strong>0</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Assigned</span>
+        <strong>0</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Needs Care</span>
+        <strong>0</strong>
+    </div>
+</div>
+
+<div class="page-toolbar">
+    <div class="page-toolbar-main">
+        <form class="search-form" method="get">
+            <input
+                type="search"
+                name="q"
+                class="search-input"
+                placeholder="Search horses by name, breed, or notes"
+            >
+
+            <select name="status" class="form-select">
+                <option value="">All horse statuses</option>
+                <option value="available">Available</option>
+                <option value="assigned">Assigned</option>
+                <option value="resting">Resting</option>
+                <option value="needs_care">Needs care</option>
+                <option value="retired">Retired</option>
+            </select>
+
+            <button type="submit" class="button button-secondary">Search</button>
+        </form>
+    </div>
+
+    <div class="page-toolbar-actions">
+        <a href="#" class="button button-secondary">Care Log</a>
+        <a href="#" class="button button-primary">Add Horse</a>
+    </div>
+</div>
+
+<div class="empty-state">
+    <div class="empty-state-content">
+        <div class="empty-state-icon">🐴</div>
+        <h2>No horses yet</h2>
+        <p>
+            Once horse management is built, this page will show horse profiles,
+            rider suitability, health notes, availability, and ranch assignments.
+        </p>
+        <a href="#" class="button button-primary">Create First Horse</a>
+    </div>
+</div>
+{% endblock %}

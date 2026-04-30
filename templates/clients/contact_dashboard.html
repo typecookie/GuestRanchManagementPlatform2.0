@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}Contact Book | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Contact Book{% endblock %}
+
+{% block page_title %}Contact Book{% endblock %}
+
+{% block page_subtitle %}
+Manage individual guests, households, family units, and multi-family travel groups.
+{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'clients:client_create' %}" class="button button-primary">Add Client</a>
+{% endblock %}
+
+{% block content %}
+<div class="stat-grid">
+    <div class="stat-card">
+        <span>Total Clients</span>
+        <strong>{{ total_clients }}</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Active Clients</span>
+        <strong>{{ active_clients }}</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Households</span>
+        <strong>{{ total_households }}</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Travel Groups</span>
+        <strong>{{ total_travel_groups }}</strong>
+    </div>
+</div>
+
+<div class="dashboard-layout">
+    <section class="dashboard-main">
+        <div class="section-heading">
+            <div>
+                <h2>Contact Book Areas</h2>
+                <p>Choose the type of contact record you want to manage.</p>
+            </div>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="dashboard-card">
+                <div class="dashboard-card-icon">👤</div>
+                <h3>People</h3>
+                <p>Manage individual guests, contact details, riding levels, notes, and preferences.</p>
+                <a href="{% url 'clients:client_list' %}" class="card-link">Open People</a>
+            </div>
+
+            <div class="dashboard-card">
+                <div class="dashboard-card-icon">🏠</div>
+                <h3>Households</h3>
+                <p>Manage family units, primary contacts, billing contacts, and related guests.</p>
+                <a href="{% url 'clients:household_list' %}" class="card-link">Open Households</a>
+            </div>
+
+            <div class="dashboard-card">
+                <div class="dashboard-card-icon">👨‍👩‍👧‍👦</div>
+                <h3>Travel Groups</h3>
+                <p>Manage reunions, multi-family trips, retreats, weddings, and connected parties.</p>
+                <a href="{% url 'clients:travel_group_list' %}" class="card-link">Open Travel Groups</a>
+            </div>
+        </div>
+    </section>
+
+    <aside class="dashboard-sidebar">
+        <section class="side-panel">
+            <div class="section-heading compact">
+                <div>
+                    <h2>Quick Actions</h2>
+                    <p>Create new contact records.</p>
+                </div>
+            </div>
+
+            <div class="quick-action-list">
+                <a href="{% url 'clients:client_create' %}" class="quick-action">Add individual client</a>
+                <a href="{% url 'clients:household_create' %}" class="quick-action">Add household</a>
+                <a href="{% url 'clients:travel_group_create' %}" class="quick-action">Add travel group</a>
+            </div>
+        </section>
+
+        <section class="side-panel">
+            <div class="section-heading compact">
+                <div>
+                    <h2>Future Enhancements</h2>
+                    <p>Coming later.</p>
+                </div>
+            </div>
+
+            <div class="attention-list">
+                <div class="attention-item">
+                    <span class="badge badge-neutral">Reservations</span>
+                    <p>Reservation history will connect to clients, households, and travel groups.</p>
+                </div>
+
+                <div class="attention-item">
+                    <span class="badge badge-neutral">Follow-Ups</span>
+                    <p>Staff follow-up tasks and reminders can live here later.</p>
+                </div>
+            </div>
+        </section>
+    </aside>
+</div>
+{% endblock %}

@@ -1,0 +1,5 @@
+include manage.py
+recursive-include apps *.py *.html *.js *.css
+recursive-include templates *.html
+recursive-include static *.css *.js *.png *.jpg *.jpeg *.gif *.svg
+recursive-include guestranchmanagementplatform *.py

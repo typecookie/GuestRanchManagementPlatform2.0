@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Dining Hall Guest List | Ranch Office{% endblock %}
+
+{% block eyebrow %}Weekly Report{% endblock %}
+
+{% block page_title %}Dining Hall Guest List{% endblock %}
+
+{% block page_subtitle %}
+    Week of {{ week_start|date:"M j, Y" }} to {{ week_end|date:"M j, Y" }}
+{% endblock %}
+
+{% block page_actions %}
+    <a href="{% url 'ranch:office_dashboard' %}?week={{ week_start|date:'Y-m-d' }}" class="button button-secondary no-print">
+        Back to Office
+    </a>
+    <button type="button" class="button button-primary no-print" onclick="window.print()">
+        Print Report
+    </button>
+{% endblock %}
+
+{% block content %}
+    <div class="print-report dining-report">
+        <div class="print-report-header">
+            <h2>Dining Hall Guest List</h2>
+            <p>
+                Week of {{ week_start|date:"M j, Y" }} to {{ week_end|date:"M j, Y" }}
+            </p>
+            <p>
+                {{ reservation_count }} reservation(s) · {{ guest_count }} guest(s)
+            </p>
+        </div>
+
+        <div class="dining-cabin-grid">
+            {% for section in cabin_sections %}
+                <section class="dining-cabin-card">
+                    <h3>
+                        {% if section.cabin %}
+                            {{ section.cabin.name }}
+                        {% else %}
+                            Unassigned Guests
+                        {% endif %}
+                    </h3>
+
+                    {% if section.adults %}
+                        <div class="guest-report-group">
+
+
+                            <ol>
+                                {% for guest in section.adults %}
+                                    <li>
+                                        <span>{{ guest.client.full_name }}</span>
+
+                                    </li>
+                                {% endfor %}
+                            </ol>
+                        </div>
+                    {% endif %}
+
+                    {% if section.kids %}
+                        <div class="guest-report-group">
+
+
+                            <ol>
+                                {% for guest in section.kids %}
+                                    <li>
+                                        <span>{{ guest.client.full_name }}</span>
+
+                                    </li>
+                                {% endfor %}
+                            </ol>
+                        </div>
+                    {% endif %}
+
+                    {% if not section.guests %}
+                        <p class="text-muted">No guests assigned to this cabin.</p>
+                    {% endif %}
+                </section>
+            {% empty %}
+                <div class="empty-state">
+                    <div class="empty-state-content">
+                        <div class="empty-state-icon"></div>
+                        <h2>No guests found</h2>
+                        <p>
+                            No reservation guests were found for this week.
+                            Add reservation guests and assign them to cabins before printing.
+                        </p>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+{% endblock %}

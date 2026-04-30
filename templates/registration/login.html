@@ -1,0 +1,60 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login | Guest Ranch Management</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{% static 'css/main.css' %}">
+</head>
+<body class="auth-body">
+    <main class="auth-page">
+        <section class="auth-card">
+            <div class="auth-brand">
+                <div class="auth-brand-mark">◇</div>
+                <h1>Guest Ranch Management</h1>
+                <p>Sign in to manage ranch operations.</p>
+            </div>
+
+            {% if form.errors %}
+                <div class="form-alert">
+                    Your username and password did not match. Please try again.
+                </div>
+            {% endif %}
+
+            {% if next %}
+                {% if user.is_authenticated %}
+                    <div class="form-alert">
+                        Your account does not have access to this page.
+                    </div>
+                {% else %}
+                    <div class="form-notice">
+                        Please sign in to continue.
+                    </div>
+                {% endif %}
+            {% endif %}
+
+            <form method="post" class="auth-form">
+                {% csrf_token %}
+
+                <div class="form-field">
+                    <label for="{{ form.username.id_for_label }}">Username</label>
+                    {{ form.username }}
+                </div>
+
+                <div class="form-field">
+                    <label for="{{ form.password.id_for_label }}">Password</label>
+                    {{ form.password }}
+                </div>
+
+                <button type="submit" class="button button-primary">
+                    Sign In
+                </button>
+
+                <input type="hidden" name="next" value="{{ next }}">
+            </form>
+        </section>
+    </main>
+</body>
+</html>

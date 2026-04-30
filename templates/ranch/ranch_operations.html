@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Ranch Operations | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Operations{% endblock %}
+
+{% block page_title %}Ranch Operations{% endblock %}
+
+{% block page_subtitle %}
+Plan and manage the broader operational needs of the ranch.
+{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'ranch:office_dashboard' %}" class="button button-primary">Admin & Office</a>
+{% endblock %}
+
+{% block content %}
+<div class="stat-grid">
+    <div class="stat-card">
+        <span>Open Tasks</span>
+        <strong>0</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Activities</span>
+        <strong>0</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Inventory Alerts</span>
+        <strong>0</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Maintenance Items</span>
+        <strong>0</strong>
+    </div>
+</div>
+
+<div class="page-toolbar">
+    <div class="page-toolbar-main">
+        <form class="search-form" method="get">
+            <input
+                type="search"
+                name="q"
+                class="search-input"
+                placeholder="Search tasks, activities, inventory, or notes"
+            >
+
+            <select name="type" class="form-select">
+                <option value="">All operation types</option>
+                <option value="activity">Activity</option>
+                <option value="maintenance">Maintenance</option>
+                <option value="inventory">Inventory</option>
+                <option value="staff">Staff</option>
+                <option value="vendor">Vendor</option>
+            </select>
+
+            <button type="submit" class="button button-secondary">Search</button>
+        </form>
+    </div>
+
+    <div class="page-toolbar-actions">
+        <a href="#" class="button button-secondary">Reports</a>
+        <a href="#" class="button button-primary">Add Task</a>
+    </div>
+</div>
+
+<div class="empty-state">
+    <div class="empty-state-content">
+        <div class="empty-state-icon">🌄</div>
+        <h2>No ranch operations yet</h2>
+        <p>
+            Once ranch operations is built, this section will manage activities,
+            maintenance tasks, inventory, staff schedules, equipment, vendors, and reports.
+        </p>
+        <a href="#" class="button button-primary">Create First Task</a>
+    </div>
+</div>
+{% endblock %}

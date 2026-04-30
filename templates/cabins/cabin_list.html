@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}Cabins | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Lodging Management{% endblock %}
+
+{% block page_title %}Cabins{% endblock %}
+
+{% block page_subtitle %}
+Manage cabin inventory, capacity, housekeeping status, maintenance status, and reservation readiness.
+{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'cabins:cabin_create' %}" class="button button-primary">Add Cabin</a>
+{% endblock %}
+
+{% block content %}
+<div class="stat-grid">
+    <div class="stat-card">
+        <span>Total Cabins</span>
+        <strong>{{ total_cabins }}</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Active Cabins</span>
+        <strong>{{ active_cabins }}</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Available</span>
+        <strong>{{ available_cabins }}</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Maintenance</span>
+        <strong>{{ maintenance_cabins }}</strong>
+    </div>
+</div>
+
+<div class="page-toolbar">
+    <div class="page-toolbar-main">
+        <form class="search-form" method="get">
+            <input
+                type="search"
+                name="q"
+                class="search-input"
+                placeholder="Search cabins by name, number, beds, or notes"
+                value="{{ search_query }}"
+            >
+
+            <select name="status" class="form-select">
+                <option value="">All cabin statuses</option>
+                {% for value, label in status_choices %}
+                    <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                {% endfor %}
+            </select>
+
+            <select name="housekeeping_status" class="form-select">
+                <option value="">All housekeeping statuses</option>
+                {% for value, label in housekeeping_choices %}
+                    <option value="{{ value }}" {% if housekeeping_filter == value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                {% endfor %}
+            </select>
+
+            <button type="submit" class="button button-secondary">Search</button>
+
+            {% if search_query or status_filter or housekeeping_filter %}
+                <a href="{% url 'cabins:cabin_list' %}" class="button button-secondary">Clear</a>
+            {% endif %}
+        </form>
+    </div>
+
+    <div class="page-toolbar-actions">
+        <a href="{% url 'cabins:cabin_create' %}" class="button button-primary">Add Cabin</a>
+    </div>
+</div>
+
+{% if cabins %}
+    <div class="table-card">
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Cabin</th>
+                        <th>Number</th>
+                        <th>Capacity</th>
+                        <th>Beds</th>
+                        <th>Status</th>
+                        <th>Housekeeping</th>
+                        <th class="text-right">Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for cabin in cabins %}
+                        <tr>
+                            <td><strong>{{ cabin.name }}</strong></td>
+
+                            <td>
+                                {% if cabin.cabin_number %}
+                                    {{ cabin.cabin_number }}
+                                {% else %}
+                                    <span class="table-muted">—</span>
+                                {% endif %}
+                            </td>
+
+                            <td>{{ cabin.capacity }}</td>
+
+                            <td>
+                                {% if cabin.bed_configuration %}
+                                    {{ cabin.bed_configuration }}
+                                {% else %}
+                                    <span class="table-muted">—</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if cabin.status == "available" %}
+                                    <span class="badge badge-success">{{ cabin.get_status_display }}</span>
+                                {% elif cabin.status == "maintenance" or cabin.status == "out_of_service" %}
+                                    <span class="badge badge-danger">{{ cabin.get_status_display }}</span>
+                                {% elif cabin.status == "occupied" %}
+                                    <span class="badge badge-warning">{{ cabin.get_status_display }}</span>
+                                {% else %}
+                                    <span class="badge badge-neutral">{{ cabin.get_status_display }}</span>
+                                {% endif %}
+                            </td>
+
+                            <td>{{ cabin.get_housekeeping_status_display }}</td>
+
+                            <td>
+                                <div class="table-actions">
+                                    <a href="{% url 'cabins:cabin_detail' cabin.pk %}" class="button button-small button-secondary">View</a>
+                                    <a href="{% url 'cabins:cabin_update' cabin.pk %}" class="button button-small button-primary">Edit</a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% else %}
+    <div class="empty-state">
+        <div class="empty-state-content">
+            <div class="empty-state-icon">🏠</div>
+
+            {% if search_query or status_filter or housekeeping_filter %}
+                <h2>No cabins found</h2>
+                <p>No cabin records matched your current search or filters.</p>
+                <a href="{% url 'cabins:cabin_list' %}" class="button button-secondary">Clear Search</a>
+            {% else %}
+                <h2>No cabins yet</h2>
+                <p>Create cabin records before building the reservation calendar.</p>
+                <a href="{% url 'cabins:cabin_create' %}" class="button button-primary">Create First Cabin</a>
+            {% endif %}
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

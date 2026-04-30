@@ -1,0 +1,13 @@
+[Unit]
+Description=Gunicorn instance to serve Guest Ranch Management Platform
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/guestranch
+Environment="PATH=/opt/guestranch/venv/bin"
+ExecStart=/opt/guestranch/venv/bin/gunicorn --workers 3 --bind unix:guestranch.sock guestranchmanagementplatform.wsgi:application
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+{% extends "base.html" %}
+
+{% block title %}{{ form_title }} | Households{% endblock %}
+
+{% block eyebrow %}Households{% endblock %}
+
+{% block page_title %}{{ form_title }}{% endblock %}
+
+{% block page_subtitle %}
+{{ form_subtitle }}
+{% endblock %}
+
+{% block page_actions %}
+{% if household %}
+    <a href="{% url 'clients:household_detail' household.pk %}" class="button button-secondary">Cancel</a>
+{% else %}
+    <a href="{% url 'clients:household_list' %}" class="button button-secondary">Cancel</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<form method="post" class="form-card">
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+        <div class="form-alert">
+            {{ form.non_field_errors }}
+        </div>
+    {% endif %}
+
+    <div class="form-grid">
+        <div class="form-field form-grid-full">
+            <label for="{{ form.name.id_for_label }}">Household Name</label>
+            {{ form.name }}
+            {% for error in form.name.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.primary_contact.id_for_label }}">Primary Contact</label>
+            {{ form.primary_contact }}
+            {% for error in form.primary_contact.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.billing_contact.id_for_label }}">Billing Contact</label>
+            {{ form.billing_contact }}
+            {% for error in form.billing_contact.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field form-grid-full">
+            <label for="{{ form.address_line_1.id_for_label }}">Address Line 1</label>
+            {{ form.address_line_1 }}
+        </div>
+
+        <div class="form-field form-grid-full">
+            <label for="{{ form.address_line_2.id_for_label }}">Address Line 2</label>
+            {{ form.address_line_2 }}
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.city.id_for_label }}">City</label>
+            {{ form.city }}
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.state.id_for_label }}">State</label>
+            {{ form.state }}
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.postal_code.id_for_label }}">Postal Code</label>
+            {{ form.postal_code }}
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.country.id_for_label }}">Country</label>
+            {{ form.country }}
+        </div>
+
+        <div class="form-field form-grid-full">
+            <label for="{{ form.notes.id_for_label }}">Notes</label>
+            {{ form.notes }}
+        </div>
+
+        <div class="form-field form-grid-full checkbox-field">
+            <label>
+                {{ form.is_active }}
+                Active household
+            </label>
+        </div>
+    </div>
+
+    <div class="form-actions">
+        {% if household %}
+            <a href="{% url 'clients:household_detail' household.pk %}" class="button button-secondary">Cancel</a>
+        {% else %}
+            <a href="{% url 'clients:household_list' %}" class="button button-secondary">Cancel</a>
+        {% endif %}
+
+        <button type="submit" class="button button-primary">{{ submit_label }}</button>
+    </div>
+</form>
+{% endblock %}

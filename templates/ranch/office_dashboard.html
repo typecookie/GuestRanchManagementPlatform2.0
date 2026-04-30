@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+
+{% block title %}Admin & Office | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Ranch Operations{% endblock %}
+
+{% block page_title %}Admin & Office{% endblock %}
+
+{% block page_subtitle %}
+Weekly office dashboard for guest assignments, reservation cleanup, and reports.
+{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'ranch:ranch_operations' %}" class="button button-secondary">Ranch Operations</a>
+<a href="{% url 'reservations:reservation_grid' %}?year={{ week_start.year }}&month={{ week_start.month }}" class="button button-secondary">Reservation Grid</a>
+{% endblock %}
+
+{% block content %}
+<div class="page-toolbar">
+    <div class="page-toolbar-main">
+        <a
+            href="{% url 'ranch:office_dashboard' %}?week={{ previous_week|date:'Y-m-d' }}"
+            class="button button-secondary"
+        >
+            ← Previous Week
+        </a>
+
+        <div class="week-heading">
+            <strong>Week of {{ week_start|date:"M j, Y" }}</strong>
+            <span>{{ week_start|date:"M j" }} to {{ week_end|date:"M j, Y" }}</span>
+        </div>
+
+        <a
+            href="{% url 'ranch:office_dashboard' %}?week={{ next_week|date:'Y-m-d' }}"
+            class="button button-secondary"
+        >
+            Next Week →
+        </a>
+    </div>
+
+    <div class="page-toolbar-actions">
+        <a href="{% url 'ranch:office_dashboard' %}" class="button button-primary">Current Week</a>
+    </div>
+</div>
+
+<div class="stat-grid">
+    <div class="stat-card">
+        <span>Reservations</span>
+        <strong>{{ reservation_count }}</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Guests</span>
+        <strong>{{ guest_count }}</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Unassigned Guests</span>
+        <strong>{{ unassigned_guest_count }}</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Occupied Cabins</span>
+        <strong>{{ occupied_cabin_count }}</strong>
+    </div>
+</div>
+
+<div class="detail-layout">
+    <section class="panel-stack">
+        <div class="detail-card">
+            <div class="section-heading">
+                <div>
+                    <h2>Needs Cabin Assignment</h2>
+                    <p>Reservations with guests who have not been assigned to cabins.</p>
+                </div>
+            </div>
+
+            {% if unassigned_guest_reservations %}
+                <div class="table-card">
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Reservation</th>
+                                    <th>Dates</th>
+                                    <th>Status</th>
+                                    <th>Unassigned Guests</th>
+                                    <th class="text-right">Action</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                {% for reservation in unassigned_guest_reservations %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ reservation.reservation_name }}</strong>
+                                        </td>
+
+                                        <td>
+                                            {{ reservation.arrival_date }} to {{ reservation.departure_date }}
+                                        </td>
+
+                                        <td>
+                                            {% if reservation.status == "confirmed" %}
+                                                <span class="badge badge-success">{{ reservation.get_status_display }}</span>
+                                            {% elif reservation.status == "penciled" or reservation.status == "inquiry" %}
+                                                <span class="badge badge-warning">{{ reservation.get_status_display }}</span>
+                                            {% else %}
+                                                <span class="badge badge-info">{{ reservation.get_status_display }}</span>
+                                            {% endif %}
+                                        </td>
+
+                                        <td>
+                                            <span class="badge badge-danger">{{ reservation.unassigned_guest_count }}</span>
+                                        </td>
+
+                                        <td>
+                                            <div class="table-actions">
+                                                <a
+                                                    href="{% url 'reservations:reservation_detail' reservation.pk %}"
+                                                    class="button button-small button-primary"
+                                                >
+                                                    Assign Guests
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <div class="empty-state-content">
+                        <div class="empty-state-icon"></div>
+                        <h2>All guests assigned</h2>
+                        <p>No reservations this week currently have unassigned guests.</p>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="detail-card">
+            <div class="section-heading">
+                <div>
+                    <h2>Reservations This Week</h2>
+                    <p>All active reservations overlapping this Sunday-to-Sunday week.</p>
+                </div>
+            </div>
+
+            {% if reservations_this_week %}
+                <div class="table-card">
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Reservation</th>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                    <th>Dates</th>
+                                    <th>Contact / Group</th>
+                                    <th class="text-right">Action</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                {% for reservation in reservations_this_week %}
+                                    <tr>
+                                        <td><strong>{{ reservation.reservation_name }}</strong></td>
+                                        <td>{{ reservation.get_reservation_type_display }}</td>
+                                        <td>{{ reservation.get_status_display }}</td>
+                                        <td>{{ reservation.arrival_date }} to {{ reservation.departure_date }}</td>
+                                        <td>
+                                            {% if reservation.travel_group %}
+                                                {{ reservation.travel_group.name }}
+                                            {% elif reservation.household %}
+                                                {{ reservation.household.name }}
+                                            {% elif reservation.primary_contact %}
+                                                {{ reservation.primary_contact.display_name }}
+                                            {% else %}
+                                                <span class="table-muted">—</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="table-actions">
+                                                <a
+                                                    href="{% url 'reservations:reservation_detail' reservation.pk %}"
+                                                    class="button button-small button-secondary"
+                                                >
+                                                    Open
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% else %}
+                <p class="text-muted mb-0">No reservations found for this week.</p>
+            {% endif %}
+        </div>
+    </section>
+
+    <aside class="panel-stack">
+        <div class="detail-card">
+            <h2>Weekly Reports</h2>
+
+            <div class="quick-action-list">
+                <a href="{% url 'ranch:weekly_dining_guest_list_report' %}?week={{ week_start|date:'Y-m-d' }}"
+    class="quick-action">Dining Hall Guest List</a>
+                <a href="#" class="quick-action">Special Needs Report</a>
+                <a href="#" class="quick-action">Horse Assignment Report</a>
+            </div>
+
+            <p class="text-muted">
+                Weekly report links will run for {{ week_start|date:"M j" }} to {{ week_end|date:"M j, Y" }}.
+            </p>
+        </div>
+
+        <div class="detail-card">
+            <h2>Office Workflow</h2>
+
+            <div class="attention-list">
+                <div class="attention-item">
+                    <span class="badge badge-info">Step 1</span>
+                    <p>Review reservations for the selected week.</p>
+                </div>
+
+                <div class="attention-item">
+                    <span class="badge badge-warning">Step 2</span>
+                    <p>Assign any unassigned guests to cabins.</p>
+                </div>
+
+                <div class="attention-item">
+                    <span class="badge badge-success">Step 3</span>
+                    <p>Run and print weekly reports.</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+</div>
+{% endblock %}
