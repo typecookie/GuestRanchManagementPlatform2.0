@@ -18,11 +18,14 @@ if [ ! -d "$APP_DIR" ]; then
     git clone "$REPO_URL" "$APP_DIR"
 fi
 
+# Ensure correct permissions for the www-data user
+chown -R www-data:www-data "$APP_DIR"
+
 cd "$APP_DIR"
 
 echo "Creating virtual environment..."
 python3 -m venv venv
-source venv/bin/bin/activate || source venv/bin/activate
+source venv/bin/activate
 
 echo "Installing dependencies..."
 pip install --upgrade pip
@@ -32,6 +35,7 @@ pip install .
 echo "Setting up Django..."
 python3 manage.py migrate
 python3 manage.py collectstatic --noinput
+python3 manage.py setup_admin
 
 echo "Setting up systemd service..."
 cp deploy/guestranch.service /etc/systemd/system/
@@ -40,6 +44,7 @@ systemctl enable guestranch
 systemctl start guestranch
 
 echo "Setting up Nginx..."
+rm -f /etc/nginx/sites-enabled/default
 cp deploy/nginx.conf /etc/nginx/sites-available/guestranch
 ln -sf /etc/nginx/sites-available/guestranch /etc/nginx/sites-enabled
 nginx -t

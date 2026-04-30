@@ -12,6 +12,9 @@ cd "$APP_DIR"
 echo "Pulling latest changes from git..."
 git pull
 
+# Ensure correct permissions after pull
+chown -R www-data:www-data "$APP_DIR"
+
 echo "Activating virtual environment..."
 source venv/bin/activate
 

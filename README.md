@@ -36,18 +36,30 @@ This project includes scripts for easy installation and updates on Debian-based 
 1. **Upload or Clone the code**:
    On your server, clone the repository or upload the files.
 
-2. **Run the installation script**:
+2. **Configure Environment Variables**:
+   Copy the example environment file and edit it:
+   ```bash
+   cp .env.example .env
+   nano .env
+   ```
+   Make sure to set `DJANGO_DEBUG=False` and add your domain/IP to `DJANGO_ALLOWED_HOSTS`.
+
+4. **Run the installation script**:
    ```bash
    cd GuestRanchManagementPlatform
    chmod +x deploy/install.sh
    sudo ./deploy/install.sh
    ```
+   The installer will prompt you to create a superuser if one doesn't exist. This user will have full access to both the platform and the Django Admin.
 
-   *Note: Edit `deploy/install.sh` first to set your `REPO_URL`.*
+5. **User Roles**:
+   - **Superusers**: Access to everything, including `/admin/`.
+   - **Ranch Admins**: Access to all ranch management features and User Management within the app, but *cannot* access `/admin/`. To create a Ranch Admin, create a regular user and add them to the "Ranch Admins" group.
 
-3. **Configure Nginx**:
-   Edit `/etc/nginx/sites-available/guestranch` to set your domain name or IP address, then restart Nginx:
+6. **Configure Nginx (Optional customization)**:
+   The installer automatically sets up Nginx as the default server. If you want to change the domain name later, edit `/etc/nginx/sites-available/guestranch`:
    ```bash
+   sudo nano /etc/nginx/sites-available/guestranch
    sudo systemctl restart nginx
    ```
 

@@ -66,11 +66,22 @@
                     >
                         Ranch Operations
                     </a>
+
+                    {% if perms.auth.view_user %}
+                    <a
+                        href="{% url 'accounts:user_list' %}"
+                        class="sidebar-link {% if request.resolver_match.namespace == 'accounts' %}is-active{% endif %}"
+                    >
+                        User Management
+                    </a>
+                    {% endif %}
                 </nav>
             </div>
 
             <div class="sidebar-footer">
+                {% if user.is_staff %}
                 <a href="/admin/" class="sidebar-admin-link">Django Admin</a>
+                {% endif %}
                 <span class="sidebar-version">Ranch Platform v0.1</span>
             </div>
         </aside>
