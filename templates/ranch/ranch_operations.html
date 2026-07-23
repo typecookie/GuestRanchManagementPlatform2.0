@@ -33,7 +33,7 @@ Plan and manage the broader operational needs of the ranch.
 
     <div class="stat-card">
         <span>Maintenance Items</span>
-        <strong>0</strong>
+        <strong>{{ projects.count }}</strong>
     </div>
 </div>
 
@@ -66,6 +66,34 @@ Plan and manage the broader operational needs of the ranch.
     </div>
 </div>
 
+{% if projects %}
+<div class="card-grid" style="margin-top: 2rem;">
+    {% for project in projects %}
+    <div class="card project-op-card">
+        <div class="card-header">
+            <h3><a href="{% url 'projects:project_detail' project.pk %}">{{ project.name }}</a></h3>
+            <span class="badge badge-neutral">{{ project.get_status_display }}</span>
+        </div>
+        <div class="card-body">
+            <div class="op-meta" style="margin-bottom: 1rem; font-size: 0.9rem; color: var(--text-muted);">
+                {% if project.cabin %}
+                <div><strong>Cabin:</strong> {{ project.cabin.name }}</div>
+                {% endif %}
+                {% if project.vehicle %}
+                <div><strong>Vehicle:</strong> {{ project.vehicle.name }}</div>
+                {% endif %}
+                <div><strong>Owner:</strong> {{ project.project_owner|default:"Unassigned" }}</div>
+            </div>
+            <p>{{ project.notes|truncatewords:20 }}</p>
+        </div>
+        <div class="card-footer" style="margin-top: 1rem; display: flex; justify-content: space-between; align-items: center;">
+            <span class="text-small">Updated {{ project.updated_at|timesince }} ago</span>
+            <a href="{% url 'projects:project_detail' project.pk %}" class="button button-small button-secondary">View Details</a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
 <div class="empty-state">
     <div class="empty-state-content">
         <div class="empty-state-icon">🌄</div>
@@ -73,8 +101,10 @@ Plan and manage the broader operational needs of the ranch.
         <p>
             Once ranch operations is built, this section will manage activities,
             maintenance tasks, inventory, staff schedules, equipment, vendors, and reports.
+            Currently, projects marked for "Ranch Operations" will appear here.
         </p>
-        <a href="#" class="button button-primary">Create First Task</a>
+        <a href="{% url 'projects:kanban_board' %}" class="button button-primary">Go to Projects</a>
     </div>
 </div>
+{% endif %}
 {% endblock %}

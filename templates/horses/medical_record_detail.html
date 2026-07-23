@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% load group_perms %}
+
+{% block title %}Medical Record: {{ record.diagnosis }} | {{ record.horse.name }}{% endblock %}
+
+{% block eyebrow %}Medical History: {{ record.horse.name }}{% endblock %}
+
+{% block page_title %}{{ record.diagnosis }}{% endblock %}
+
+{% block page_actions %}
+{% can_do user "Horses" "write" as can_write %}
+{% can_do user "Horses" "delete" as can_delete %}
+{% if can_write %}
+<a href="{% url 'horses:medical_record_update' record.pk %}" class="button button-primary">Edit Record</a>
+{% endif %}
+{% if can_delete %}
+<a href="{% url 'horses:medical_record_delete' record.pk %}" class="button button-danger">Delete</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+{% can_do user "Horses" "write" as can_write %}
+{% can_do user "Horses" "delete" as can_delete %}
+<div class="detail-layout">
+    <section class="panel-stack">
+        <div class="detail-card">
+            <h2>Record Information</h2>
+            <div class="detail-list">
+                <div class="detail-row">
+                    <div class="detail-label">Sickness/Injury</div>
+                    <div class="detail-value"><strong>{{ record.diagnosis }}</strong></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Incident Date</div>
+                    <div class="detail-value">{{ record.incident_date }}</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Resolution Date</div>
+                    <div class="detail-value">
+                        {% if record.resolution_date %}
+                            {{ record.resolution_date }}
+                            <span class="badge badge-success" style="margin-left: 0.5rem;">Resolved</span>
+                        {% else %}
+                            <span class="badge badge-warning">Ongoing</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="detail-card">
+            <h2>Diagnostics Used</h2>
+            {{ record.diagnostics|linebreaks }}
+        </div>
+
+        <div class="detail-card">
+            <h2>Required Care</h2>
+            {{ record.required_care|linebreaks }}
+        </div>
+
+        <div class="detail-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h2 style="margin-bottom: 0;">Care Steps & Status Updates</h2>
+            </div>
+
+            {% if care_steps %}
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Care Provided</th>
+                                <th>Status Update</th>
+                                <th class="text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for step in care_steps %}
+                                <tr>
+                                    <td style="white-space: nowrap;"><strong>{{ step.date }}</strong></td>
+                                    <td>{{ step.description|linebreaks }}</td>
+                                    <td>
+                                        {% if step.status_update %}
+                                            <span class="badge badge-neutral">{{ step.status_update }}</span>
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="table-actions">
+                                            {% if can_write %}
+                                            <a href="{% url 'horses:care_step_update' step.pk %}" class="button button-small button-secondary">Edit</a>
+                                            {% endif %}
+                                            {% if can_delete %}
+                                            <a href="{% url 'horses:care_step_delete' step.pk %}" class="button button-small button-danger">Remove</a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted">No care steps recorded yet.</p>
+            {% endif %}
+
+            {% if can_write %}
+            <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
+                <h3>Quick Add Care Entry</h3>
+                <form method="post" action="{% url 'horses:care_step_create' record.pk %}">
+                    {% csrf_token %}
+                    <div class="form-grid">
+                        <div class="form-field">
+                            <label for="{{ quick_add_form.date.id_for_label }}">Date</label>
+                            {{ quick_add_form.date }}
+                        </div>
+                        <div class="form-field">
+                            <label for="{{ quick_add_form.status_update.id_for_label }}">Status Update</label>
+                            {{ quick_add_form.status_update }}
+                        </div>
+                        <div class="form-field form-grid-full">
+                            <label for="{{ quick_add_form.description.id_for_label }}">Care Description</label>
+                            {{ quick_add_form.description }}
+                        </div>
+                    </div>
+                    <div class="form-actions" style="margin-top: 1rem;">
+                        <button type="submit" class="button button-primary">Add Entry</button>
+                    </div>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+
+    <aside class="panel-stack">
+        <div class="detail-card">
+            <h2>Horse</h2>
+            <p><strong>{{ record.horse.name }}</strong></p>
+            <p>{{ record.horse.breed }}</p>
+            <a href="{% url 'horses:horse_detail' record.horse.pk %}" class="button button-small button-secondary" style="width: 100%; text-align: center;">View Horse Profile</a>
+        </div>
+        
+        <div style="margin-top: 2rem;">
+            <a href="{% url 'horses:horse_detail' record.horse.pk %}" class="button button-neutral" style="width: 100%; text-align: center;">Back to Horse</a>
+        </div>
+    </aside>
+</div>
+{% endblock %}

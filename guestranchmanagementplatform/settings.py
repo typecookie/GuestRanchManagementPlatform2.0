@@ -48,6 +48,8 @@ INSTALLED_APPS = [
     "apps.cabins.apps.CabinsConfig",
     "apps.vehicles.apps.VehiclesConfig",
     "apps.ranch.apps.RanchConfig",
+    "apps.projects.apps.ProjectsConfig",
+    "apps.groups.apps.GroupsConfig",
 ]
 
 MIDDLEWARE = [

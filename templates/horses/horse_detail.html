@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% load group_perms %}
+
+{% block title %}{{ horse.name }} | Horses | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Ranch Assets{% endblock %}
+
+{% block page_title %}{{ horse.name }}{% endblock %}
+
+{% block page_actions %}
+{% can_do user "Horses" "write" as can_write %}
+{% can_do user "Horses" "delete" as can_delete %}
+{% if can_write %}
+<a href="{% url 'horses:horse_update' horse.pk %}" class="button button-primary">Edit Horse</a>
+{% endif %}
+{% if can_delete %}
+<a href="{% url 'horses:horse_delete' horse.pk %}" class="button button-danger">Remove</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+{% can_do user "Horses" "write" as can_write %}
+<div class="detail-layout">
+    <section class="panel-stack">
+        <div class="detail-card">
+            <h2>Horse Information</h2>
+
+            <div class="detail-list">
+                <div class="detail-row">
+                    <div class="detail-label">Breed</div>
+                    <div class="detail-value">{{ horse.breed|default:"—" }}</div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Color</div>
+                    <div class="detail-value">{{ horse.color|default:"—" }}</div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Birth Year</div>
+                    <div class="detail-value">{{ horse.birth_year|default:"—" }}</div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Gender</div>
+                    <div class="detail-value">{{ horse.get_gender_display }}</div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Status</div>
+                    <div class="detail-value">
+                        {% if horse.status == "active" %}
+                            <span class="badge badge-success">{{ horse.get_status_display }}</span>
+                        {% elif horse.status == "retired" %}
+                            <span class="badge badge-neutral">{{ horse.get_status_display }}</span>
+                        {% elif horse.status == "out_of_service" %}
+                            <span class="badge badge-warning">{{ horse.get_status_display }}</span>
+                        {% else %}
+                            <span class="badge badge-danger">{{ horse.get_status_display }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="detail-card">
+            <h2>General Notes</h2>
+            {% if horse.notes %}
+                {{ horse.notes|linebreaks }}
+            {% else %}
+                <p class="text-muted mb-0">No general notes recorded.</p>
+            {% endif %}
+        </div>
+        
+        <div class="detail-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h2 style="margin-bottom: 0;">Medical History</h2>
+                {% if can_write %}
+                <a href="{% url 'horses:medical_record_create' horse.pk %}" class="button button-small button-primary">Add Record</a>
+                {% endif %}
+            </div>
+            
+            {% if medical_records %}
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Incident Date</th>
+                                <th>Sickness/Injury</th>
+                                <th>Status</th>
+                                <th>Latest Update</th>
+                                <th class="text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for record in medical_records %}
+                                <tr>
+                                    <td><strong>{{ record.incident_date }}</strong></td>
+                                    <td>{{ record.diagnosis }}</td>
+                                    <td>
+                                        {% if record.resolution_date %}
+                                            <span class="badge badge-success">Resolved</span>
+                                        {% else %}
+                                            <span class="badge badge-warning">Ongoing</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% with last_step=record.care_steps.last %}
+                                            {% if last_step %}
+                                                {% if last_step.status_update %}
+                                                    <span class="badge badge-neutral">{{ last_step.status_update }}</span>
+                                                {% else %}
+                                                    {{ last_step.date }}
+                                                {% endif %}
+                                            {% else %}
+                                                —
+                                            {% endif %}
+                                        {% endwith %}
+                                    </td>
+                                    <td>
+                                        <div class="table-actions">
+                                            <a href="{% url 'horses:medical_record_detail' record.pk %}" class="button button-small button-secondary">View</a>
+                                            {% if can_write %}
+                                            <a href="{% url 'horses:medical_record_update' record.pk %}" class="button button-small button-primary">Edit</a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted mb-0">No medical history recorded.</p>
+                {% if can_write %}
+                <div style="margin-top: 1rem;">
+                    <a href="{% url 'horses:medical_record_create' horse.pk %}" class="button button-secondary">Create First Record</a>
+                </div>
+                {% endif %}
+            {% endif %}
+
+            {% if horse.medical_notes %}
+                <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                    <h3>Legacy Medical Notes</h3>
+                    {{ horse.medical_notes|linebreaks }}
+                </div>
+            {% endif %}
+        </div>
+    </section>
+    
+    <aside class="panel-stack">
+        <div class="detail-card">
+            <h2>System Info</h2>
+            <div class="detail-list">
+                <div class="detail-row">
+                    <div class="detail-label">Added</div>
+                    <div class="detail-value">{{ horse.created_at|date:"M j, Y" }}</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Last Updated</div>
+                    <div class="detail-value">{{ horse.updated_at|date:"M j, Y H:i" }}</div>
+                </div>
+            </div>
+        </div>
+        
+        <div style="margin-top: 2rem;">
+            <a href="{% url 'horses:horse_list' %}" class="button button-neutral" style="width: 100%; text-align: center;">Back to List</a>
+        </div>
+    </aside>
+</div>
+{% endblock %}

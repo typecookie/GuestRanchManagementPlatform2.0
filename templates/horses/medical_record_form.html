@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} | Horses | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Medical History: {{ horse.name }}{% endblock %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="form-card">
+    <form method="post">
+        {% csrf_token %}
+        
+        <div class="form-grid">
+            <div class="form-field form-grid-full">
+                <label for="{{ form.diagnosis.id_for_label }}">Sickness/Injury Name</label>
+                {{ form.diagnosis }}
+                {% if form.diagnosis.errors %}
+                    <div class="form-error">{{ form.diagnosis.errors }}</div>
+                {% endif %}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.incident_date.id_for_label }}">Date of Injury/Sickness</label>
+                {{ form.incident_date }}
+                {% if form.incident_date.errors %}
+                    <div class="form-error">{{ form.incident_date.errors }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-field">
+                <label for="{{ form.resolution_date.id_for_label }}">Resolution Date</label>
+                {{ form.resolution_date }}
+                <p class="help-text">Leave blank if ongoing.</p>
+                {% if form.resolution_date.errors %}
+                    <div class="form-error">{{ form.resolution_date.errors }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-field form-grid-full">
+                <label for="{{ form.diagnostics.id_for_label }}">Diagnostics Used</label>
+                {{ form.diagnostics }}
+                {% if form.diagnostics.errors %}
+                    <div class="form-error">{{ form.diagnostics.errors }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-field form-grid-full">
+                <label for="{{ form.required_care.id_for_label }}">Required Care</label>
+                {{ form.required_care }}
+                {% if form.required_care.errors %}
+                    <div class="form-error">{{ form.required_care.errors }}</div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="button button-primary">Save Record</button>
+            <a href="{% if record %}{% url 'horses:medical_record_detail' record.pk %}{% else %}{% url 'horses:horse_detail' horse.pk %}{% endif %}" class="button button-neutral">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

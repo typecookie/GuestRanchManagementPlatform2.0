@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load group_perms %}
 
 {% block title %}User Management | Guest Ranch Management{% endblock %}
 
@@ -11,10 +12,15 @@ Manage system users, passwords, and access roles.
 {% endblock %}
 
 {% block page_actions %}
+{% can_do user "User Management" "write" as can_write %}
+{% if can_write %}
 <a href="{% url 'accounts:user_create' %}" class="button button-primary">Add User</a>
+{% endif %}
 {% endblock %}
 
 {% block content %}
+{% can_do request.user "User Management" "write" as can_write %}
+{% can_do request.user "User Management" "delete" as can_delete %}
 <div class="table-card">
     <div class="table-responsive">
         <table class="data-table">
@@ -50,7 +56,20 @@ Manage system users, passwords, and access roles.
                     </td>
                     <td>
                         <div class="table-actions">
+                            {% if can_write %}
                             <a href="{% url 'accounts:user_update' user.pk %}" class="button button-small button-primary">Edit</a>
+                            {% endif %}
+                            
+                            {% if user != request.user %}
+                                {% if can_write %}
+                                <a href="{% url 'accounts:user_toggle_status' user.pk %}" class="button button-small {% if user.is_active %}button-neutral{% else %}button-success{% endif %}">
+                                    {% if user.is_active %}Deactivate{% else %}Activate{% endif %}
+                                </a>
+                                {% endif %}
+                                {% if can_delete %}
+                                <a href="{% url 'accounts:user_delete' user.pk %}" class="button button-small button-danger">Delete</a>
+                                {% endif %}
+                            {% endif %}
                         </div>
                     </td>
                 </tr>

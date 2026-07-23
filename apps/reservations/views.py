@@ -6,6 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
+from apps.groups.decorators import module_permission_required
 
 from apps.cabins.models import Cabin
 
@@ -69,7 +70,7 @@ def get_next_sunday():
     return today + timedelta(days=days_until_sunday)
 
 
-@login_required
+@module_permission_required('Reservations', 'read')
 def reservation_list(request):
     search_query = request.GET.get("q", "").strip()
     status_filter = request.GET.get("status", "").strip()
@@ -119,7 +120,7 @@ def reservation_list(request):
     return render(request, "reservations/reservation_list.html", context)
 
 
-@login_required
+@module_permission_required('Reservations', 'read')
 def reservation_detail(request, pk):
     reservation = get_object_or_404(
         Reservation.objects.select_related(
@@ -169,7 +170,7 @@ def reservation_detail(request, pk):
     return render(request, "reservations/reservation_detail.html", context)
 
 
-@login_required
+@module_permission_required('Reservations', 'write')
 def reservation_create(request):
     next_sunday = get_next_sunday()
     following_sunday = next_sunday + timedelta(days=7)
@@ -231,7 +232,7 @@ def reservation_create(request):
     return render(request, "reservations/reservation_form.html", context)
 
 
-@login_required
+@module_permission_required('Reservations', 'write')
 def reservation_update(request, pk):
     reservation = get_object_or_404(Reservation, pk=pk)
 
@@ -256,7 +257,7 @@ def reservation_update(request, pk):
     return render(request, "reservations/reservation_form.html", context)
 
 
-@login_required
+@module_permission_required('Reservations', 'write')
 def reservation_cabin_create(request, pk):
     reservation = get_object_or_404(Reservation, pk=pk)
 
@@ -282,7 +283,7 @@ def reservation_cabin_create(request, pk):
     return redirect("reservations:reservation_detail", pk=reservation.pk)
 
 
-@login_required
+@module_permission_required('Reservations', 'delete')
 def reservation_cabin_delete(request, pk):
     cabin_assignment = get_object_or_404(ReservationCabin, pk=pk)
     reservation = cabin_assignment.reservation
@@ -293,7 +294,7 @@ def reservation_cabin_delete(request, pk):
 
     return redirect("reservations:reservation_detail", pk=reservation.pk)
 
-@login_required
+@module_permission_required('Reservations', 'write')
 def reservation_guest_create(request, pk):
     reservation = get_object_or_404(Reservation, pk=pk)
 
@@ -329,7 +330,7 @@ def reservation_guest_create(request, pk):
     return redirect("reservations:reservation_detail", pk=reservation.pk)
 
 
-@login_required
+@module_permission_required('Reservations', 'write')
 def reservation_guest_update(request, pk):
     guest = get_object_or_404(ReservationGuest, pk=pk)
     reservation = guest.reservation
@@ -367,7 +368,7 @@ def reservation_guest_update(request, pk):
     return render(request, "reservations/reservation_guest_form.html", context)
 
 
-@login_required
+@module_permission_required('Reservations', 'delete')
 def reservation_guest_delete(request, pk):
     guest = get_object_or_404(ReservationGuest, pk=pk)
     reservation = guest.reservation
@@ -407,7 +408,7 @@ def create_reservation_guest_from_client(reservation, client):
     return guest, created
 
 
-@login_required
+@module_permission_required('Reservations', 'write')
 def reservation_add_household_guests(request, pk):
     reservation = get_object_or_404(Reservation, pk=pk)
 
@@ -446,7 +447,7 @@ def reservation_add_household_guests(request, pk):
     return redirect("reservations:reservation_detail", pk=reservation.pk)
 
 
-@login_required
+@module_permission_required('Reservations', 'write')
 def reservation_add_travel_group_guests(request, pk):
     reservation = get_object_or_404(Reservation, pk=pk)
 
@@ -555,7 +556,7 @@ def get_assignment_week_position(assignment, week):
         "is_partial": left_percent > 0 or width_percent < 100,
     }
 
-@login_required
+@module_permission_required('Reservations', 'write')
 def reservation_guest_assign_cabin(request, pk):
     guest = get_object_or_404(
         ReservationGuest.objects.select_related("reservation"),
@@ -587,7 +588,7 @@ def reservation_guest_assign_cabin(request, pk):
     return redirect("reservations:reservation_detail", pk=reservation.pk)
 
 
-@login_required
+@module_permission_required('Reservations', 'write')
 def reservation_guest_unassign_cabin(request, pk):
     guest = get_object_or_404(
         ReservationGuest.objects.select_related("reservation", "client", "cabin"),
@@ -604,7 +605,7 @@ def reservation_guest_unassign_cabin(request, pk):
 
     return redirect("reservations:reservation_detail", pk=reservation.pk)
 
-@login_required
+@module_permission_required('Reservations', 'read')
 def reservation_grid(request):
     today = date.today()
 

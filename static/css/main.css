@@ -553,6 +553,15 @@ textarea:focus-visible {
     background: #fbf7f0;
 }
 
+.button-primary {
+    background: var(--color-accent);
+    color: #ffffff;
+}
+
+.button-primary:hover {
+    background: var(--color-accent-dark);
+}
+
 .button-danger {
     background: var(--color-danger);
     color: #ffffff;

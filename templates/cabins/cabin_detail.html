@@ -1,5 +1,6 @@
 
 {% extends "base.html" %}
+{% load group_perms %}
 
 {% block title %}{{ cabin.name }} | Cabins{% endblock %}
 
@@ -12,8 +13,11 @@ View cabin details, capacity, housekeeping, and reservation readiness.
 {% endblock %}
 
 {% block page_actions %}
+{% can_do user "Cabins" "write" as can_write %}
 <a href="{% url 'cabins:cabin_list' %}" class="button button-secondary">Back to Cabins</a>
+{% if can_write %}
 <a href="{% url 'cabins:cabin_update' cabin.pk %}" class="button button-primary">Edit Cabin</a>
+{% endif %}
 {% endblock %}
 
 {% block content %}

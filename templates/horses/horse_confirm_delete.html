@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Remove Horse | Horses | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Ranch Assets{% endblock %}
+
+{% block page_title %}Remove Horse: {{ horse.name }}{% endblock %}
+
+{% block content %}
+<div class="form-card">
+    <p>Are you sure you want to remove "<strong>{{ horse.name }}</strong>" from the ranch records?</p>
+    <p class="help-text">This action will permanently delete all data associated with this horse.</p>
+    
+    <form method="post" style="margin-top: 2rem;">
+        {% csrf_token %}
+        <div class="form-actions" style="display: flex; gap: 1rem;">
+            <button type="submit" class="button button-danger">Confirm Removal</button>
+            <a href="{% url 'horses:horse_detail' horse.pk %}" class="button button-neutral">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

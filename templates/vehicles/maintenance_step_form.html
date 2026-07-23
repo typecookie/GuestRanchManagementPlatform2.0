@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} | {{ record.vehicle.name }}{% endblock %}
+
+{% block eyebrow %}Maintenance Step: {{ record.issue }}{% endblock %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="form-container">
+    <form method="post" class="standard-form">
+        {% csrf_token %}
+        
+        <div class="form-grid">
+            <div class="form-field">
+                <label for="{{ form.date.id_for_label }}">Date</label>
+                {{ form.date }}
+                {% if form.date.errors %}
+                    <div class="form-error">{{ form.date.errors }}</div>
+                {% endif %}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.status_update.id_for_label }}">Status Update</label>
+                {{ form.status_update }}
+                {% if form.status_update.errors %}
+                    <div class="form-error">{{ form.status_update.errors }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-field form-grid-full">
+                <label for="{{ form.description.id_for_label }}">Work Description</label>
+                {{ form.description }}
+                {% if form.description.errors %}
+                    <div class="form-error">{{ form.description.errors }}</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <a href="{% url 'vehicles:maintenance_record_detail' record.pk %}" class="button button-secondary">Cancel</a>
+            <button type="submit" class="button button-primary">Save Work Step</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,245 @@
+{% extends 'base.html' %}
+{% load group_perms %}
+
+{% block title %}Project Details - {{ project.name }}{% endblock %}
+
+{% block eyebrow %}Projects{% endblock %}
+{% block page_title %}{{ project.name }}{% endblock %}
+{% block page_subtitle %}Current Status: {{ project.get_status_display }}{% endblock %}
+
+{% block page_actions %}
+{% can_do user "Projects" "write" as can_write %}
+{% can_do user "Projects" "delete" as can_delete %}
+{% if can_write %}
+<a href="{% url 'projects:project_edit' project.id %}" class="button button-primary">
+    Edit Project
+</a>
+{% endif %}
+{% if can_delete %}
+<a href="{% url 'projects:project_delete' project.id %}" class="button button-danger">
+    Delete Project
+</a>
+{% endif %}
+<a href="{% url 'projects:kanban_board' %}" class="button button-secondary">
+    Back to Board
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="project-details-grid">
+    <div class="details-main">
+        <section class="details-section">
+            <h3>Project Information</h3>
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="label">Equipment Needed</span>
+                    <p>{{ project.equipment|default:"None specified"|linebreaks }}</p>
+                </div>
+                <div class="info-item">
+                    <span class="label">Parts Needed</span>
+                    <p>{{ project.parts|default:"None specified"|linebreaks }}</p>
+                </div>
+            </div>
+            
+            {% if project.cabin or project.vehicle or project.show_in_ranch_operations %}
+            <div class="info-grid" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
+                {% if project.cabin %}
+                <div class="info-item">
+                    <span class="label">Linked Cabin</span>
+                    <p><a href="{% url 'cabins:cabin_detail' project.cabin.pk %}">{{ project.cabin.name }}</a></p>
+                </div>
+                {% endif %}
+                
+                {% if project.vehicle %}
+                <div class="info-item">
+                    <span class="label">Linked Vehicle</span>
+                    <p><a href="{% url 'vehicles:vehicle_detail' project.vehicle.pk %}">{{ project.vehicle.name }}</a></p>
+                </div>
+                {% endif %}
+
+                <div class="info-item">
+                    <span class="label">Ranch Operations</span>
+                    <p>
+                        {% if project.show_in_ranch_operations %}
+                            <span class="badge badge-success">Visible</span>
+                        {% else %}
+                            <span class="badge badge-neutral">Hidden</span>
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+            {% endif %}
+        </section>
+
+        <section class="details-section">
+            <h3>Project Team</h3>
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="label">Project Owner</span>
+                    <p>{{ project.project_owner|default:"Not assigned" }}</p>
+                </div>
+                <div class="info-item">
+                    <span class="label">Primary Worker</span>
+                    <p>{{ project.primary_worker|default:"Not assigned" }}</p>
+                </div>
+            </div>
+            <div class="info-item" style="margin-top: 1rem;">
+                <span class="label">Other Workers</span>
+                <p>{{ project.other_workers|default:"None assigned"|linebreaksbr }}</p>
+            </div>
+        </section>
+
+        <section class="details-section">
+            <h3>Costs</h3>
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="label">Proposed Cost</span>
+                    <p class="cost">${{ project.proposed_cost }}</p>
+                </div>
+                <div class="info-item">
+                    <span class="label">Actual Cost</span>
+                    <p class="cost">${{ project.actual_cost }}</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="details-section">
+            <h3>Notes</h3>
+            <div class="notes-content">
+                {{ project.notes|default:"No notes available."|linebreaks }}
+            </div>
+        </section>
+    </div>
+
+    <aside class="details-sidebar">
+        <section class="details-section">
+            <h3>History</h3>
+            <div class="history-list">
+                {% for entry in project.history.all %}
+                <div class="history-item">
+                    <div class="history-dot"></div>
+                    <div class="history-content">
+                        <p class="history-text">
+                            Moved from <strong>{{ entry.get_from_status_display }}</strong> 
+                            to <strong>{{ entry.get_to_status_display }}</strong>
+                        </p>
+                        <span class="history-date">{{ entry.moved_at|date:"F j, Y, g:i a" }}</span>
+                    </div>
+                </div>
+                {% empty %}
+                <p class="muted">No movement history yet.</p>
+                {% endfor %}
+                <div class="history-item">
+                    <div class="history-dot" style="background: var(--color-success)"></div>
+                    <div class="history-content">
+                        <p class="history-text">Project Created</p>
+                        <span class="history-date">{{ project.created_at|date:"F j, Y, g:i a" }}</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </aside>
+</div>
+
+<style>
+    .project-details-grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 2rem;
+    }
+    
+    .details-section {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 8px;
+        box-shadow: var(--shadow-card);
+        margin-bottom: 2rem;
+    }
+    
+    .details-section h3 {
+        margin-top: 0;
+        margin-bottom: 1.5rem;
+        border-bottom: 1px solid var(--color-border);
+        padding-bottom: 0.5rem;
+        color: var(--color-sidebar);
+        font-size: 1.1rem;
+    }
+    
+    .info-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+    }
+    
+    .label {
+        display: block;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        color: var(--color-muted);
+        letter-spacing: 0.05em;
+        margin-bottom: 0.5rem;
+    }
+    
+    .cost {
+        font-size: 1.25rem;
+        font-weight: bold;
+        color: var(--color-accent);
+    }
+    
+    .history-list {
+        position: relative;
+        padding-left: 1.5rem;
+    }
+    
+    .history-list::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: var(--color-border);
+    }
+    
+    .history-item {
+        position: relative;
+        margin-bottom: 1.5rem;
+    }
+    
+    .history-dot {
+        position: absolute;
+        left: -1.5rem;
+        top: 0.25rem;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--color-accent);
+        margin-left: -4px;
+    }
+    
+    .history-content {
+        padding-left: 0.5rem;
+    }
+    
+    .history-text {
+        margin: 0;
+        font-size: 0.9rem;
+    }
+    
+    .history-date {
+        font-size: 0.75rem;
+        color: var(--color-muted);
+    }
+    
+    .muted {
+        color: var(--color-muted);
+        font-style: italic;
+    }
+
+    @media (max-width: 900px) {
+        .project-details-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}

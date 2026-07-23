@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} | Vehicles | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Ranch Assets{% endblock %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="form-card">
+    <form method="post">
+        {% csrf_token %}
+        
+        <div class="form-grid">
+            <div class="form-grid-full">
+                <h3>General Information</h3>
+            </div>
+            
+            <div class="form-field">
+                <label for="{{ form.name.id_for_label }}">Vehicle Name</label>
+                {{ form.name }}
+                {% if form.name.errors %}
+                    <div class="form-error">{{ form.name.errors }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-field">
+                <label for="{{ form.vehicle_type.id_for_label }}">Vehicle Type</label>
+                {{ form.vehicle_type }}
+                {% if form.vehicle_type.errors %}
+                    <div class="form-error">{{ form.vehicle_type.errors }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-field">
+                <label for="{{ form.make.id_for_label }}">Make</label>
+                {{ form.make }}
+                {% if form.make.errors %}
+                    <div class="form-error">{{ form.make.errors }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-field">
+                <label for="{{ form.model.id_for_label }}">Model</label>
+                {{ form.model }}
+                {% if form.model.errors %}
+                    <div class="form-error">{{ form.model.errors }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-field">
+                <label for="{{ form.year.id_for_label }}">Year</label>
+                {{ form.year }}
+                {% if form.year.errors %}
+                    <div class="form-error">{{ form.year.errors }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-field">
+                <label for="{{ form.license_plate.id_for_label }}">License Plate</label>
+                {{ form.license_plate }}
+                {% if form.license_plate.errors %}
+                    <div class="form-error">{{ form.license_plate.errors }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-field">
+                <label for="{{ form.vin.id_for_label }}">VIN</label>
+                {{ form.vin }}
+                {% if form.vin.errors %}
+                    <div class="form-error">{{ form.vin.errors }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-field checkbox-field" style="display: flex; align-items: center; gap: 0.5rem; height: 100%;">
+                {{ form.is_active }}
+                <label for="{{ form.is_active.id_for_label }}" style="margin-bottom: 0;">Is Active?</label>
+                {% if form.is_active.errors %}
+                    <div class="form-error">{{ form.is_active.errors }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-grid-full" style="margin-top: 1rem;">
+                <h3>Notes & Maintenance</h3>
+            </div>
+            
+            <div class="form-field form-grid-full">
+                <label for="{{ form.notes.id_for_label }}">General Notes</label>
+                {{ form.notes }}
+                {% if form.notes.errors %}
+                    <div class="form-error">{{ form.notes.errors }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-field form-grid-full">
+                <label for="{{ form.maintenance_notes.id_for_label }}">Maintenance History</label>
+                {{ form.maintenance_notes }}
+                {% if form.maintenance_notes.errors %}
+                    <div class="form-error">{{ form.maintenance_notes.errors }}</div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="button button-primary">Save Vehicle</button>
+            <a href="{% if vehicle %}{% url 'vehicles:vehicle_detail' vehicle.pk %}{% else %}{% url 'vehicles:vehicle_list' %}{% endif %}" class="button button-neutral">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

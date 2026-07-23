@@ -67,12 +67,28 @@
                         Ranch Operations
                     </a>
 
+                    <a
+                        href="{% url 'projects:kanban_board' %}"
+                        class="sidebar-link {% if request.resolver_match.namespace == 'projects' %}is-active{% endif %}"
+                    >
+                        Projects
+                    </a>
+
                     {% if perms.auth.view_user %}
                     <a
                         href="{% url 'accounts:user_list' %}"
                         class="sidebar-link {% if request.resolver_match.namespace == 'accounts' %}is-active{% endif %}"
                     >
                         User Management
+                    </a>
+                    {% endif %}
+
+                    {% if perms.auth.view_group %}
+                    <a
+                        href="{% url 'groups:group_list' %}"
+                        class="sidebar-link {% if request.resolver_match.namespace == 'groups' %}is-active{% endif %}"
+                    >
+                        Group Management
                     </a>
                     {% endif %}
                 </nav>

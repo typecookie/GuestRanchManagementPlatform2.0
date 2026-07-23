@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Delete Care Step | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Medical History: {{ step.medical_record.horse.name }}{% endblock %}
+
+{% block page_title %}Delete Care Step{% endblock %}
+
+{% block content %}
+<div class="form-card">
+    <p>Are you sure you want to delete the care step from <strong>{{ step.date }}</strong>?</p>
+    <p class="description" style="background: var(--bg-secondary); padding: 1rem; border-radius: 4px; margin: 1rem 0;">
+        {{ step.description|linebreaks }}
+    </p>
+    
+    <form method="post" style="margin-top: 2rem;">
+        {% csrf_token %}
+        <div class="form-actions" style="display: flex; gap: 1rem;">
+            <button type="submit" class="button button-danger">Confirm Delete</button>
+            <a href="{% url 'horses:medical_record_detail' step.medical_record.pk %}" class="button button-neutral">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

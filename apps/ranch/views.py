@@ -3,9 +3,11 @@ from datetime import date, datetime, timedelta
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
 from django.shortcuts import render
+from apps.groups.decorators import module_permission_required
 
 from apps.reservations.models import Reservation, ReservationCabin, ReservationGuest
 from apps.cabins.models import Cabin
+from apps.projects.models import Project
 
 def get_current_sunday():
     today = date.today()
@@ -28,12 +30,16 @@ def parse_week_start(request):
     return parsed_date - timedelta(days=days_since_sunday)
 
 
-@login_required
+@module_permission_required('Ranch', 'read')
 def ranch_operations(request):
-    return render(request, "ranch/ranch_operations.html")
+    projects = Project.objects.filter(show_in_ranch_operations=True)
+    context = {
+        'projects': projects,
+    }
+    return render(request, "ranch/ranch_operations.html", context)
 
 
-@login_required
+@module_permission_required('Ranch', 'read')
 def office_dashboard(request):
     week_start = parse_week_start(request)
     week_end = week_start + timedelta(days=7)
@@ -102,7 +108,7 @@ def office_dashboard(request):
     return render(request, "ranch/office_dashboard.html", context)
 
 
-@login_required
+@module_permission_required('Ranch', 'read')
 def weekly_dining_guest_list_report(request):
     week_start = parse_week_start(request)
     week_end = week_start + timedelta(days=7)

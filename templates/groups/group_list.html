@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% load group_perms %}
+
+{% block title %}Group Management | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Administration{% endblock %}
+
+{% block page_title %}Group Management{% endblock %}
+
+{% block page_subtitle %}
+Manage system groups and their read/write permissions per module.
+{% endblock %}
+
+{% block page_actions %}
+{% can_do user "Group Management" "write" as can_write %}
+{% if can_write %}
+<a href="{% url 'groups:group_create' %}" class="button button-primary">Add Group</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="table-card">
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Group Name</th>
+                    <th>Permissions Status</th>
+                    <th class="text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for group in groups %}
+                <tr>
+                    <td><strong>{{ group.name }}</strong></td>
+                    <td>
+                        {% if group.is_superuser %}
+                            <span class="badge badge-success">Full Access</span>
+                        {% else %}
+                            <span class="badge badge-neutral">Standard</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="table-actions">
+                            {% can_do user "Group Management" "write" as can_write %}
+                            {% can_do user "Group Management" "delete" as can_delete %}
+                            {% if can_write %}
+                            <a href="{% url 'groups:group_edit' group.pk %}" class="button button-small button-primary">Edit Permissions</a>
+                            {% endif %}
+                            {% if can_delete and group.name not in "superuser,administrator" %}
+                            <a href="{% url 'groups:group_delete' group.pk %}" class="button button-small button-danger">Delete</a>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

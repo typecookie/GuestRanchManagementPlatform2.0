@@ -1,39 +1,34 @@
 {% extends "base.html" %}
+{% load group_perms %}
 
 {% block title %}Horses | Guest Ranch Management{% endblock %}
 
-{% block eyebrow %}Horse Management{% endblock %}
+{% block eyebrow %}Ranch Assets{% endblock %}
 
 {% block page_title %}Horses{% endblock %}
 
 {% block page_subtitle %}
-Manage horse profiles, availability, riding suitability, care notes, and assignments.
+Manage horse profiles, status, medical notes, and ranch assignments.
 {% endblock %}
 
 {% block page_actions %}
-<a href="#" class="button button-primary">Add Horse</a>
+{% can_do user "Horses" "write" as can_write %}
+{% if can_write %}
+<a href="{% url 'horses:horse_create' %}" class="button button-primary">Add Horse</a>
+{% endif %}
 {% endblock %}
 
 {% block content %}
+{% can_do user "Horses" "write" as can_write %}
 <div class="stat-grid">
     <div class="stat-card">
         <span>Total Horses</span>
-        <strong>0</strong>
+        <strong>{{ total_horses }}</strong>
     </div>
 
     <div class="stat-card">
-        <span>Available</span>
-        <strong>0</strong>
-    </div>
-
-    <div class="stat-card">
-        <span>Assigned</span>
-        <strong>0</strong>
-    </div>
-
-    <div class="stat-card">
-        <span>Needs Care</span>
-        <strong>0</strong>
+        <span>Active</span>
+        <strong>{{ active_horses }}</strong>
     </div>
 </div>
 
@@ -45,36 +40,94 @@ Manage horse profiles, availability, riding suitability, care notes, and assignm
                 name="q"
                 class="search-input"
                 placeholder="Search horses by name, breed, or notes"
+                value="{{ search_query }}"
             >
 
             <select name="status" class="form-select">
-                <option value="">All horse statuses</option>
-                <option value="available">Available</option>
-                <option value="assigned">Assigned</option>
-                <option value="resting">Resting</option>
-                <option value="needs_care">Needs care</option>
-                <option value="retired">Retired</option>
+                <option value="">All statuses</option>
+                {% for value, label in status_choices %}
+                    <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                {% endfor %}
             </select>
 
             <button type="submit" class="button button-secondary">Search</button>
+            
+            {% if search_query or status_filter %}
+                <a href="{% url 'horses:horse_list' %}" class="button button-secondary">Clear</a>
+            {% endif %}
         </form>
     </div>
 
     <div class="page-toolbar-actions">
-        <a href="#" class="button button-secondary">Care Log</a>
-        <a href="#" class="button button-primary">Add Horse</a>
+        {% if can_write %}
+        <a href="{% url 'horses:horse_create' %}" class="button button-primary">Add Horse</a>
+        {% endif %}
     </div>
 </div>
 
-<div class="empty-state">
-    <div class="empty-state-content">
-        <div class="empty-state-icon">🐴</div>
-        <h2>No horses yet</h2>
-        <p>
-            Once horse management is built, this page will show horse profiles,
-            rider suitability, health notes, availability, and ranch assignments.
-        </p>
-        <a href="#" class="button button-primary">Create First Horse</a>
+{% if horses %}
+    <div class="table-card">
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Horse</th>
+                        <th>Breed</th>
+                        <th>Gender</th>
+                        <th>Status</th>
+                        <th class="text-right">Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for horse in horses %}
+                        <tr>
+                            <td><strong>{{ horse.name }}</strong></td>
+                            <td>{{ horse.breed|default:"—" }}</td>
+                            <td>{{ horse.get_gender_display }}</td>
+                            <td>
+                                {% if horse.status == "active" %}
+                                    <span class="badge badge-success">{{ horse.get_status_display }}</span>
+                                {% elif horse.status == "retired" %}
+                                    <span class="badge badge-neutral">{{ horse.get_status_display }}</span>
+                                {% elif horse.status == "out_of_service" %}
+                                    <span class="badge badge-warning">{{ horse.get_status_display }}</span>
+                                {% else %}
+                                    <span class="badge badge-danger">{{ horse.get_status_display }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="table-actions">
+                                    <a href="{% url 'horses:horse_detail' horse.pk %}" class="button button-small button-secondary">View</a>
+                                    {% if can_write %}
+                                    <a href="{% url 'horses:horse_update' horse.pk %}" class="button button-small button-primary">Edit</a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
-</div>
+{% else %}
+    <div class="empty-state">
+        <div class="empty-state-content">
+            <div class="empty-state-icon">🐴</div>
+            {% if search_query or status_filter %}
+                <h2>No horses found</h2>
+                <p>No horse records matched your current search or filters.</p>
+                <a href="{% url 'horses:horse_list' %}" class="button button-secondary">Clear Search</a>
+            {% else %}
+                <h2>No horses yet</h2>
+                <p>Add your first horse to start managing your ranch assets.</p>
+                {% if can_write %}
+                <a href="{% url 'horses:horse_create' %}" class="button button-primary">Create First Horse</a>
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+{% endif %}
 {% endblock %}

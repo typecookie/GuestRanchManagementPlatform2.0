@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load group_perms %}
 
 {% block title %}Cabins | Guest Ranch Management{% endblock %}
 
@@ -11,10 +12,14 @@ Manage cabin inventory, capacity, housekeeping status, maintenance status, and r
 {% endblock %}
 
 {% block page_actions %}
+{% can_do user "Cabins" "write" as can_write %}
+{% if can_write %}
 <a href="{% url 'cabins:cabin_create' %}" class="button button-primary">Add Cabin</a>
+{% endif %}
 {% endblock %}
 
 {% block content %}
+{% can_do user "Cabins" "write" as can_write %}
 <div class="stat-grid">
     <div class="stat-card">
         <span>Total Cabins</span>
@@ -75,7 +80,9 @@ Manage cabin inventory, capacity, housekeeping status, maintenance status, and r
     </div>
 
     <div class="page-toolbar-actions">
+        {% if can_write %}
         <a href="{% url 'cabins:cabin_create' %}" class="button button-primary">Add Cabin</a>
+        {% endif %}
     </div>
 </div>
 
@@ -135,7 +142,9 @@ Manage cabin inventory, capacity, housekeeping status, maintenance status, and r
                             <td>
                                 <div class="table-actions">
                                     <a href="{% url 'cabins:cabin_detail' cabin.pk %}" class="button button-small button-secondary">View</a>
+                                    {% if can_write %}
                                     <a href="{% url 'cabins:cabin_update' cabin.pk %}" class="button button-small button-primary">Edit</a>
+                                    {% endif %}
                                 </div>
                             </td>
                         </tr>
@@ -156,7 +165,9 @@ Manage cabin inventory, capacity, housekeeping status, maintenance status, and r
             {% else %}
                 <h2>No cabins yet</h2>
                 <p>Create cabin records before building the reservation calendar.</p>
+                {% if can_write %}
                 <a href="{% url 'cabins:cabin_create' %}" class="button button-primary">Create First Cabin</a>
+                {% endif %}
             {% endif %}
         </div>
     </div>

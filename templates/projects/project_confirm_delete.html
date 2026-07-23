@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+
+{% block title %}Delete Project - {{ project.name }}{% endblock %}
+
+{% block eyebrow %}Projects{% endblock %}
+{% block page_title %}Delete Project{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm" style="max-width: 600px; margin: 2rem auto;">
+    <div class="card-body">
+        <h3 class="text-danger">Are you sure?</h3>
+        <p>You are about to permanently delete the project: <strong>{{ project.name }}</strong>.</p>
+        <p class="text-muted">This action cannot be undone. All project history and data will be removed.</p>
+        
+        <form method="post" style="margin-top: 2rem; display: flex; gap: 1rem;">
+            {% csrf_token %}
+            <button type="submit" class="button button-danger">Confirm Delete</button>
+            <a href="{% url 'projects:project_detail' project.pk %}" class="button button-secondary">Cancel</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

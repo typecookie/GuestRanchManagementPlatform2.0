@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load group_perms %}
 
 {% block title %}People | Guest Ranch Management{% endblock %}
 
@@ -11,13 +12,17 @@ Manage individual guest records, contact information, riding levels, preferences
 {% endblock %}
 
 {% block page_actions %}
+{% can_do user "Clients" "write" as can_write %}
 <a href="{% url 'clients:contact_dashboard' %}" class="button button-secondary">Contact Book</a>
 <a href="{% url 'clients:household_list' %}" class="button button-secondary">Households</a>
 <a href="{% url 'clients:travel_group_list' %}" class="button button-secondary">Travel Groups</a>
+{% if can_write %}
 <a href="{% url 'clients:client_create' %}" class="button button-primary">Add Client</a>
+{% endif %}
 {% endblock %}
 
 {% block content %}
+{% can_do user "Clients" "write" as can_write %}
 <div class="stat-grid">
     <div class="stat-card">
         <span>Total Clients</span>
@@ -84,9 +89,11 @@ Manage individual guest records, contact information, riding levels, preferences
     </div>
 
     <div class="page-toolbar-actions">
+        {% if can_write %}
         <a href="{% url 'clients:household_create' %}" class="button button-secondary">Add Household</a>
         <a href="{% url 'clients:travel_group_create' %}" class="button button-secondary">Add Travel Group</a>
         <a href="{% url 'clients:client_create' %}" class="button button-primary">Add Client</a>
+        {% endif %}
     </div>
 </div>
 
@@ -153,7 +160,9 @@ Manage individual guest records, contact information, riding levels, preferences
                             <td>
                                 <div class="table-actions">
                                     <a href="{% url 'clients:client_detail' client.pk %}" class="button button-small button-secondary">View</a>
+                                    {% if can_write %}
                                     <a href="{% url 'clients:client_update' client.pk %}" class="button button-small button-primary">Edit</a>
+                                    {% endif %}
                                 </div>
                             </td>
                         </tr>
@@ -180,7 +189,9 @@ Manage individual guest records, contact information, riding levels, preferences
                     Once you add clients, this page will show guest profiles,
                     contact information, riding levels, dietary notes, and internal notes.
                 </p>
+                {% if can_write %}
                 <a href="{% url 'clients:client_create' %}" class="button button-primary">Create First Client</a>
+                {% endif %}
             {% endif %}
         </div>
     </div>

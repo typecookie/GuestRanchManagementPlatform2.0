@@ -2,6 +2,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
+from apps.groups.decorators import module_permission_required
 
 from .forms import (
     ClientForm,
@@ -14,7 +15,7 @@ from .forms import (
 from .models import Client, Household, HouseholdMember, TravelGroup, TravelGroupMember
 
 
-@login_required
+@module_permission_required('Clients', 'read')
 def client_list(request):
     search_query = request.GET.get("q", "").strip()
     status_filter = request.GET.get("status", "").strip()
@@ -62,7 +63,7 @@ def client_list(request):
     return render(request, "clients/client_list.html", context)
 
 
-@login_required
+@module_permission_required('Clients', 'read')
 def client_detail(request, pk):
     client = get_object_or_404(Client, pk=pk)
 
@@ -82,7 +83,7 @@ def client_detail(request, pk):
     return render(request, "clients/client_detail.html", context)
 
 
-@login_required
+@module_permission_required('Clients', 'write')
 def client_create(request):
     if request.method == "POST":
         form = ClientForm(request.POST)
@@ -104,7 +105,7 @@ def client_create(request):
     return render(request, "clients/client_form.html", context)
 
 
-@login_required
+@module_permission_required('Clients', 'write')
 def client_update(request, pk):
     client = get_object_or_404(Client, pk=pk)
 
@@ -129,7 +130,7 @@ def client_update(request, pk):
     return render(request, "clients/client_form.html", context)
 
 
-@login_required
+@module_permission_required('Clients', 'write')
 def client_note_create(request, pk):
     client = get_object_or_404(Client, pk=pk)
 
@@ -150,7 +151,7 @@ def client_note_create(request, pk):
     return redirect("clients:client_detail", pk=client.pk)
 
 
-@login_required
+@module_permission_required('Clients', 'write')
 def household_create(request):
     if request.method == "POST":
         form = HouseholdForm(request.POST)
@@ -172,7 +173,7 @@ def household_create(request):
     return render(request, "clients/household_form.html", context)
 
 
-@login_required
+@module_permission_required('Clients', 'read')
 def household_detail(request, pk):
     household = get_object_or_404(Household, pk=pk)
 
@@ -190,7 +191,7 @@ def household_detail(request, pk):
     return render(request, "clients/household_detail.html", context)
 
 
-@login_required
+@module_permission_required('Clients', 'write')
 def household_update(request, pk):
     household = get_object_or_404(Household, pk=pk)
 
@@ -215,7 +216,7 @@ def household_update(request, pk):
     return render(request, "clients/household_form.html", context)
 
 
-@login_required
+@module_permission_required('Clients', 'write')
 def household_member_create(request, pk):
     household = get_object_or_404(Household, pk=pk)
 
@@ -243,7 +244,7 @@ def household_member_create(request, pk):
     return redirect("clients:household_detail", pk=household.pk)
 
 
-@login_required
+@module_permission_required('Clients', 'delete')
 def household_member_delete(request, pk):
     membership = get_object_or_404(HouseholdMember, pk=pk)
     household = membership.household
@@ -265,7 +266,7 @@ def household_member_delete(request, pk):
     return redirect("clients:household_detail", pk=household.pk)
 
 
-@login_required
+@module_permission_required('Clients', 'write')
 def travel_group_create(request):
     if request.method == "POST":
         form = TravelGroupForm(request.POST)
@@ -288,7 +289,7 @@ def travel_group_create(request):
     return render(request, "clients/travel_group_form.html", context)
 
 
-@login_required
+@module_permission_required('Clients', 'read')
 def travel_group_detail(request, pk):
     travel_group = get_object_or_404(TravelGroup, pk=pk)
 
@@ -307,7 +308,7 @@ def travel_group_detail(request, pk):
     return render(request, "clients/travel_group_detail.html", context)
 
 
-@login_required
+@module_permission_required('Clients', 'write')
 def travel_group_update(request, pk):
     travel_group = get_object_or_404(TravelGroup, pk=pk)
 
@@ -332,7 +333,7 @@ def travel_group_update(request, pk):
     return render(request, "clients/travel_group_form.html", context)
 
 
-@login_required
+@module_permission_required('Clients', 'write')
 def travel_group_member_create(request, pk):
     travel_group = get_object_or_404(TravelGroup, pk=pk)
 
@@ -352,7 +353,7 @@ def travel_group_member_create(request, pk):
     return redirect("clients:travel_group_detail", pk=travel_group.pk)
 
 
-@login_required
+@module_permission_required('Clients', 'read')
 def household_list(request):
     search_query = request.GET.get("q", "").strip()
     status_filter = request.GET.get("status", "").strip()
@@ -393,7 +394,7 @@ def household_list(request):
     return render(request, "clients/household_list.html", context)
 
 
-@login_required
+@module_permission_required('Clients', 'read')
 def travel_group_list(request):
     search_query = request.GET.get("q", "").strip()
     status_filter = request.GET.get("status", "").strip()
@@ -433,7 +434,7 @@ def travel_group_list(request):
     return render(request, "clients/travel_group_list.html", context)
 
 
-@login_required
+@module_permission_required('Clients', 'read')
 def contact_dashboard(request):
     context = {
         "total_clients": Client.objects.count(),
@@ -446,7 +447,7 @@ def contact_dashboard(request):
     return render(request, "clients/contact_dashboard.html", context)
 
 
-@login_required
+@module_permission_required('Clients', 'delete')
 def travel_group_member_delete(request, pk):
     membership = get_object_or_404(TravelGroupMember, pk=pk)
     travel_group = membership.travel_group

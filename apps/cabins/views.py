@@ -1,13 +1,13 @@
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
+from apps.groups.decorators import module_permission_required
 
 from .forms import CabinForm
 from .models import Cabin
 
 
-@login_required
+@module_permission_required('Cabins', 'read')
 def cabin_list(request):
     search_query = request.GET.get("q", "").strip()
     status_filter = request.GET.get("status", "").strip()
@@ -47,7 +47,7 @@ def cabin_list(request):
     return render(request, "cabins/cabin_list.html", context)
 
 
-@login_required
+@module_permission_required('Cabins', 'read')
 def cabin_detail(request, pk):
     cabin = get_object_or_404(Cabin, pk=pk)
 
@@ -58,7 +58,7 @@ def cabin_detail(request, pk):
     return render(request, "cabins/cabin_detail.html", context)
 
 
-@login_required
+@module_permission_required('Cabins', 'write')
 def cabin_create(request):
     if request.method == "POST":
         form = CabinForm(request.POST)
@@ -80,7 +80,7 @@ def cabin_create(request):
     return render(request, "cabins/cabin_form.html", context)
 
 
-@login_required
+@module_permission_required('Cabins', 'write')
 def cabin_update(request, pk):
     cabin = get_object_or_404(Cabin, pk=pk)
 

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Delete Maintenance Record | Guest Ranch Management{% endblock %}
+
+{% block page_title %}Delete Maintenance Record{% endblock %}
+
+{% block content %}
+<div class="form-container">
+    <div class="detail-card">
+        <p>Are you sure you want to delete the maintenance record for <strong>"{{ record.issue }}"</strong> dated {{ record.start_date }}?</p>
+        <p class="text-danger">This action cannot be undone and will delete all associated work steps.</p>
+        
+        <form method="post" style="margin-top: 2rem;">
+            {% csrf_token %}
+            <div class="form-actions">
+                <a href="{% url 'vehicles:maintenance_record_detail' record.pk %}" class="button button-secondary">Cancel</a>
+                <button type="submit" class="button button-danger">Confirm Delete</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

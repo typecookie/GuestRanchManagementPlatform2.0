@@ -1,0 +1,106 @@
+{% extends 'base.html' %}
+
+{% block title %}Create Project{% endblock %}
+
+{% block eyebrow %}Projects{% endblock %}
+{% block page_title %}{% if project %}Edit {{ project.name }}{% else %}Create New Project{% endif %}{% endblock %}
+
+{% block content %}
+<div class="form-container">
+    <form method="post" class="standard-form">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="{{ form.name.id_for_label }}">Project Name</label>
+            {{ form.name }}
+            {% if form.name.errors %}<div class="form-error">{{ form.name.errors }}</div>{% endif %}
+        </div>
+        
+        <div class="asset-links" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+            <div class="form-group">
+                <label for="{{ form.cabin.id_for_label }}">Attach to Cabin (Optional)</label>
+                {{ form.cabin }}
+                {% if form.cabin.errors %}<div class="form-error">{{ form.cabin.errors }}</div>{% endif %}
+            </div>
+            
+            <div class="form-group">
+                <label for="{{ form.vehicle.id_for_label }}">Attach to Vehicle (Optional)</label>
+                {{ form.vehicle }}
+                {% if form.vehicle.errors %}<div class="form-error">{{ form.vehicle.errors }}</div>{% endif %}
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label for="{{ form.equipment.id_for_label }}">Equipment Needed</label>
+            {{ form.equipment }}
+            {% if form.equipment.errors %}<div class="form-error">{{ form.equipment.errors }}</div>{% endif %}
+        </div>
+        
+        <div class="form-group">
+            <label for="{{ form.parts.id_for_label }}">Parts Needed</label>
+            {{ form.parts }}
+            {% if form.parts.errors %}<div class="form-error">{{ form.parts.errors }}</div>{% endif %}
+        </div>
+
+        <div class="workers-section" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+            <div class="form-group">
+                <label for="{{ form.project_owner.id_for_label }}">Project Owner</label>
+                {{ form.project_owner }}
+                {% if form.project_owner.errors %}<div class="form-error">{{ form.project_owner.errors }}</div>{% endif %}
+            </div>
+            
+            <div class="form-group">
+                <label for="{{ form.primary_worker.id_for_label }}">Primary Worker</label>
+                {{ form.primary_worker }}
+                {% if form.primary_worker.errors %}<div class="form-error">{{ form.primary_worker.errors }}</div>{% endif %}
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="{{ form.other_workers.id_for_label }}">Other Workers</label>
+            {{ form.other_workers }}
+            {% if form.other_workers.errors %}<div class="form-error">{{ form.other_workers.errors }}</div>{% endif %}
+        </div>
+        
+        <div class="cost-fields" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="form-group">
+                <label for="{{ form.proposed_cost.id_for_label }}">Proposed Cost</label>
+                {{ form.proposed_cost }}
+                {% if form.proposed_cost.errors %}<div class="form-error">{{ form.proposed_cost.errors }}</div>{% endif %}
+            </div>
+            
+            <div class="form-group">
+                <label for="{{ form.actual_cost.id_for_label }}">Actual Cost</label>
+                {{ form.actual_cost }}
+                {% if form.actual_cost.errors %}<div class="form-error">{{ form.actual_cost.errors }}</div>{% endif %}
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label for="{{ form.notes.id_for_label }}">Notes</label>
+            {{ form.notes }}
+            {% if form.notes.errors %}<div class="form-error">{{ form.notes.errors }}</div>{% endif %}
+        </div>
+
+        <div class="form-group checkbox-group" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+            {{ form.show_in_ranch_operations }}
+            <label for="{{ form.show_in_ranch_operations.id_for_label }}" style="margin-bottom: 0;">Show in Ranch Operations</label>
+            {% if form.show_in_ranch_operations.errors %}<div class="form-error">{{ form.show_in_ranch_operations.errors }}</div>{% endif %}
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="button button-primary">{% if project %}Save Changes{% else %}Create Project{% endif %}</button>
+            <a href="{% if project %}{% url 'projects:project_detail' project.pk %}{% else %}{% url 'projects:kanban_board' %}{% endif %}" class="button button-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<style>
+    .form-container {
+        max-width: 800px;
+        background: white;
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: var(--shadow-card);
+    }
+</style>
+{% endblock %}

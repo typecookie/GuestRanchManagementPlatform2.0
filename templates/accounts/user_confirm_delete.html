@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Delete User | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Administration{% endblock %}
+
+{% block page_title %}Delete User: {{ user_to_delete.username }}{% endblock %}
+
+{% block content %}
+<div class="form-card">
+    <p>Are you sure you want to permanently delete the user "<strong>{{ user_to_delete.username }}</strong>"?</p>
+    <p class="help-text">This action cannot be undone. All data associated directly with this user account will be removed.</p>
+    
+    <form method="post" style="margin-top: 2rem;">
+        {% csrf_token %}
+        <div class="form-actions" style="display: flex; gap: 1rem;">
+            <button type="submit" class="button button-danger">Confirm Permanent Delete</button>
+            <a href="{% url 'accounts:user_list' %}" class="button button-neutral">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

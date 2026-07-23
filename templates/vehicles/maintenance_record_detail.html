@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% load group_perms %}
+
+{% block title %}Maintenance Record: {{ record.issue }} | {{ record.vehicle.name }}{% endblock %}
+
+{% block eyebrow %}Maintenance History: {{ record.vehicle.name }}{% endblock %}
+
+{% block page_title %}{{ record.issue }}{% endblock %}
+
+{% block page_actions %}
+{% can_do user "Vehicles" "write" as can_write %}
+{% can_do user "Vehicles" "delete" as can_delete %}
+{% if can_write %}
+<a href="{% url 'vehicles:maintenance_record_update' record.pk %}" class="button button-primary">Edit Record</a>
+{% endif %}
+<a href="{% url 'vehicles:vehicle_detail' record.vehicle.pk %}" class="button button-secondary">Back to Vehicle</a>
+{% endblock %}
+
+{% block content %}
+{% can_do user "Vehicles" "write" as can_write %}
+{% can_do user "Vehicles" "delete" as can_delete %}
+<div class="detail-layout">
+    <section class="detail-main">
+        <div class="detail-card">
+            <h2>Record Information</h2>
+            <div class="detail-list">
+                <div class="detail-row">
+                    <div class="detail-label">Issue/Service Type</div>
+                    <div class="detail-value"><strong>{{ record.issue }}</strong></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Date Started</div>
+                    <div class="detail-value">{{ record.start_date }}</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Date Completed</div>
+                    <div class="detail-value">
+                        {% if record.completion_date %}
+                            {{ record.completion_date }}
+                        {% else %}
+                            <span class="badge badge-warning">In Progress</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="detail-card">
+            <h2>Diagnostics & Maintenance Details</h2>
+            <div style="margin-bottom: 2rem;">
+                <h3>Diagnostics/Inspection Results</h3>
+                <div class="text-block">
+                    {{ record.diagnostics|linebreaks }}
+                </div>
+            </div>
+            <div>
+                <h3>Required Repairs/Service</h3>
+                <div class="text-block">
+                    {{ record.required_maintenance|linebreaks }}
+                </div>
+            </div>
+        </div>
+
+        <div class="detail-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h2 style="margin-bottom: 0;">Work Steps & Status Updates</h2>
+            </div>
+
+            {% if steps %}
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Work Performed</th>
+                                <th>Status Update</th>
+                                <th class="text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for step in steps %}
+                                <tr>
+                                    <td style="white-space: nowrap;"><strong>{{ step.date }}</strong></td>
+                                    <td>{{ step.description|linebreaks }}</td>
+                                    <td>
+                                        {% if step.status_update %}
+                                            <span class="badge badge-neutral">{{ step.status_update }}</span>
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="table-actions">
+                                            {% if can_write %}
+                                            <a href="{% url 'vehicles:maintenance_step_update' step.pk %}" class="button button-small button-secondary">Edit</a>
+                                            {% endif %}
+                                            {% if can_delete %}
+                                            <a href="{% url 'vehicles:maintenance_step_delete' step.pk %}" class="button button-small button-danger">Remove</a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted">No work steps recorded yet.</p>
+            {% endif %}
+
+            {% if can_write %}
+            <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
+                <h3>Quick Add Work Entry</h3>
+                <form method="post" action="{% url 'vehicles:maintenance_step_create' record.pk %}">
+                    {% csrf_token %}
+                    <div class="form-grid">
+                        <div class="form-field">
+                            <label for="{{ quick_add_form.date.id_for_label }}">Date</label>
+                            {{ quick_add_form.date }}
+                        </div>
+                        <div class="form-field">
+                            <label for="{{ quick_add_form.status_update.id_for_label }}">Status Update</label>
+                            {{ quick_add_form.status_update }}
+                        </div>
+                        <div class="form-field form-grid-full">
+                            <label for="{{ quick_add_form.description.id_for_label }}">Work Description</label>
+                            {{ quick_add_form.description }}
+                        </div>
+                    </div>
+                    <div class="form-actions" style="margin-top: 1rem;">
+                        <button type="submit" class="button button-primary">Add Entry</button>
+                    </div>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+
+    <aside class="detail-sidebar">
+        <div class="detail-card">
+            <h3>Actions</h3>
+            <div class="sidebar-actions">
+                {% if can_write %}
+                <a href="{% url 'vehicles:maintenance_record_update' record.pk %}" class="button button-full button-secondary">Edit Record</a>
+                {% endif %}
+                {% if can_delete %}
+                <form method="post" action="{% url 'vehicles:maintenance_record_delete' record.pk %}" onsubmit="return confirm('Are you sure you want to delete this maintenance record? This will also delete all associated work steps.');">
+                    {% csrf_token %}
+                    <button type="submit" class="button button-full button-danger">Delete Record</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </aside>
+</div>
+{% endblock %}

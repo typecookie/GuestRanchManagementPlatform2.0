@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Administration{% endblock %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="form-card">
+    <form method="post">
+        {% csrf_token %}
+        
+        <div class="form-group">
+            <label for="name">Group Name</label>
+            <input type="text" name="name" id="name" class="form-control" value="{{ group.name|default:'' }}" required>
+        </div>
+
+        {% if group %}
+        <h3>Module Permissions</h3>
+        <p class="help-text" style="margin-bottom: 1.5rem;">Toggle read, write, and delete access for each platform module.</p>
+        
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Module</th>
+                        <th class="text-center">Read Access</th>
+                        <th class="text-center">Write Access</th>
+                        <th class="text-center">Delete Access</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for module, perms in module_perms.items %}
+                    <tr>
+                        <td><strong>{{ module }}</strong></td>
+                        <td class="text-center">
+                            <input type="checkbox" name="perm_{{ module }}_read" {% if perms.read %}checked{% endif %}>
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox" name="perm_{{ module }}_write" {% if perms.write %}checked{% endif %}>
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox" name="perm_{{ module }}_delete" {% if perms.delete %}checked{% endif %}>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <div class="form-actions" style="margin-top: 2rem; display: flex; gap: 1rem;">
+            <button type="submit" class="button button-primary">Save Group</button>
+            <a href="{% url 'groups:group_list' %}" class="button button-neutral">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<style>
+    .text-center { text-align: center; }
+    .form-card h3 { margin-top: 2rem; margin-bottom: 0.5rem; }
+    .data-table input[type="checkbox"] { transform: scale(1.2); cursor: pointer; }
+</style>
+{% endblock %}
