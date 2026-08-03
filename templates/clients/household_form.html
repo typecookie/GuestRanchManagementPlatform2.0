@@ -1,9 +1,3 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Title</title>
-</head>
 {% extends "base.html" %}
 
 {% block title %}{{ form_title }} | Households{% endblock %}
@@ -19,6 +13,8 @@
 {% block page_actions %}
 {% if household %}
     <a href="{% url 'clients:household_detail' household.pk %}" class="button button-secondary">Cancel</a>
+{% elif travel_group %}
+    <a href="{% url 'clients:travel_group_detail' travel_group.pk %}" class="button button-secondary">Cancel</a>
 {% else %}
     <a href="{% url 'clients:household_list' %}" class="button button-secondary">Cancel</a>
 {% endif %}
@@ -105,6 +101,8 @@
     <div class="form-actions">
         {% if household %}
             <a href="{% url 'clients:household_detail' household.pk %}" class="button button-secondary">Cancel</a>
+        {% elif travel_group %}
+            <a href="{% url 'clients:travel_group_detail' travel_group.pk %}" class="button button-secondary">Cancel</a>
         {% else %}
             <a href="{% url 'clients:household_list' %}" class="button button-secondary">Cancel</a>
         {% endif %}

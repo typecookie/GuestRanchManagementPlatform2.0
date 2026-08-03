@@ -28,6 +28,10 @@ class Project(models.Model):
     primary_worker = models.CharField(max_length=255, blank=True, default="")
     other_workers = models.TextField(blank=True, default="", help_text="Comma-separated list of other workers")
     
+    # Linked employees
+    project_lead = models.ForeignKey('employees.Employee', on_delete=models.SET_NULL, null=True, blank=True, related_name='led_projects')
+    assigned_employees = models.ManyToManyField('employees.Employee', blank=True, related_name='assigned_projects')
+    
     show_in_ranch_operations = models.BooleanField(default=False, verbose_name="Show in Ranch Operations")
     
     status = models.CharField(

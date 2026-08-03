@@ -45,9 +45,15 @@ Track guest stays, cabin assignments, work crew lodging, farrier stays, and rese
                 type="search"
                 name="q"
                 class="search-input"
-                placeholder="Search reservations, clients, households, or groups"
+                placeholder="Search reservations, clients..."
                 value="{{ search_query }}"
             >
+
+            <div class="filter-group" style="display: flex; gap: 0.5rem; align-items: center;">
+                <input type="date" name="date_start" class="form-select" value="{{ date_start }}" title="Arrival From">
+                <span>to</span>
+                <input type="date" name="date_end" class="form-select" value="{{ date_end }}" title="Departure To">
+            </div>
 
             <select name="status" class="form-select">
                 <option value="">All statuses</option>
@@ -67,9 +73,14 @@ Track guest stays, cabin assignments, work crew lodging, farrier stays, and rese
                 {% endfor %}
             </select>
 
+            <label class="checkbox-label" style="display: flex; align-items: center; gap: 0.5rem; white-space: nowrap;">
+                <input type="checkbox" name="show_past" value="true" {% if show_past %}checked{% endif %}>
+                Show Past
+            </label>
+
             <button type="submit" class="button button-secondary">Search</button>
 
-            {% if search_query or status_filter or reservation_type_filter %}
+            {% if search_query or status_filter or reservation_type_filter or date_start or date_end or show_past %}
                 <a href="{% url 'reservations:reservation_list' %}" class="button button-secondary">Clear</a>
             {% endif %}
         </form>

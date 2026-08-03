@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load group_perms %}
 
 {% block title %}{{ reservation.reservation_name }} | Reservations{% endblock %}
 
@@ -16,6 +17,7 @@
 {% endblock %}
 
 {% block content %}
+{% can_do user "Reservations" "write" as can_write %}
 <div class="detail-layout">
     <section class="panel-stack">
         <div class="detail-card">
@@ -59,6 +61,41 @@
                         <span class="text-muted">
                             ({{ reservation.adult_count }} adults, {{ reservation.child_count }} children)
                         </span>
+                    </div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Deposit Status</div>
+                    <div class="detail-value">
+                        <div class="inline-list">
+                            {% if can_write %}
+                                <form method="post" action="{% url 'reservations:reservation_toggle_deposit_request' reservation.pk %}" style="display: inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="badge {% if reservation.deposit_request_sent %}badge-info{% else %}badge-neutral{% endif %}">
+                                        {% if reservation.deposit_request_sent %}Request Sent{% else %}Not Sent{% endif %}
+                                    </button>
+                                </form>
+
+                                <form method="post" action="{% url 'reservations:reservation_toggle_deposit_received' reservation.pk %}" style="display: inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="badge {% if reservation.deposit_received %}badge-success{% else %}badge-neutral{% endif %}">
+                                        {% if reservation.deposit_received %}Received{% else %}Not Received{% endif %}
+                                    </button>
+                                </form>
+                            {% else %}
+                                {% if reservation.deposit_request_sent %}
+                                    <span class="badge badge-info">Request Sent</span>
+                                {% else %}
+                                    <span class="badge badge-neutral">Not Sent</span>
+                                {% endif %}
+
+                                {% if reservation.deposit_received %}
+                                    <span class="badge badge-success">Received</span>
+                                {% else %}
+                                    <span class="badge badge-neutral">Not Received</span>
+                                {% endif %}
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -183,13 +220,63 @@
                 </div>
             </div>
 
+            <div class="quick-add-section" style="margin-bottom: 24px; padding: 18px; background: #fbf7f0; border: 1px solid var(--color-border); border-radius: 18px;">
+                <h3 style="margin-top: 0; font-size: 1rem;">Quick Add</h3>
+                <p style="font-size: 0.85rem; color: var(--color-muted); margin-bottom: 12px;">Add guests or update reservation groups instantly.</p>
+                <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 150px;">
+                        <label style="font-size: 0.8rem; color: var(--color-muted); font-weight: 800; display: block; margin-bottom: 4px;">Type</label>
+                        <select id="quick-add-type" class="form-select">
+                            <option value="client">Guest / Client</option>
+                            <option value="household">Household</option>
+                            <option value="travel_group">Travel Group</option>
+                        </select>
+                    </div>
+                    <div style="flex: 2; min-width: 200px;">
+                        <label style="font-size: 0.8rem; color: var(--color-muted); font-weight: 800; display: block; margin-bottom: 4px;">Name</label>
+                        <input type="text" id="quick-add-name" class="form-control" placeholder="Enter name...">
+                    </div>
+
+                    <div id="quick-add-tg-container" style="flex: 2; min-width: 200px;">
+                        <label style="font-size: 0.8rem; color: var(--color-muted); font-weight: 800; display: block; margin-bottom: 4px;">Travel Group</label>
+                        <select id="quick-add-tg" class="form-select">
+                            <option value="">(None)</option>
+                            {% for tg in travel_groups %}
+                                <option value="{{ tg.pk }}" {% if tg == reservation.travel_group %}selected{% endif %}>{{ tg.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div id="quick-add-hh-container" style="flex: 2; min-width: 200px;">
+                        <label style="font-size: 0.8rem; color: var(--color-muted); font-weight: 800; display: block; margin-bottom: 4px;">Household</label>
+                        <select id="quick-add-hh" class="form-select">
+                            <option value="">(None)</option>
+                            {% for hh in households %}
+                                <option value="{{ hh.pk }}" {% if hh == reservation.household %}selected{% endif %}>{{ hh.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div style="flex: 0 0 auto;">
+                        <button type="button" id="quick-add-button" class="button button-primary" data-url="{% url 'reservations:quick_add_reservation_item' reservation.pk %}">Quick Add</button>
+                    </div>
+                </div>
+            </div>
+
             <form method="post" action="{% url 'reservations:reservation_guest_create' reservation.pk %}" class="note-form" novalidate>
                 {% csrf_token %}
 
                 <div class="form-grid">
                     <div class="form-field form-grid-full">
                         <label for="{{ guest_form.client.id_for_label }}">Guest</label>
-                        {{ guest_form.client }}
+                        <div style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                            <div style="flex: 1;">
+                                {{ guest_form.client }}
+                            </div>
+                            <a href="{% url 'reservations:reservation_guest_create_new_client' reservation.pk %}" class="button button-secondary" title="Add New Client">
+                                + New Guest
+                            </a>
+                        </div>
                     </div>
 
                     <div class="form-field form-grid-full">
@@ -224,6 +311,13 @@
                         <label>
                             {{ guest_form.is_riding }}
                             Guest will ride
+                        </label>
+                    </div>
+
+                    <div class="form-field checkbox-field">
+                        <label>
+                            {{ guest_form.signed_release }}
+                            Signed release form
                         </label>
                     </div>
 
@@ -268,6 +362,7 @@
                                     <th>Weight</th>
                                     <th>Riding</th>
                                     <th>Experience</th>
+                                    <th>Release</th>
                                     <th>Alerts</th>
                                     <th class="text-right">Actions</th>
                                 </tr>
@@ -325,6 +420,23 @@
                                         </td>
 
                                         <td>{{ guest.get_riding_experience_display }}</td>
+
+                                        <td>
+                                            {% if can_write %}
+                                                <form method="post" action="{% url 'reservations:reservation_guest_toggle_release' guest.pk %}" style="display: inline;">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="badge {% if guest.signed_release %}badge-success{% else %}badge-danger{% endif %}">
+                                                        {% if guest.signed_release %}Signed{% else %}Not Signed{% endif %}
+                                                    </button>
+                                                </form>
+                                            {% else %}
+                                                {% if guest.signed_release %}
+                                                    <span class="badge badge-success">Signed</span>
+                                                {% else %}
+                                                    <span class="badge badge-danger">Not Signed</span>
+                                                {% endif %}
+                                            {% endif %}
+                                        </td>
 
                                         <td>
                                             <div class="inline-list">
@@ -610,4 +722,117 @@
         </div>
     </aside>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const quickAddButton = document.getElementById("quick-add-button");
+    const quickAddName = document.getElementById("quick-add-name");
+    const quickAddType = document.getElementById("quick-add-type");
+    const quickAddTGContainer = document.getElementById("quick-add-tg-container");
+    const quickAddHHContainer = document.getElementById("quick-add-hh-container");
+    const quickAddTG = document.getElementById("quick-add-tg");
+    const quickAddHH = document.getElementById("quick-add-hh");
+
+    if (quickAddButton && quickAddName && quickAddType) {
+        function updateQuickAddUI() {
+            const type = quickAddType.value;
+            if (type === "client") {
+                quickAddTGContainer.style.display = "block";
+                quickAddHHContainer.style.display = "block";
+            } else if (type === "household") {
+                quickAddTGContainer.style.display = "block";
+                quickAddHHContainer.style.display = "none";
+            } else {
+                quickAddTGContainer.style.display = "none";
+                quickAddHHContainer.style.display = "none";
+            }
+        }
+
+        function fetchTGHouseholds(tgId) {
+            if (!tgId) {
+                // If no TG, keep current HH but maybe we should show all?
+                // For now, in detail view we were only showing HHs assigned to reservation.
+                // But if they are quick-adding, they might want to pick a different TG.
+                return;
+            }
+            
+            const url = `{% url 'clients:travel_group_detail_api' 0 %}`.replace('0', tgId);
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    const currentVal = quickAddHH.value;
+                    quickAddHH.innerHTML = `<option value="">(None)</option>`;
+                    if (data.households) {
+                        data.households.forEach(hh => {
+                            const opt = new Option(hh.name, hh.id);
+                            if (hh.id.toString() === currentVal) opt.selected = true;
+                            quickAddHH.add(opt);
+                        });
+                    }
+                });
+        }
+
+        quickAddTG.addEventListener("change", function() {
+            fetchTGHouseholds(quickAddTG.value);
+        });
+
+        quickAddType.addEventListener("change", updateQuickAddUI);
+        updateQuickAddUI();
+
+        quickAddButton.addEventListener("click", function() {
+            const name = quickAddName.value.trim();
+            const type = quickAddType.value;
+            if (!name) return;
+
+            const url = quickAddButton.dataset.url;
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            
+            const formData = new FormData();
+            formData.append("name", name);
+            formData.append("type", type);
+
+            if (type === "client") {
+                if (quickAddTG.value) formData.append("travel_group_id", quickAddTG.value);
+                if (quickAddHH.value) formData.append("household_id", quickAddHH.value);
+            } else if (type === "household") {
+                if (quickAddTG.value) formData.append("travel_group_id", quickAddTG.value);
+            }
+
+            quickAddButton.disabled = true;
+
+            fetch(url, {
+                method: "POST",
+                headers: {
+                    "X-CSRFToken": csrfToken,
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) throw new Error("Network response was not ok");
+                return response.json();
+            })
+            .then(data => {
+                // Success - reload to show new item
+                window.location.reload();
+            })
+            .catch(error => {
+                console.error("Error:", error);
+                alert("Error during quick add. Please try again.");
+                quickAddButton.disabled = false;
+            });
+        });
+
+        // Also support Enter key
+        quickAddName.addEventListener("keypress", function(e) {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                quickAddButton.click();
+            }
+        });
+    }
+});
+</script>
 {% endblock %}

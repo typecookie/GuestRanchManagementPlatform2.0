@@ -46,7 +46,11 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    {% if project.primary_worker %}
+                    {% if project.project_lead %}
+                    <div class="worker-badge" title="Lead: {{ project.project_lead.full_name }}" style="background: var(--color-success)">
+                        {{ project.project_lead.first_name|slice:":1" }}{{ project.project_lead.last_name|slice:":1" }}
+                    </div>
+                    {% elif project.primary_worker %}
                     <div class="worker-badge" title="Primary Worker: {{ project.primary_worker }}">
                         {{ project.primary_worker|slice:":2"|upper }}
                     </div>

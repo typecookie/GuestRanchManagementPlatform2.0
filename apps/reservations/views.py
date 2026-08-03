@@ -9,6 +9,9 @@ from django.shortcuts import get_object_or_404, redirect, render
 from apps.groups.decorators import module_permission_required
 
 from apps.cabins.models import Cabin
+from apps.clients.forms import ClientForm
+from apps.clients.models import Client, TravelGroup, Household, TravelGroupMember, HouseholdMember
+from django.http import JsonResponse
 
 from .forms import ReservationCabinForm, ReservationForm, ReservationGuestForm
 from .models import Reservation, ReservationCabin, ReservationGuest
@@ -75,6 +78,9 @@ def reservation_list(request):
     search_query = request.GET.get("q", "").strip()
     status_filter = request.GET.get("status", "").strip()
     reservation_type_filter = request.GET.get("reservation_type", "").strip()
+    date_start = request.GET.get("date_start", "").strip()
+    date_end = request.GET.get("date_end", "").strip()
+    show_past = request.GET.get("show_past") == "true"
 
     reservations = Reservation.objects.select_related(
         "primary_contact",
@@ -94,6 +100,25 @@ def reservation_list(request):
             | Q(internal_notes__icontains=search_query)
         )
 
+    if date_start:
+        try:
+            reservations = reservations.filter(arrival_date__gte=date_start)
+        except (ValueError, ValidationError):
+            pass
+
+    if date_end:
+        try:
+            reservations = reservations.filter(departure_date__lte=date_end)
+        except (ValueError, ValidationError):
+            pass
+
+    # Default logic: Hide past reservations unless explicitly searching or showing them
+    # Past reservations are those where departure_date < today
+    is_lookup_active = search_query or date_start or date_end
+
+    if not show_past and not is_lookup_active:
+        reservations = reservations.filter(departure_date__gte=date.today())
+
     if status_filter:
         reservations = reservations.filter(status=status_filter)
 
@@ -105,6 +130,9 @@ def reservation_list(request):
         "search_query": search_query,
         "status_filter": status_filter,
         "reservation_type_filter": reservation_type_filter,
+        "date_start": date_start,
+        "date_end": date_end,
+        "show_past": show_past,
         "total_reservations": Reservation.objects.count(),
         "penciled_reservations": Reservation.objects.filter(
             status=Reservation.ReservationStatus.PENCILED
@@ -133,7 +161,7 @@ def reservation_detail(request, pk):
 
     cabin_assignments = reservation.cabin_assignments.select_related("cabin")
     reservation_guests = reservation.guests.select_related("client", "cabin")
-    guest_form = ReservationGuestForm()
+    guest_form = ReservationGuestForm(reservation=reservation)
 
     cabin_guest_sections = []
 
@@ -157,6 +185,21 @@ def reservation_detail(request, pk):
         }
     )
 
+    tgs = TravelGroup.objects.none()
+    if reservation.travel_group:
+        tgs = TravelGroup.objects.filter(pk=reservation.travel_group.pk)
+    
+    hhs = Household.objects.none()
+    if reservation.household:
+        hhs = Household.objects.filter(pk=reservation.household.pk)
+    
+    if reservation.travel_group:
+        # Include all households that are members of the travel group
+        group_hhs = Household.objects.filter(
+            travel_group_memberships__travel_group=reservation.travel_group
+        )
+        hhs = (hhs | group_hhs).distinct()
+
     context = {
         "reservation": reservation,
         "cabin_assignments": cabin_assignments,
@@ -165,6 +208,8 @@ def reservation_detail(request, pk):
         "guest_form": guest_form,
         "cabin_guest_sections": cabin_guest_sections,
         "unassigned_guests": unassigned_guests,
+        "travel_groups": tgs,
+        "households": hhs,
     }
 
     return render(request, "reservations/reservation_detail.html", context)
@@ -295,11 +340,41 @@ def reservation_cabin_delete(request, pk):
     return redirect("reservations:reservation_detail", pk=reservation.pk)
 
 @module_permission_required('Reservations', 'write')
+@module_permission_required('Clients', 'write')
+def reservation_guest_create_new_client(request, pk):
+    reservation = get_object_or_404(Reservation, pk=pk)
+
+    if request.method == "POST":
+        form = ClientForm(request.POST)
+
+        if form.is_valid():
+            client = form.save()
+            create_reservation_guest_from_client(reservation, client)
+            messages.success(
+                request,
+                f"Client {client.display_name} was created and added to the reservation.",
+            )
+            return redirect("reservations:reservation_detail", pk=reservation.pk)
+    else:
+        form = ClientForm()
+
+    context = {
+        "form": form,
+        "reservation": reservation,
+        "form_title": "Add New Guest",
+        "form_subtitle": f"Create a new client profile and add them to {reservation.reservation_name}.",
+        "submit_label": "Create and Add Guest",
+    }
+
+    return render(request, "reservations/reservation_guest_new_client_form.html", context)
+
+
+@module_permission_required('Reservations', 'write')
 def reservation_guest_create(request, pk):
     reservation = get_object_or_404(Reservation, pk=pk)
 
     if request.method == "POST":
-        form = ReservationGuestForm(request.POST)
+        form = ReservationGuestForm(request.POST, reservation=reservation)
 
         if form.is_valid():
             guest = form.save(commit=False)
@@ -331,12 +406,77 @@ def reservation_guest_create(request, pk):
 
 
 @module_permission_required('Reservations', 'write')
+def quick_add_reservation_item(request, pk):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST method required'}, status=405)
+
+    reservation = get_object_or_404(Reservation, pk=pk)
+    name = request.POST.get('name', '').strip()
+    item_type = request.POST.get('type', 'client')
+    travel_group_id = request.POST.get('travel_group_id')
+    household_id = request.POST.get('household_id')
+
+    if not name:
+        return JsonResponse({'error': 'Name is required'}, status=400)
+
+    if item_type == 'client':
+        parts = name.split(' ', 1)
+        if len(parts) > 1:
+            first_name, last_name = parts
+        else:
+            first_name = parts[0]
+            last_name = "-"
+
+        client = Client.objects.create(first_name=first_name, last_name=last_name)
+
+        if travel_group_id:
+            TravelGroupMember.objects.get_or_create(travel_group_id=travel_group_id, client=client)
+        if household_id:
+            HouseholdMember.objects.get_or_create(household_id=household_id, client=client)
+
+        create_reservation_guest_from_client(reservation, client)
+        
+        return JsonResponse({
+            'id': client.pk,
+            'name': client.full_name,
+            'type': 'client'
+        })
+
+    elif item_type == 'household':
+        household = Household.objects.create(name=name)
+        if travel_group_id:
+            TravelGroupMember.objects.get_or_create(travel_group_id=travel_group_id, household=household)
+        
+        reservation.household = household
+        reservation.save(update_fields=['household'])
+        
+        return JsonResponse({
+            'id': household.pk,
+            'name': household.name,
+            'type': 'household'
+        })
+
+    elif item_type == 'travel_group':
+        travel_group = TravelGroup.objects.create(name=name)
+        reservation.travel_group = travel_group
+        reservation.save(update_fields=['travel_group'])
+        
+        return JsonResponse({
+            'id': travel_group.pk,
+            'name': travel_group.name,
+            'type': 'travel_group'
+        })
+
+    return JsonResponse({'error': 'Invalid item type'}, status=400)
+
+
+@module_permission_required('Reservations', 'write')
 def reservation_guest_update(request, pk):
     guest = get_object_or_404(ReservationGuest, pk=pk)
     reservation = guest.reservation
 
     if request.method == "POST":
-        form = ReservationGuestForm(request.POST, instance=guest)
+        form = ReservationGuestForm(request.POST, instance=guest, reservation=reservation)
 
         if form.is_valid():
             guest = form.save(commit=False)
@@ -354,7 +494,7 @@ def reservation_guest_update(request, pk):
             messages.success(request, f"Guest information for {guest.client.display_name} was updated.")
             return redirect("reservations:reservation_detail", pk=reservation.pk)
     else:
-        form = ReservationGuestForm(instance=guest)
+        form = ReservationGuestForm(instance=guest, reservation=reservation)
 
     context = {
         "guest": guest,
@@ -687,3 +827,44 @@ def reservation_grid(request):
     }
 
     return render(request, "reservations/reservation_grid.html", context)
+    
+@module_permission_required('Reservations', 'write')
+def reservation_toggle_deposit_request(request, pk):
+    reservation = get_object_or_404(Reservation, pk=pk)
+    
+    if request.method == "POST":
+        reservation.deposit_request_sent = not reservation.deposit_request_sent
+        reservation.save(update_fields=["deposit_request_sent", "updated_at"])
+        
+        status = "sent" if reservation.deposit_request_sent else "not sent"
+        messages.success(request, f"Deposit request status updated to {status}.")
+        
+    return redirect("reservations:reservation_detail", pk=reservation.pk)
+
+
+@module_permission_required('Reservations', 'write')
+def reservation_toggle_deposit_received(request, pk):
+    reservation = get_object_or_404(Reservation, pk=pk)
+    
+    if request.method == "POST":
+        reservation.deposit_received = not reservation.deposit_received
+        reservation.save(update_fields=["deposit_received", "updated_at"])
+        
+        status = "received" if reservation.deposit_received else "not received"
+        messages.success(request, f"Deposit payment status updated to {status}.")
+        
+    return redirect("reservations:reservation_detail", pk=reservation.pk)
+
+
+@module_permission_required('Reservations', 'write')
+def reservation_guest_toggle_release(request, pk):
+    guest = get_object_or_404(ReservationGuest.objects.select_related("reservation"), pk=pk)
+    
+    if request.method == "POST":
+        guest.signed_release = not guest.signed_release
+        guest.save(update_fields=["signed_release", "updated_at"])
+        
+        status = "signed" if guest.signed_release else "not signed"
+        messages.success(request, f"Release form status for {guest.client.display_name} updated to {status}.")
+        
+    return redirect("reservations:reservation_detail", pk=guest.reservation.pk)

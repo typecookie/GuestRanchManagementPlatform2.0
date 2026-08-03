@@ -23,6 +23,11 @@ urlpatterns = [
         name="household_member_create",
     ),
     path(
+        "households/<int:pk>/members/new-client/",
+        views.household_member_create_new_client,
+        name="household_member_create_new_client",
+    ),
+    path(
         "household-members/<int:pk>/delete/",
         views.household_member_delete,
         name="household_member_delete",
@@ -38,8 +43,26 @@ urlpatterns = [
         name="travel_group_member_create",
     ),
     path(
+        "travel-groups/<int:pk>/members/new-client/",
+        views.travel_group_member_create_new_client,
+        name="travel_group_member_create_new_client",
+    ),
+    path(
+        "travel-groups/<int:pk>/members/new-household/",
+        views.travel_group_member_create_new_household,
+        name="travel_group_member_create_new_household",
+    ),
+    path(
         "travel-group-members/<int:pk>/delete/",
         views.travel_group_member_delete,
         name="travel_group_member_delete",
     ),
+    # API endpoints
+    path("api/travel-groups/<int:pk>/", views.travel_group_detail_api, name="travel_group_detail_api"),
+    path("api/households/<int:pk>/", views.household_detail_api, name="household_detail_api"),
+    path("api/quick-add/client/", views.quick_add_client, name="quick_add_client"),
+    path("api/quick-add/household/", views.quick_add_household, name="quick_add_household"),
+    path("api/quick-add/travel-group/", views.quick_add_travel_group, name="quick_add_travel_group"),
+    path("api/quick-add/household-member/<int:pk>/", views.quick_add_household_member, name="quick_add_household_member"),
+    path("api/quick-add/travel-group-member/<int:pk>/", views.quick_add_travel_group_member, name="quick_add_travel_group_member"),
 ]

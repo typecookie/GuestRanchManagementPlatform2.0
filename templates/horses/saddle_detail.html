@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% load group_perms %}
+
+{% block title %}Saddle Detail: {{ saddle.saddle_number }} | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Saddle Inventory{% endblock %}
+
+{% block page_title %}Saddle {{ saddle.saddle_number }}{% endblock %}
+
+{% block page_actions %}
+{% can_do user "Horses" "write" as can_write %}
+{% if can_write %}
+<a href="{% url 'horses:saddle_update' saddle.pk %}" class="button button-primary">Edit Saddle</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-layout">
+    <div class="dashboard-main">
+        <div class="panel-stack">
+            <div class="detail-card">
+                <div class="section-heading">
+                    <h2>Saddle Specifications</h2>
+                    <div>
+                        {% if saddle.status == 'in_service' %}
+                            <span class="badge badge-success">In Service</span>
+                        {% else %}
+                            <span class="badge badge-danger">Out of Service</span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="detail-list">
+                    <div class="detail-row">
+                        <div class="detail-label">Saddle ID</div>
+                        <div class="detail-value"><strong>{{ saddle.saddle_number }}</strong></div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Rack Number</div>
+                        <div class="detail-value">{{ saddle.rack_number|default:"—" }}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Seat Size</div>
+                        <div class="detail-value">{{ saddle.seat_size }}"</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Stirrup Range</div>
+                        <div class="detail-value">{{ saddle.min_stirrup_length }}" - {{ saddle.max_stirrup_length }}"</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Condition</div>
+                        <div class="detail-value">
+                            <span class="badge condition-badge-{{ saddle.condition }}">
+                                {{ saddle.get_condition_display }}
+                            </span>
+                        </div>
+                    </div>
+                    {% if saddle.status == 'out_of_service' %}
+                    <div class="detail-row">
+                        <div class="detail-label">OOS Location</div>
+                        <div class="detail-value"><strong>{{ saddle.out_of_service_location|default:"Unknown" }}</strong></div>
+                    </div>
+                    {% endif %}
+                    <div class="detail-row">
+                        <div class="detail-label">Purchase Date</div>
+                        <div class="detail-value">{{ saddle.purchase_date|date:"F j, Y"|default:"—" }}</div>
+                    </div>
+                </div>
+
+                {% if saddle.notes %}
+                <div class="divider"></div>
+                <h3>Notes</h3>
+                <p>{{ saddle.notes|linebreaks }}</p>
+                {% endif %}
+            </div>
+
+            <div class="dashboard-section">
+                <div class="section-heading">
+                    <h2>Maintenance History</h2>
+                    {% can_do user "Horses" "write" as can_write %}
+                    {% if can_write %}
+                    <a href="{% url 'horses:saddle_maintenance_log_create' saddle.pk %}" class="button button-small button-primary">Add Log Entry</a>
+                    {% endif %}
+                </div>
+
+                {% if logs %}
+                    <div class="table-card">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Description</th>
+                                        <th class="text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for log in logs %}
+                                        <tr>
+                                            <td class="nowrap"><strong>{{ log.date|date:"M j, Y" }}</strong></td>
+                                            <td>
+                                                {{ log.description|linebreaksbr }}
+                                                {% if log.notes %}
+                                                    <br><small class="text-muted">Note: {{ log.notes }}</small>
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-right">
+                                                {% can_do user "Horses" "delete" as can_delete %}
+                                                {% if can_delete %}
+                                                <a href="{% url 'horses:saddle_maintenance_log_delete' log.pk %}" class="button button-small button-danger">Delete</a>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        <p>No maintenance logs recorded for this saddle yet.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <aside class="dashboard-sidebar">
+        <div class="detail-card">
+            <h2>Actions</h2>
+            <div class="panel-stack">
+                <a href="{% url 'horses:saddle_update' saddle.pk %}" class="button button-primary">Edit Specifications</a>
+                <a href="{% url 'horses:saddle_maintenance_log_create' saddle.pk %}" class="button button-secondary">Record Maintenance</a>
+                <div class="divider"></div>
+                <a href="{% url 'horses:saddle_delete' saddle.pk %}" class="button button-danger">Remove from Inventory</a>
+            </div>
+        </div>
+        
+        <div class="mt-3">
+            <a href="{% url 'horses:saddle_list' %}" class="card-link">Back to Saddle List</a>
+        </div>
+    </aside>
+</div>
+
+<style>
+    .condition-badge-1 { background-color: var(--color-danger) !important; color: white !important; }
+    .condition-badge-2 { background-color: #e67e22 !important; color: white !important; }
+    .condition-badge-3 { background-color: #f1c40f !important; color: black !important; }
+    .condition-badge-4 { background-color: #2ecc71 !important; color: white !important; }
+    .condition-badge-5 { background-color: var(--color-success) !important; color: white !important; }
+</style>
+{% endblock %}

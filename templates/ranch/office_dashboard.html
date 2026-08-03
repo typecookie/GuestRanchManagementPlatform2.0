@@ -212,7 +212,7 @@ Weekly office dashboard for guest assignments, reservation cleanup, and reports.
                 <a href="{% url 'ranch:weekly_dining_guest_list_report' %}?week={{ week_start|date:'Y-m-d' }}"
     class="quick-action">Dining Hall Guest List</a>
                 <a href="#" class="quick-action">Special Needs Report</a>
-                <a href="#" class="quick-action">Horse Assignment Report</a>
+                <a href="{% url 'ranch:weekly_horse_assignment_report' %}?week={{ week_start|date:'Y-m-d' }}" class="quick-action">Horse Assignment Report</a>
             </div>
 
             <p class="text-muted">

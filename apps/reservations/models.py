@@ -77,6 +77,9 @@ class Reservation(models.Model):
     notes = models.TextField(blank=True)
     internal_notes = models.TextField(blank=True)
 
+    deposit_request_sent = models.BooleanField(default=False)
+    deposit_received = models.BooleanField(default=False)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -201,6 +204,20 @@ class ReservationGuest(models.Model):
         related_name="reservation_guests",
         help_text="Cabin this guest is staying in for this reservation.",
     )
+    horse = models.ForeignKey(
+        "horses.Horse",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reservation_guests",
+    )
+    saddle = models.ForeignKey(
+        "horses.Saddle",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reservation_guests",
+    )
 
     age_at_stay = models.PositiveIntegerField(null=True, blank=True)
     height = models.CharField(
@@ -226,6 +243,7 @@ class ReservationGuest(models.Model):
     notes = models.TextField(blank=True)
 
     is_riding = models.BooleanField(default=True)
+    signed_release = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

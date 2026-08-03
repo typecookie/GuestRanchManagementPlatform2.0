@@ -47,6 +47,13 @@ Welcome to your guest ranch command center.
             </div>
 
             <div class="dashboard-card">
+                <div class="dashboard-card-icon">🏇</div>
+                <h3>Saddles</h3>
+                <p>Manage saddle inventory, seat sizes, and condition levels.</p>
+                <a href="{% url 'horses:saddle_list' %}" class="card-link">Open Saddles</a>
+            </div>
+
+            <div class="dashboard-card">
                 <div class="dashboard-card-icon">🏠</div>
                 <h3>Cabins</h3>
                 <p>Monitor lodging status, capacity, housekeeping, and maintenance needs.</p>
@@ -66,6 +73,15 @@ Welcome to your guest ranch command center.
                 <p>Plan activities, maintenance tasks, inventory, schedules, and reports.</p>
                 <a href="{% url 'ranch:ranch_operations' %}" class="card-link">Open Operations</a>
             </div>
+
+            {% if perms.employees.view_employee %}
+            <div class="dashboard-card">
+                <div class="dashboard-card-icon">👷</div>
+                <h3>Employees</h3>
+                <p>Manage staff profiles, performance notes, work history, and interviews.</p>
+                <a href="{% url 'employees:employee_list' %}" class="card-link">Open Employees</a>
+            </div>
+            {% endif %}
         </div>
     </section>
 
@@ -124,6 +140,20 @@ Welcome to your guest ranch command center.
                     <span class="badge badge-neutral">Vehicles</span>
                     <p>No service alerts yet.</p>
                 </div>
+            </div>
+        </section>
+
+        <section class="side-panel">
+            <div class="section-heading compact">
+                <div>
+                    <h2>Operational Reports</h2>
+                    <p>Quick access to weekly reports.</p>
+                </div>
+            </div>
+
+            <div class="quick-action-list">
+                <a href="{% url 'ranch:weekly_horse_assignment_report' %}" class="quick-action">Horse Assignment Report</a>
+                <a href="{% url 'ranch:weekly_dining_guest_list_report' %}" class="quick-action">Dining Hall Guest List</a>
             </div>
         </section>
 

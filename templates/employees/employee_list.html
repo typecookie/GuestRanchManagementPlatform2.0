@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% load group_perms %}
+
+{% block title %}Employees | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Employee Management{% endblock %}
+
+{% block page_title %}Employees{% endblock %}
+
+{% block page_subtitle %}
+Manage employee profiles, position history, and interview records.
+{% endblock %}
+
+{% block page_actions %}
+{% can_do user "Employees" "write" as can_write %}
+<a href="{% url 'employees:interview_list' %}" class="button button-secondary">Interviews</a>
+{% if can_write %}
+<a href="{% url 'employees:employee_create' %}" class="button button-primary">Add Employee</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+{% can_do user "Employees" "write" as can_write %}
+
+<div class="page-toolbar">
+    <div class="page-toolbar-main">
+        <form class="search-form" method="get">
+            <input
+                type="search"
+                name="q"
+                class="search-input"
+                placeholder="Search by name or position"
+                value="{{ request.GET.q }}"
+            >
+
+            <select name="status" class="form-select">
+                <option value="">All statuses</option>
+                {% for value, label in status_choices %}
+                    <option value="{{ value }}" {% if request.GET.status == value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                {% endfor %}
+            </select>
+
+            <button type="submit" class="button button-secondary">Search</button>
+
+            {% if request.GET.q or request.GET.status %}
+                <a href="{% url 'employees:employee_list' %}" class="button button-secondary">Clear</a>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+{% if employees %}
+    <div class="table-card">
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Current Position</th>
+                        <th>Status</th>
+                        <th>Linked User</th>
+                        <th class="text-right">Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for employee in employees %}
+                        <tr>
+                            <td>
+                                <strong>{{ employee.full_name }}</strong>
+                            </td>
+
+                            <td>
+                                {{ employee.current_position|default:"—" }}
+                            </td>
+
+                            <td>
+                                {% if employee.status == 'active' %}
+                                    <span class="badge badge-success">Active</span>
+                                {% elif employee.status == 'terminated' %}
+                                    <span class="badge badge-danger">Terminated</span>
+                                {% elif employee.status == 'end_of_contract' %}
+                                    <span class="badge badge-warning">End of Contract</span>
+                                {% elif employee.status == 'left_early' %}
+                                    <span class="badge badge-neutral">Left Early</span>
+                                {% else %}
+                                    <span class="badge badge-neutral">{{ employee.get_status_display }}</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if employee.user %}
+                                    {{ employee.user.username }}
+                                {% else %}
+                                    <span class="table-muted">Not linked</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                <div class="table-actions">
+                                    <a href="{% url 'employees:employee_detail' employee.pk %}" class="button button-small button-secondary">View</a>
+                                    {% if can_write %}
+                                    <a href="{% url 'employees:employee_update' employee.pk %}" class="button button-small button-primary">Edit</a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% else %}
+    <div class="empty-state">
+        <div class="empty-state-content">
+            <div class="empty-state-icon">👥</div>
+            <h2>No employees found</h2>
+            <p>
+                {% if request.GET.q or request.GET.status %}
+                    No employee records matched your current search or filters.
+                {% else %}
+                    Start by adding your first employee to track their performance, positions, and interviews.
+                {% endif %}
+            </p>
+            {% if can_write %}
+                <a href="{% url 'employees:employee_create' %}" class="button button-primary">Add Employee</a>
+            {% endif %}
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

@@ -13,6 +13,10 @@
 {% block page_actions %}
 {% if client %}
     <a href="{% url 'clients:client_detail' client.pk %}" class="button button-secondary">Cancel</a>
+{% elif household %}
+    <a href="{% url 'clients:household_detail' household.pk %}" class="button button-secondary">Cancel</a>
+{% elif travel_group %}
+    <a href="{% url 'clients:travel_group_detail' travel_group.pk %}" class="button button-secondary">Cancel</a>
 {% else %}
     <a href="{% url 'clients:client_list' %}" class="button button-secondary">Cancel</a>
 {% endif %}
@@ -147,6 +151,10 @@
     <div class="form-actions">
         {% if client %}
             <a href="{% url 'clients:client_detail' client.pk %}" class="button button-secondary">Cancel</a>
+        {% elif household %}
+            <a href="{% url 'clients:household_detail' household.pk %}" class="button button-secondary">Cancel</a>
+        {% elif travel_group %}
+            <a href="{% url 'clients:travel_group_detail' travel_group.pk %}" class="button button-secondary">Cancel</a>
         {% else %}
             <a href="{% url 'clients:client_list' %}" class="button button-secondary">Cancel</a>
         {% endif %}

@@ -1,4 +1,5 @@
 from django import forms
+from django.urls import reverse_lazy
 
 from .models import (
     Client,
@@ -54,6 +55,22 @@ class HouseholdForm(forms.ModelForm):
             "is_active",
         ]
         widgets = {
+            "primary_contact": forms.Select(
+                attrs={
+                    "class": "js-searchable-select",
+                    "data-placeholder": "Search clients...",
+                    "data-create-url": reverse_lazy("clients:client_create"),
+                    "data-quick-add-url": reverse_lazy("clients:quick_add_client"),
+                }
+            ),
+            "billing_contact": forms.Select(
+                attrs={
+                    "class": "js-searchable-select",
+                    "data-placeholder": "Search clients...",
+                    "data-create-url": reverse_lazy("clients:client_create"),
+                    "data-quick-add-url": reverse_lazy("clients:quick_add_client"),
+                }
+            ),
             "notes": forms.Textarea(attrs={"rows": 4}),
         }
 
@@ -69,6 +86,14 @@ class TravelGroupForm(forms.ModelForm):
             "is_active",
         ]
         widgets = {
+            "primary_contact": forms.Select(
+                attrs={
+                    "class": "js-searchable-select",
+                    "data-placeholder": "Search clients...",
+                    "data-create-url": reverse_lazy("clients:client_create"),
+                    "data-quick-add-url": reverse_lazy("clients:quick_add_client"),
+                }
+            ),
             "notes": forms.Textarea(attrs={"rows": 4}),
         }
 
@@ -97,7 +122,13 @@ class HouseholdMemberForm(forms.ModelForm):
             "notes",
         ]
         widgets = {
-            "client": forms.Select(attrs={"class": "js-searchable-select"}),
+            "client": forms.Select(
+                attrs={
+                    "class": "js-searchable-select",
+                    "data-placeholder": "Search clients...",
+                    "data-quick-add-url": reverse_lazy("clients:quick_add_client"),
+                }
+            ),
             "notes": forms.Textarea(attrs={"rows": 3}),
         }
 
@@ -116,12 +147,14 @@ class TravelGroupMemberForm(forms.ModelForm):
                 attrs={
                     "class": "js-searchable-select",
                     "data-placeholder": "Search households...",
+                    "data-quick-add-url": reverse_lazy("clients:quick_add_household"),
                 }
             ),
             "client": forms.Select(
                 attrs={
                     "class": "js-searchable-select",
                     "data-placeholder": "Search clients...",
+                    "data-quick-add-url": reverse_lazy("clients:quick_add_client"),
                 }
             ),
             "notes": forms.Textarea(attrs={"rows": 3}),

@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% load group_perms %}
+
+{% block title %}{{ employee.full_name }} | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Employee Profile{% endblock %}
+
+{% block page_title %}{{ employee.full_name }}{% endblock %}
+
+{% block page_subtitle %}
+Position: {{ employee.current_position|default:"None" }} | Status: {{ employee.get_status_display }}
+{% endblock %}
+
+{% block page_actions %}
+{% can_do user "Employees" "write" as can_write %}
+<a href="{% url 'employees:employee_list' %}" class="button button-secondary">Back to List</a>
+{% if can_write %}
+<a href="{% url 'employees:add_interview' employee.pk %}" class="button button-secondary">Log Interview</a>
+<a href="{% url 'employees:add_position_history' employee.pk %}" class="button button-secondary">Update Position</a>
+<a href="{% url 'employees:employee_update' employee.pk %}" class="button button-primary">Edit Profile</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="detail-layout">
+    <section>
+        <div class="panel-stack">
+            <!-- Performance Notes -->
+            <div class="detail-card">
+                <h2>Performance Notes</h2>
+                <div class="guest-note-summary">
+                    {% if employee.performance_notes %}
+                        <p>{{ employee.performance_notes|linebreaksbr }}</p>
+                    {% else %}
+                        <p class="text-muted">No performance notes recorded for this employee.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Position History -->
+            <div class="table-card">
+                <div class="section-heading" style="padding: 22px 22px 0;">
+                    <h2>Position History</h2>
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Position</th>
+                                <th>Start Date</th>
+                                <th>End Date</th>
+                                <th>Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for history in position_history %}
+                                <tr>
+                                    <td><strong>{{ history.position }}</strong></td>
+                                    <td>{{ history.start_date }}</td>
+                                    <td>{{ history.end_date|default:"Present" }}</td>
+                                    <td>{{ history.notes|truncatechars:50 }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">No position history found.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Interviews -->
+            <div class="table-card">
+                <div class="section-heading" style="padding: 22px 22px 0;">
+                    <h2>Interview Records</h2>
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Status</th>
+                                <th>Interviewing</th>
+                                <th>Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for interview in interviews %}
+                                <tr>
+                                    <td><strong>{{ interview.date }}</strong></td>
+                                    <td>{{ interview.get_status_display }}</td>
+                                    <td>
+                                        {% if interview.is_interviewing %}
+                                            <span class="badge badge-info">Yes</span>
+                                        {% else %}
+                                            <span class="badge badge-neutral">No</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ interview.notes|truncatechars:50 }}
+                                        {% if interview.status == 'job_offered' and interview.offered_position %}
+                                            <div class="text-muted small">Offer: {{ interview.offered_position }}</div>
+                                        {% endif %}
+                                        {% if interview.status == 'follow_up' and interview.follow_up_reason %}
+                                            <div class="text-muted small">Reason: {{ interview.follow_up_reason }}</div>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">No interview records found.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <aside>
+        <div class="panel-stack">
+            <div class="detail-card">
+                <h2>Employee Details</h2>
+                <div class="detail-list">
+                    <div class="detail-row">
+                        <span class="detail-label">Status</span>
+                        <span class="detail-value">
+                            {% if employee.status == 'active' %}
+                                <span class="badge badge-success">Active</span>
+                            {% elif employee.status == 'terminated' %}
+                                <span class="badge badge-danger">Terminated</span>
+                            {% elif employee.status == 'end_of_contract' %}
+                                <span class="badge badge-warning">End of Contract</span>
+                            {% elif employee.status == 'left_early' %}
+                                <span class="badge badge-neutral">Left Early</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                    {% if employee.status != 'active' %}
+                    <div class="detail-row">
+                        <span class="detail-label">Reason</span>
+                        <span class="detail-value">{{ employee.status_reason|default:"No reason provided" }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="detail-row">
+                        <span class="detail-label">Linked User</span>
+                        <span class="detail-value">{{ employee.user.username|default:"Not linked" }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Joined</span>
+                        <span class="detail-value">{{ employee.created_at|date:"F j, Y" }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Assigned Projects -->
+            <div class="detail-card">
+                <h2>Active Projects</h2>
+                <div class="side-list">
+                    {% for project in employee.assigned_projects.all %}
+                        {% if project.status != 'finished' %}
+                        <div class="side-list-item">
+                            <a href="{% url 'projects:project_detail' project.pk %}"><strong>{{ project.name }}</strong></a>
+                            <span>Status: {{ project.get_status_display }}</span>
+                        </div>
+                        {% endif %}
+                    {% empty %}
+                        <p class="text-muted">No active project assignments.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </aside>
+</div>
+{% endblock %}

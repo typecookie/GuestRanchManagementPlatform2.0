@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "apps.vehicles.apps.VehiclesConfig",
     "apps.ranch.apps.RanchConfig",
     "apps.projects.apps.ProjectsConfig",
+    "apps.employees.apps.EmployeesConfig",
     "apps.groups.apps.GroupsConfig",
 ]
 

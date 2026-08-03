@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% load group_perms %}
+
+{% block title %}Saddles | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Ranch Assets{% endblock %}
+
+{% block page_title %}Saddles{% endblock %}
+
+{% block page_subtitle %}
+Manage saddle inventory, seat sizes, stirrup lengths, and condition.
+{% endblock %}
+
+{% block page_actions %}
+{% can_do user "Horses" "write" as can_write %}
+{% if can_write %}
+<a href="{% url 'horses:saddle_create' %}" class="button button-primary">Add Saddle</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+{% can_do user "Horses" "write" as can_write %}
+<div class="stat-grid">
+    <div class="stat-card">
+        <span>Total Saddles</span>
+        <strong>{{ total_saddles }}</strong>
+    </div>
+</div>
+
+<div class="page-toolbar">
+    <div class="page-toolbar-main">
+        <form class="search-form" method="get">
+            <input
+                type="search"
+                name="q"
+                class="search-input"
+                placeholder="Search saddles by number, rack, or notes"
+                value="{{ search_query }}"
+            >
+
+            <button type="submit" class="button button-secondary">Search</button>
+            
+            {% if search_query %}
+                <a href="{% url 'horses:saddle_list' %}" class="button button-secondary">Clear</a>
+            {% endif %}
+        </form>
+    </div>
+
+    <div class="page-toolbar-actions">
+        {% if can_write %}
+        <a href="{% url 'horses:saddle_create' %}" class="button button-primary">Add Saddle</a>
+        {% endif %}
+    </div>
+</div>
+
+{% if saddles %}
+    <div class="table-card">
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Saddle #</th>
+                        <th>Rack #</th>
+                        <th>Seat Size</th>
+                        <th>Condition</th>
+                        <th>Status</th>
+                        <th class="text-right">Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for saddle in saddles %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'horses:saddle_detail' saddle.pk %}" class="card-link">
+                                    <strong>{{ saddle.saddle_number }}</strong>
+                                </a>
+                            </td>
+                            <td>{{ saddle.rack_number|default:"—" }}</td>
+                            <td>{{ saddle.seat_size }}"</td>
+                            <td>
+                                <span class="badge condition-badge-{{ saddle.condition }}">
+                                    {{ saddle.get_condition_display }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if saddle.status == 'in_service' %}
+                                    <span class="badge badge-success">In Service</span>
+                                {% else %}
+                                    <span class="badge badge-danger">Out of Service</span>
+                                    {% if saddle.out_of_service_location %}
+                                        <br><small class="text-muted">@ {{ saddle.out_of_service_location }}</small>
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="table-actions">
+                                    <a href="{% url 'horses:saddle_detail' saddle.pk %}" class="button button-small button-secondary">View</a>
+                                    {% if can_write %}
+                                    <a href="{% url 'horses:saddle_update' saddle.pk %}" class="button button-small button-primary">Edit</a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% else %}
+    <div class="empty-state">
+        <div class="empty-state-content">
+            <div class="empty-state-icon">🏇</div>
+            {% if search_query %}
+                <h2>No saddles found</h2>
+                <p>No saddle records matched your current search.</p>
+                <a href="{% url 'horses:saddle_list' %}" class="button button-secondary">Clear Search</a>
+            {% else %}
+                <h2>No saddles yet</h2>
+                <p>Add your first saddle to start managing your ranch inventory.</p>
+                {% if can_write %}
+                <a href="{% url 'horses:saddle_create' %}" class="button button-primary">Create First Saddle</a>
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+{% endif %}
+
+<style>
+    .condition-badge-1 { background-color: var(--color-danger) !important; color: white !important; }
+    .condition-badge-2 { background-color: #e67e22 !important; color: white !important; }
+    .condition-badge-3 { background-color: #f1c40f !important; color: black !important; }
+    .condition-badge-4 { background-color: #2ecc71 !important; color: white !important; }
+    .condition-badge-5 { background-color: var(--color-success) !important; color: white !important; }
+</style>
+{% endblock %}

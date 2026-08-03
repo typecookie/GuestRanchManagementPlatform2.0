@@ -20,9 +20,16 @@
                 <nav class="sidebar-nav" aria-label="Primary navigation">
                     <a
                         href="{% url 'core:dashboard' %}"
-                        class="sidebar-link {% if request.resolver_match.namespace == 'core' %}is-active{% endif %}"
+                        class="sidebar-link {% if request.resolver_match.url_name == 'dashboard' %}is-active{% endif %}"
                     >
                         Dashboard
+                    </a>
+
+                    <a
+                        href="{% url 'ranch:office_dashboard' %}"
+                        class="sidebar-link {% if request.resolver_match.url_name == 'office_dashboard' or 'report' in request.resolver_match.url_name %}is-active{% endif %}"
+                    >
+                        Office
                     </a>
 
                     <a
@@ -41,9 +48,16 @@
 
                     <a
                         href="{% url 'horses:horse_list' %}"
-                        class="sidebar-link {% if request.resolver_match.namespace == 'horses' %}is-active{% endif %}"
+                        class="sidebar-link {% if request.resolver_match.namespace == 'horses' and 'saddle' not in request.resolver_match.url_name %}is-active{% endif %}"
                     >
                         Horses
+                    </a>
+
+                    <a
+                        href="{% url 'horses:saddle_list' %}"
+                        class="sidebar-link {% if 'saddle' in request.resolver_match.url_name %}is-active{% endif %}"
+                    >
+                        Saddles
                     </a>
 
                     <a
@@ -62,7 +76,7 @@
 
                     <a
                         href="{% url 'ranch:ranch_operations' %}"
-                        class="sidebar-link {% if request.resolver_match.namespace == 'ranch' %}is-active{% endif %}"
+                        class="sidebar-link {% if request.resolver_match.url_name == 'ranch_operations' %}is-active{% endif %}"
                     >
                         Ranch Operations
                     </a>
@@ -73,6 +87,15 @@
                     >
                         Projects
                     </a>
+
+                    {% if perms.employees.view_employee %}
+                    <a
+                        href="{% url 'employees:employee_list' %}"
+                        class="sidebar-link {% if request.resolver_match.namespace == 'employees' %}is-active{% endif %}"
+                    >
+                        Employees
+                    </a>
+                    {% endif %}
 
                     {% if perms.auth.view_user %}
                     <a
@@ -91,13 +114,19 @@
                         Group Management
                     </a>
                     {% endif %}
+
+                    {% if user.is_staff %}
+                    <a
+                        href="/admin/"
+                        class="sidebar-link {% if '/admin/' in request.path %}is-active{% endif %}"
+                    >
+                        Admin
+                    </a>
+                    {% endif %}
                 </nav>
             </div>
 
             <div class="sidebar-footer">
-                {% if user.is_staff %}
-                <a href="/admin/" class="sidebar-admin-link">Django Admin</a>
-                {% endif %}
                 <span class="sidebar-version">Ranch Platform v0.1</span>
             </div>
         </aside>
@@ -149,5 +178,6 @@
         </main>
     </div>
         <script src="{% static 'js/main.js' %}"></script>
-    </body>
+    {% block scripts %}{% endblock %}
+</body>
 </html>

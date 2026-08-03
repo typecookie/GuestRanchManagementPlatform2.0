@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Employee: {{ employee.full_name }}{% endblock %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="form-card">
+    <form method="post">
+        {% csrf_token %}
+        
+        <div class="form-grid">
+            <div class="form-field form-grid-full">
+                <label for="{{ form.position.id_for_label }}">Position</label>
+                {{ form.position }}
+                {% if form.position.errors %}<div class="form-error">{{ form.position.errors }}</div>{% endif %}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.start_date.id_for_label }}">Start Date</label>
+                {{ form.start_date }}
+                {% if form.start_date.errors %}<div class="form-error">{{ form.start_date.errors }}</div>{% endif %}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.end_date.id_for_label }}">End Date</label>
+                {{ form.end_date }}
+                <div class="form-help">Leave blank if this is the current position.</div>
+                {% if form.end_date.errors %}<div class="form-error">{{ form.end_date.errors }}</div>{% endif %}
+            </div>
+
+            <div class="form-field form-grid-full">
+                <label for="{{ form.notes.id_for_label }}">Notes</label>
+                {{ form.notes }}
+                {% if form.notes.errors %}<div class="form-error">{{ form.notes.errors }}</div>{% endif %}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <a href="{% url 'employees:employee_detail' employee.pk %}" class="button button-secondary">Cancel</a>
+            <button type="submit" class="button button-primary">Save Position</button>
+        </div>
+    </form>
+</div>
+
+{% include "employees/_positions_datalist.html" %}
+{% endblock %}

@@ -6,7 +6,28 @@
 {% block page_title %}{% if project %}Edit {{ project.name }}{% else %}Create New Project{% endif %}{% endblock %}
 
 {% block content %}
+{% can_do user "Employees" "write" as can_write_employees %}
 <div class="form-container">
+    {% if can_write_employees %}
+    <div class="quick-add-section" style="margin-bottom: 24px; padding: 18px; background: #fbf7f0; border: 1px solid var(--color-border); border-radius: 12px;">
+        <h4 style="margin-top: 0; font-size: 0.9rem; text-transform: uppercase; color: var(--color-muted); letter-spacing: 0.05em;">Quick Add Staff to Database</h4>
+        <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+            <div style="flex: 2; min-width: 150px;">
+                <label style="font-size: 0.8rem; color: var(--color-muted); font-weight: 800; display: block; margin-bottom: 4px;">Name</label>
+                <input type="text" id="form-quick-add-name" class="form-control" placeholder="Employee Name...">
+            </div>
+            <div style="flex: 2; min-width: 150px;">
+                <label style="font-size: 0.8rem; color: var(--color-muted); font-weight: 800; display: block; margin-bottom: 4px;">Position / Job Title</label>
+                <input type="text" id="form-quick-add-position" class="form-control" placeholder="e.g. Lead Carpenter" list="positions-datalist">
+            </div>
+            <div style="flex: 0 0 auto;">
+                <button type="button" id="form-quick-add-button" class="button button-secondary" data-url="{% url 'employees:quick_add_employee' %}">Quick Add</button>
+            </div>
+        </div>
+        <p style="font-size: 0.75rem; color: var(--color-muted); margin-top: 8px; margin-bottom: 0;">This adds the employee to the system so you can select them below.</p>
+    </div>
+    {% endif %}
+
     <form method="post" class="standard-form">
         {% csrf_token %}
         <div class="form-group">
@@ -43,22 +64,37 @@
 
         <div class="workers-section" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
             <div class="form-group">
-                <label for="{{ form.project_owner.id_for_label }}">Project Owner</label>
-                {{ form.project_owner }}
-                {% if form.project_owner.errors %}<div class="form-error">{{ form.project_owner.errors }}</div>{% endif %}
+                <label for="{{ form.project_lead.id_for_label }}">Project Lead (Employee)</label>
+                {{ form.project_lead }}
+                {% if form.project_lead.errors %}<div class="form-error">{{ form.project_lead.errors }}</div>{% endif %}
             </div>
             
             <div class="form-group">
-                <label for="{{ form.primary_worker.id_for_label }}">Primary Worker</label>
-                {{ form.primary_worker }}
-                {% if form.primary_worker.errors %}<div class="form-error">{{ form.primary_worker.errors }}</div>{% endif %}
+                <label for="{{ form.project_owner.id_for_label }}">Project Owner (Legacy)</label>
+                {{ form.project_owner }}
+                {% if form.project_owner.errors %}<div class="form-error">{{ form.project_owner.errors }}</div>{% endif %}
             </div>
         </div>
 
         <div class="form-group">
-            <label for="{{ form.other_workers.id_for_label }}">Other Workers</label>
-            {{ form.other_workers }}
-            {% if form.other_workers.errors %}<div class="form-error">{{ form.other_workers.errors }}</div>{% endif %}
+            <label for="{{ form.assigned_employees.id_for_label }}">Assigned Employees</label>
+            {{ form.assigned_employees }}
+            <div class="form-help">Hold Ctrl (or Cmd) to select multiple active employees.</div>
+            {% if form.assigned_employees.errors %}<div class="form-error">{{ form.assigned_employees.errors }}</div>{% endif %}
+        </div>
+
+        <div class="workers-section" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+            <div class="form-group">
+                <label for="{{ form.primary_worker.id_for_label }}">Primary Worker (Legacy)</label>
+                {{ form.primary_worker }}
+                {% if form.primary_worker.errors %}<div class="form-error">{{ form.primary_worker.errors }}</div>{% endif %}
+            </div>
+            
+            <div class="form-group">
+                <label for="{{ form.other_workers.id_for_label }}">Other Workers (Legacy)</label>
+                {{ form.other_workers }}
+                {% if form.other_workers.errors %}<div class="form-error">{{ form.other_workers.errors }}</div>{% endif %}
+            </div>
         </div>
         
         <div class="cost-fields" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
@@ -103,4 +139,83 @@
         box-shadow: var(--shadow-card);
     }
 </style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const quickAddButton = document.getElementById("form-quick-add-button");
+    const quickAddName = document.getElementById("form-quick-add-name");
+    const quickAddPosition = document.getElementById("form-quick-add-position");
+    
+    const leadSelect = document.getElementById("id_project_lead");
+    const assignedSelect = document.getElementById("id_assigned_employees");
+
+    if (quickAddButton && quickAddName) {
+        quickAddButton.addEventListener("click", function() {
+            const name = quickAddName.value.trim();
+            const position = quickAddPosition.value.trim();
+            
+            if (!name) return;
+
+            const url = quickAddButton.dataset.url;
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            
+            const formData = new FormData();
+            formData.append("name", name);
+            formData.append("position", position);
+
+            quickAddButton.disabled = true;
+
+            fetch(url, {
+                method: "POST",
+                headers: {
+                    "X-CSRFToken": csrfToken,
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) throw new Error("Network response was not ok");
+                return response.json();
+            })
+            .then(data => {
+                if (data.id) {
+                    // Add to both selects
+                    [leadSelect, assignedSelect].forEach(select => {
+                        if (select) {
+                            const opt = new Option(data.name, data.id, false, false);
+                            select.add(opt);
+                        }
+                    });
+
+                    // Clear inputs
+                    quickAddName.value = "";
+                    quickAddPosition.value = "";
+                    
+                    alert(`Added ${data.name} to database. You can now select them in the lists below.`);
+                }
+                quickAddButton.disabled = false;
+            })
+            .catch(error => {
+                console.error("Error:", error);
+                alert("Error during quick add. Please try again.");
+                quickAddButton.disabled = false;
+            });
+        });
+
+        // Also support Enter key
+        [quickAddName, quickAddPosition].forEach(el => {
+            el.addEventListener("keypress", function(e) {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    quickAddButton.click();
+                }
+            });
+        });
+    }
+    });
+</script>
+
+{% include "employees/_positions_datalist.html" %}
 {% endblock %}

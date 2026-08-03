@@ -31,6 +31,63 @@ class Horse(models.Model):
     def __str__(self):
         return self.name
 
+class Saddle(models.Model):
+    class Status(models.TextChoices):
+        IN_SERVICE = "in_service", "In Service"
+        OUT_OF_SERVICE = "out_of_service", "Out of Service"
+
+    saddle_number = models.CharField(max_length=50, unique=True, verbose_name="Saddle Identifier")
+    rack_number = models.CharField(max_length=50, blank=True)
+    seat_size = models.DecimalField(max_digits=4, decimal_places=1, help_text="Seat size in inches (e.g. 14.5)")
+    min_stirrup_length = models.PositiveIntegerField(help_text="In inches")
+    max_stirrup_length = models.PositiveIntegerField(help_text="In inches")
+    purchase_date = models.DateField(null=True, blank=True)
+    condition = models.PositiveIntegerField(
+        choices=[(1, "1 (Red)"), (2, "2"), (3, "3"), (4, "4"), (5, "5 (Green)")],
+        default=5
+    )
+    status = models.CharField(
+        max_length=20, 
+        choices=Status.choices, 
+        default=Status.IN_SERVICE
+    )
+    out_of_service_location = models.CharField(
+        max_length=100, 
+        blank=True, 
+        help_text="Location if out of service (e.g. Leather Shop)"
+    )
+    notes = models.TextField(blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["status", "rack_number", "saddle_number"]
+
+    def __str__(self):
+        if self.rack_number:
+            res = f"Rack {self.rack_number}"
+        else:
+            res = f"Saddle {self.saddle_number}"
+        
+        if self.status == self.Status.OUT_OF_SERVICE:
+            res += " [OUT OF SERVICE]"
+        return res
+
+class SaddleMaintenanceLog(models.Model):
+    saddle = models.ForeignKey(Saddle, on_delete=models.CASCADE, related_name='maintenance_logs')
+    date = models.DateField()
+    description = models.TextField()
+    notes = models.TextField(blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date", "-created_at"]
+
+    def __str__(self):
+        return f"{self.date}: {self.saddle.saddle_number}"
+
 class MedicalRecord(models.Model):
     horse = models.ForeignKey(Horse, on_delete=models.CASCADE, related_name='medical_records')
     diagnosis = models.CharField(max_length=255, verbose_name="Sickness/Injury", default="Unknown")

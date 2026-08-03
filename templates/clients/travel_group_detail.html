@@ -68,6 +68,37 @@ Manage connected households and guests for this multi-family trip, reunion, or r
                 </div>
             </div>
 
+            <div class="mb-3">
+                <div class="form-field">
+                    <label>Quick Add Member (Name only)</label>
+                    <div style="display: flex; gap: 10px; align-items: flex-end;">
+                        <div style="flex: 1;">
+                            <label style="font-size: 0.8rem; color: var(--color-muted);">Type</label>
+                            <select id="quick-add-member-type" class="form-select">
+                                <option value="client">Individual Client</option>
+                                <option value="household">Household</option>
+                            </select>
+                        </div>
+                        <div style="flex: 3;">
+                            <label style="font-size: 0.8rem; color: var(--color-muted);">Name</label>
+                            <input type="text" id="quick-add-member-name" class="form-control" placeholder="Enter name...">
+                        </div>
+                        <div id="quick-add-household-select-container" style="flex: 2;">
+                            <label style="font-size: 0.8rem; color: var(--color-muted);">Add to Household</label>
+                            <select id="quick-add-member-household" class="form-select">
+                                <option value="">(None)</option>
+                                {% for membership in memberships %}
+                                    {% if membership.household %}
+                                        <option value="{{ membership.household.pk }}">{{ membership.household.name }}</option>
+                                    {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="button" id="quick-add-member-button" class="button button-primary" data-url="{% url 'clients:quick_add_travel_group_member' travel_group.pk %}">Quick Add</button>
+                    </div>
+                </div>
+            </div>
+
             <form method="post" action="{% url 'clients:travel_group_member_create' travel_group.pk %}" class="note-form">
                 {% csrf_token %}
 
@@ -79,12 +110,18 @@ Manage connected households and guests for this multi-family trip, reunion, or r
 
                 <div class="form-grid">
                     <div class="form-field">
-                        <label for="{{ member_form.household.id_for_label }}">Household</label>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <label for="{{ member_form.household.id_for_label }}">Household</label>
+                            <a href="{% url 'clients:travel_group_member_create_new_household' travel_group.pk %}" class="button button-small button-secondary" style="font-size: 0.7rem; padding: 4px 8px; min-height: 0;">+ Create New</a>
+                        </div>
                         {{ member_form.household }}
                     </div>
 
                     <div class="form-field">
-                        <label for="{{ member_form.client.id_for_label }}">Individual Client</label>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <label for="{{ member_form.client.id_for_label }}">Individual Client</label>
+                            <a href="{% url 'clients:travel_group_member_create_new_client' travel_group.pk %}" class="button button-small button-secondary" style="font-size: 0.7rem; padding: 4px 8px; min-height: 0;">+ Create New</a>
+                        </div>
                         {{ member_form.client }}
                     </div>
 
@@ -210,4 +247,74 @@ Manage connected households and guests for this multi-family trip, reunion, or r
         </div>
     </aside>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const quickAddButton = document.getElementById("quick-add-member-button");
+    const quickAddInput = document.getElementById("quick-add-member-name");
+    const quickAddType = document.getElementById("quick-add-member-type");
+    const quickAddHousehold = document.getElementById("quick-add-member-household");
+    const quickAddHouseholdContainer = document.getElementById("quick-add-household-select-container");
+
+    if (quickAddButton && quickAddInput && quickAddType) {
+        // Toggle household select visibility based on type
+        quickAddType.addEventListener("change", function() {
+            if (quickAddType.value === "client") {
+                quickAddHouseholdContainer.style.display = "block";
+            } else {
+                quickAddHouseholdContainer.style.display = "none";
+                quickAddHousehold.value = "";
+            }
+        });
+
+        quickAddButton.addEventListener("click", function() {
+            const name = quickAddInput.value.trim();
+            const type = quickAddType.value;
+            const householdId = quickAddHousehold.value;
+            if (!name) return;
+
+            const url = quickAddButton.dataset.url;
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            const formData = new FormData();
+            formData.append("name", name);
+            formData.append("type", type);
+            if (type === "client" && householdId) {
+                formData.append("household_id", householdId);
+            }
+
+            quickAddButton.disabled = true;
+
+            fetch(url, {
+                method: "POST",
+                headers: {
+                    "X-CSRFToken": csrfToken,
+                },
+                body: formData,
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.id) {
+                    window.location.reload();
+                } else if (data.error) {
+                    alert(data.error);
+                    quickAddButton.disabled = false;
+                }
+            })
+            .catch(error => {
+                console.error("Error:", error);
+                alert("An error occurred. Please try again.");
+                quickAddButton.disabled = false;
+            });
+        });
+
+        quickAddInput.addEventListener("keypress", function(e) {
+            if (e.key === "Enter") {
+                quickAddButton.click();
+            }
+        });
+    }
+});
+</script>
 {% endblock %}

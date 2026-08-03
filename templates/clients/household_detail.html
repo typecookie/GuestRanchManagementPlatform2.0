@@ -92,12 +92,25 @@ View family members, contact information, travel group connections, and househol
                 </div>
             </div>
 
+            <div class="mb-3">
+                <div class="form-field">
+                    <label>Quick Add Member (Name only)</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="quick-add-member-name" class="form-control" placeholder="Enter first and last name...">
+                        <button type="button" id="quick-add-member-button" class="button button-primary" data-url="{% url 'clients:quick_add_household_member' household.pk %}">Quick Add</button>
+                    </div>
+                </div>
+            </div>
+
             <form method="post" action="{% url 'clients:household_member_create' household.pk %}" class="note-form">
                 {% csrf_token %}
 
                 <div class="form-grid">
                     <div class="form-field">
-                        <label for="{{ member_form.client.id_for_label }}">Client</label>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <label for="{{ member_form.client.id_for_label }}">Client</label>
+                            <a href="{% url 'clients:household_member_create_new_client' household.pk %}" class="button button-small button-secondary" style="font-size: 0.7rem; padding: 4px 8px; min-height: 0;">+ Create New</a>
+                        </div>
                         {{ member_form.client }}
                     </div>
 
@@ -246,4 +259,55 @@ View family members, contact information, travel group connections, and househol
         </div>
     </aside>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const quickAddButton = document.getElementById("quick-add-member-button");
+    const quickAddInput = document.getElementById("quick-add-member-name");
+
+    if (quickAddButton && quickAddInput) {
+        quickAddButton.addEventListener("click", function() {
+            const name = quickAddInput.value.trim();
+            if (!name) return;
+
+            const url = quickAddButton.dataset.url;
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            const formData = new FormData();
+            formData.append("name", name);
+
+            quickAddButton.disabled = true;
+
+            fetch(url, {
+                method: "POST",
+                headers: {
+                    "X-CSRFToken": csrfToken,
+                },
+                body: formData,
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.id) {
+                    window.location.reload();
+                } else if (data.error) {
+                    alert(data.error);
+                    quickAddButton.disabled = false;
+                }
+            })
+            .catch(error => {
+                console.error("Error:", error);
+                alert("An error occurred. Please try again.");
+                quickAddButton.disabled = false;
+            });
+        });
+
+        quickAddInput.addEventListener("keypress", function(e) {
+            if (e.key === "Enter") {
+                quickAddButton.click();
+            }
+        });
+    }
+});
+</script>
 {% endblock %}

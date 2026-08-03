@@ -1,0 +1,23 @@
+<datalist id="positions-datalist">
+    {% for pos in all_positions %}
+        <option value="{{ pos }}">
+    {% endfor %}
+</datalist>
+
+<script>
+    // If all_positions is not in context, fetch it via API
+    document.addEventListener('DOMContentLoaded', function() {
+        const datalist = document.getElementById('positions-datalist');
+        if (datalist.options.length === 0) {
+            fetch('{% url "employees:api_positions" %}')
+                .then(response => response.json())
+                .then(data => {
+                    data.positions.forEach(pos => {
+                        const option = document.createElement('option');
+                        option.value = pos;
+                        datalist.appendChild(option);
+                    });
+                });
+        }
+    });
+</script>

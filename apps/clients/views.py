@@ -1,7 +1,9 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from apps.groups.decorators import module_permission_required
 
 from .forms import (
@@ -180,6 +182,7 @@ def household_detail(request, pk):
     memberships = household.memberships.select_related("client")
     travel_group_memberships = household.travel_group_memberships.select_related("travel_group")
     member_form = HouseholdMemberForm()
+    member_form.fields['client'].widget.attrs['data-create-url'] = reverse('clients:household_member_create_new_client', args=[household.pk])
 
     context = {
         "household": household,
@@ -244,6 +247,36 @@ def household_member_create(request, pk):
     return redirect("clients:household_detail", pk=household.pk)
 
 
+@module_permission_required('Clients', 'write')
+def household_member_create_new_client(request, pk):
+    household = get_object_or_404(Household, pk=pk)
+
+    if request.method == "POST":
+        form = ClientForm(request.POST)
+
+        if form.is_valid():
+            client = form.save()
+            HouseholdMember.objects.create(
+                household=household,
+                client=client,
+                relationship=HouseholdMember.Relationship.UNKNOWN
+            )
+            messages.success(request, f"Client {client.display_name} was created and added to {household.name}.")
+            return redirect("clients:household_detail", pk=household.pk)
+    else:
+        form = ClientForm()
+
+    context = {
+        "form": form,
+        "household": household,
+        "form_title": "Add New Member to Household",
+        "form_subtitle": f"Create a new client profile and add them to {household.name}.",
+        "submit_label": "Create and Add Member",
+    }
+
+    return render(request, "clients/client_form.html", context)
+
+
 @module_permission_required('Clients', 'delete')
 def household_member_delete(request, pk):
     membership = get_object_or_404(HouseholdMember, pk=pk)
@@ -298,6 +331,8 @@ def travel_group_detail(request, pk):
         "client",
     )
     member_form = TravelGroupMemberForm()
+    member_form.fields['client'].widget.attrs['data-create-url'] = reverse('clients:travel_group_member_create_new_client', args=[travel_group.pk])
+    member_form.fields['household'].widget.attrs['data-create-url'] = reverse('clients:travel_group_member_create_new_household', args=[travel_group.pk])
 
     context = {
         "travel_group": travel_group,
@@ -351,6 +386,66 @@ def travel_group_member_create(request, pk):
         messages.error(request, "Please correct the travel group member form errors.")
 
     return redirect("clients:travel_group_detail", pk=travel_group.pk)
+
+
+@module_permission_required('Clients', 'write')
+def travel_group_member_create_new_client(request, pk):
+    travel_group = get_object_or_404(TravelGroup, pk=pk)
+
+    if request.method == "POST":
+        form = ClientForm(request.POST)
+
+        if form.is_valid():
+            client = form.save()
+            TravelGroupMember.objects.create(
+                travel_group=travel_group,
+                client=client,
+                role=TravelGroupMember.Role.GUEST
+            )
+            messages.success(request, f"Client {client.display_name} was created and added to {travel_group.name}.")
+            return redirect("clients:travel_group_detail", pk=travel_group.pk)
+    else:
+        form = ClientForm()
+
+    context = {
+        "form": form,
+        "travel_group": travel_group,
+        "form_title": "Add New Client to Travel Group",
+        "form_subtitle": f"Create a new client profile and add them to {travel_group.name}.",
+        "submit_label": "Create and Add Client",
+    }
+
+    return render(request, "clients/client_form.html", context)
+
+
+@module_permission_required('Clients', 'write')
+def travel_group_member_create_new_household(request, pk):
+    travel_group = get_object_or_404(TravelGroup, pk=pk)
+
+    if request.method == "POST":
+        form = HouseholdForm(request.POST)
+
+        if form.is_valid():
+            household = form.save()
+            TravelGroupMember.objects.create(
+                travel_group=travel_group,
+                household=household,
+                role=TravelGroupMember.Role.FAMILY_UNIT
+            )
+            messages.success(request, f"Household {household.name} was created and added to {travel_group.name}.")
+            return redirect("clients:travel_group_detail", pk=travel_group.pk)
+    else:
+        form = HouseholdForm()
+
+    context = {
+        "form": form,
+        "travel_group": travel_group,
+        "form_title": "Add New Household to Travel Group",
+        "form_subtitle": f"Create a new household and add it to {travel_group.name}.",
+        "submit_label": "Create and Add Household",
+    }
+
+    return render(request, "clients/household_form.html", context)
 
 
 @module_permission_required('Clients', 'read')
@@ -457,3 +552,178 @@ def travel_group_member_delete(request, pk):
         messages.success(request, "Travel group member was removed.")
 
     return redirect("clients:travel_group_detail", pk=travel_group.pk)
+
+
+@module_permission_required('Clients', 'read')
+def travel_group_detail_api(request, pk):
+    travel_group = get_object_or_404(TravelGroup, pk=pk)
+    households = []
+    # Get all households that are members of this travel group
+    for membership in travel_group.memberships.filter(household__isnull=False).select_related('household'):
+        households.append({
+            'id': membership.household.pk,
+            'name': membership.household.name
+        })
+        
+    data = {
+        "id": travel_group.pk,
+        "name": travel_group.name,
+        "primary_contact_id": travel_group.primary_contact_id,
+        "households": households,
+    }
+    return JsonResponse(data)
+
+
+@module_permission_required('Clients', 'read')
+def household_detail_api(request, pk):
+    household = get_object_or_404(Household, pk=pk)
+    data = {
+        "id": household.pk,
+        "name": household.name,
+        "primary_contact_id": household.primary_contact_id,
+    }
+    return JsonResponse(data)
+
+
+@module_permission_required('Clients', 'create')
+def quick_add_client(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST method required'}, status=405)
+    
+    name = request.POST.get('name', '').strip()
+    travel_group_id = request.POST.get('travel_group_id', '').strip()
+    household_id = request.POST.get('household_id', '').strip()
+    
+    if not name:
+        return JsonResponse({'error': 'Name is required'}, status=400)
+    
+    parts = name.split(' ', 1)
+    if len(parts) > 1:
+        first_name, last_name = parts
+    else:
+        first_name = parts[0]
+        last_name = "-"
+        
+    client = Client.objects.create(first_name=first_name, last_name=last_name)
+    
+    if travel_group_id:
+        tg = TravelGroup.objects.filter(pk=travel_group_id).first()
+        if tg:
+            TravelGroupMember.objects.get_or_create(travel_group=tg, client=client)
+            
+    if household_id:
+        hh = Household.objects.filter(pk=household_id).first()
+        if hh:
+            HouseholdMember.objects.get_or_create(household=hh, client=client)
+            
+    return JsonResponse({
+        'id': client.pk,
+        'name': client.full_name
+    })
+
+
+@module_permission_required('Clients', 'create')
+def quick_add_household(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST method required'}, status=405)
+    
+    name = request.POST.get('name', '').strip()
+    travel_group_id = request.POST.get('travel_group_id', '').strip()
+    
+    if not name:
+        return JsonResponse({'error': 'Name is required'}, status=400)
+    
+    household = Household.objects.create(name=name)
+    
+    if travel_group_id:
+        tg = TravelGroup.objects.filter(pk=travel_group_id).first()
+        if tg:
+            TravelGroupMember.objects.get_or_create(travel_group=tg, household=household)
+            
+    return JsonResponse({
+        'id': household.pk,
+        'name': household.name
+    })
+
+
+@module_permission_required('Clients', 'create')
+def quick_add_travel_group(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST method required'}, status=405)
+    
+    name = request.POST.get('name', '').strip()
+    if not name:
+        return JsonResponse({'error': 'Name is required'}, status=400)
+    
+    travel_group = TravelGroup.objects.create(name=name)
+    return JsonResponse({
+        'id': travel_group.pk,
+        'name': travel_group.name
+    })
+
+
+@module_permission_required('Clients', 'create')
+def quick_add_household_member(request, pk):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST method required'}, status=405)
+    
+    household = get_object_or_404(Household, pk=pk)
+    name = request.POST.get('name', '').strip()
+    if not name:
+        return JsonResponse({'error': 'Name is required'}, status=400)
+    
+    parts = name.split(' ', 1)
+    if len(parts) > 1:
+        first_name, last_name = parts
+    else:
+        first_name = parts[0]
+        last_name = "-"
+        
+    client = Client.objects.create(first_name=first_name, last_name=last_name)
+    HouseholdMember.objects.create(household=household, client=client)
+    
+    return JsonResponse({
+        'id': client.pk,
+        'name': client.full_name
+    })
+
+
+@module_permission_required('Clients', 'create')
+def quick_add_travel_group_member(request, pk):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST method required'}, status=405)
+    
+    travel_group = get_object_or_404(TravelGroup, pk=pk)
+    name = request.POST.get('name', '').strip()
+    member_type = request.POST.get('type', 'client').strip()
+    household_id = request.POST.get('household_id', '').strip()
+    
+    if not name:
+        return JsonResponse({'error': 'Name is required'}, status=400)
+    
+    if member_type == 'household':
+        household = Household.objects.create(name=name)
+        TravelGroupMember.objects.create(travel_group=travel_group, household=household)
+        return JsonResponse({
+            'id': household.pk,
+            'name': household.name
+        })
+    else:
+        parts = name.split(' ', 1)
+        if len(parts) > 1:
+            first_name, last_name = parts
+        else:
+            first_name = parts[0]
+            last_name = "-"
+            
+        client = Client.objects.create(first_name=first_name, last_name=last_name)
+        TravelGroupMember.objects.create(travel_group=travel_group, client=client)
+        
+        if household_id:
+            household = get_object_or_404(Household, pk=household_id)
+            HouseholdMember.objects.create(household=household, client=client)
+        
+        return JsonResponse({
+            'id': client.pk,
+            'name': client.full_name
+        })

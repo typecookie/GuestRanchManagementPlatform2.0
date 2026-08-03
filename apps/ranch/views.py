@@ -2,10 +2,12 @@ from datetime import date, datetime, timedelta
 
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
-from django.shortcuts import render
+from django.shortcuts import render, redirect, get_object_or_404
 from apps.groups.decorators import module_permission_required
 
 from apps.reservations.models import Reservation, ReservationCabin, ReservationGuest
+from apps.reservations.forms import HorseAssignmentForm
+from apps.horses.models import Horse
 from apps.cabins.models import Cabin
 from apps.projects.models import Project
 
@@ -203,3 +205,120 @@ def weekly_dining_guest_list_report(request):
     }
 
     return render(request, "ranch/reports/weekly_dining_guest_list.html", context)
+
+
+@module_permission_required('Ranch', 'read')
+def weekly_horse_assignment_report(request):
+    week_start = parse_week_start(request)
+    week_end = week_start + timedelta(days=7)
+
+    if request.method == "POST":
+        # Handle bulk save
+        if "save_all" in request.POST:
+            guest_ids = request.POST.getlist("guest_ids")
+            for guest_id in guest_ids:
+                guest = ReservationGuest.objects.filter(pk=guest_id).first()
+                if guest:
+                    form = HorseAssignmentForm(request.POST, instance=guest, prefix=f"guest_{guest_id}")
+                    if form.is_valid():
+                        form.save()
+            return redirect(f"{request.path}?week={week_start.strftime('%Y-%m-%d')}")
+        
+        # Keep single guest save for backward compatibility or direct posts
+        guest_id = request.POST.get("guest_id")
+        if guest_id:
+            guest = get_object_or_404(ReservationGuest, pk=guest_id)
+            form = HorseAssignmentForm(request.POST, instance=guest)
+            if form.is_valid():
+                form.save()
+                return redirect(f"{request.path}?week={week_start.strftime('%Y-%m-%d')}")
+
+    reservations_this_week = Reservation.objects.filter(
+        arrival_date__lt=week_end,
+        departure_date__gt=week_start,
+    ).exclude(
+        status=Reservation.ReservationStatus.CANCELLED,
+    )
+
+    reservation_ids = reservations_this_week.values_list("id", flat=True)
+
+    cabins = Cabin.objects.filter(
+        reservation_guests__reservation_id__in=reservation_ids,
+    ).distinct().order_by(
+        "sort_order",
+        "name",
+    )
+
+    reservation_guests = ReservationGuest.objects.select_related(
+        "reservation",
+        "client",
+        "cabin",
+        "horse",
+        "saddle",
+    ).filter(
+        reservation_id__in=reservation_ids,
+    ).order_by(
+        "cabin__sort_order",
+        "cabin__name",
+        "client__last_name",
+        "client__first_name",
+    )
+
+    # Fetch 3 most recent past horses and saddles for each guest
+    for guest in reservation_guests:
+        past_assignments = ReservationGuest.objects.filter(
+            client=guest.client,
+            reservation__arrival_date__lt=guest.reservation.arrival_date
+        ).filter(
+            Q(horse__isnull=False) | Q(saddle__isnull=False)
+        ).select_related('horse', 'saddle', 'reservation').order_by('-reservation__arrival_date')[:3]
+        
+        guest.past_horses = [pa.horse for pa in past_assignments if pa.horse]
+        guest.past_saddles = [pa.saddle for pa in past_assignments if pa.saddle]
+
+    cabin_sections = []
+
+    for cabin in cabins:
+        guests = [
+            guest
+            for guest in reservation_guests
+            if guest.cabin_id == cabin.pk
+        ]
+        
+        # Prepare forms for each guest
+        for guest in guests:
+            guest.horse_form = HorseAssignmentForm(instance=guest, prefix=f"guest_{guest.pk}")
+
+        cabin_sections.append(
+            {
+                "cabin": cabin,
+                "guests": guests,
+            }
+        )
+
+    unassigned_guests = [
+        guest
+        for guest in reservation_guests
+        if guest.cabin_id is None
+    ]
+    
+    if unassigned_guests:
+        for guest in unassigned_guests:
+            guest.horse_form = HorseAssignmentForm(instance=guest, prefix=f"guest_{guest.pk}")
+            
+        cabin_sections.append(
+            {
+                "cabin": None,
+                "guests": unassigned_guests,
+            }
+        )
+
+    context = {
+        "week_start": week_start,
+        "week_end": week_end,
+        "cabin_sections": cabin_sections,
+        "reservation_count": reservations_this_week.count(),
+        "guest_count": reservation_guests.count(),
+    }
+
+    return render(request, "ranch/reports/weekly_horse_assignment.html", context)

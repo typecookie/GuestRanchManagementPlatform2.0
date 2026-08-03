@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Employee: {{ employee.full_name }}{% endblock %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="form-card">
+    <form method="post">
+        {% csrf_token %}
+        
+        <div class="form-grid">
+            <div class="form-field">
+                <label for="{{ form.date.id_for_label }}">Interview Date</label>
+                {{ form.date }}
+                {% if form.date.errors %}<div class="form-error">{{ form.date.errors }}</div>{% endif %}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.status.id_for_label }}">Primary Status</label>
+                {{ form.status }}
+                {% if form.status.errors %}<div class="form-error">{{ form.status.errors }}</div>{% endif %}
+            </div>
+
+            <div class="form-field checkbox-field">
+                <label for="{{ form.is_interviewing.id_for_label }}">
+                    {{ form.is_interviewing }}
+                    Currently Interviewing (Sub-status)
+                </label>
+                {% if form.is_interviewing.errors %}<div class="form-error">{{ form.is_interviewing.errors }}</div>{% endif %}
+            </div>
+
+            <div class="form-field form-grid-full" id="offered-position-field" {% if form.status.value != 'job_offered' %}style="display:none;"{% endif %}>
+                <label for="{{ form.offered_position.id_for_label }}">Offered Position</label>
+                {{ form.offered_position }}
+                {% if form.offered_position.errors %}<div class="form-error">{{ form.offered_position.errors }}</div>{% endif %}
+            </div>
+
+            <div class="form-field form-grid-full" id="follow-up-reason-field" {% if form.status.value != 'follow_up' %}style="display:none;"{% endif %}>
+                <label for="{{ form.follow_up_reason.id_for_label }}">Follow-up Reason / Details</label>
+                {{ form.follow_up_reason }}
+                {% if form.follow_up_reason.errors %}<div class="form-error">{{ form.follow_up_reason.errors }}</div>{% endif %}
+            </div>
+
+            <div class="form-field form-grid-full">
+                <label for="{{ form.notes.id_for_label }}">Interview Notes</label>
+                {{ form.notes }}
+                <div class="form-help">Detailed notes from the interview session.</div>
+                {% if form.notes.errors %}<div class="form-error">{{ form.notes.errors }}</div>{% endif %}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <a href="{% url 'employees:employee_detail' employee.pk %}" class="button button-secondary">Cancel</a>
+            <button type="submit" class="button button-primary">Save Interview</button>
+        </div>
+    </form>
+</div>
+
+{% include "employees/_positions_datalist.html" %}
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const statusSelect = document.querySelector('select[name="status"]');
+        const offerField = document.getElementById('offered-position-field');
+        const followUpField = document.getElementById('follow-up-reason-field');
+
+        statusSelect.addEventListener('change', function() {
+            offerField.style.display = (this.value === 'job_offered') ? 'block' : 'none';
+            followUpField.style.display = (this.value === 'follow_up') ? 'block' : 'none';
+        });
+    });
+</script>
+{% endblock %}

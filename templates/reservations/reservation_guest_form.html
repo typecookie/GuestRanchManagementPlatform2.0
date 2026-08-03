@@ -90,6 +90,16 @@
                 {% endfor %}
             </div>
 
+            <div class="form-field checkbox-field">
+                <label>
+                    {{ form.signed_release }}
+                    Signed release form
+                </label>
+                {% for error in form.signed_release.errors %}
+                    <span class="form-error">{{ error }}</span>
+                {% endfor %}
+            </div>
+
             <div class="form-field form-grid-full">
                 <label for="{{ form.allergies.id_for_label }}">Allergies</label>
                 {{ form.allergies }}

@@ -10,4 +10,5 @@ urlpatterns = [
     path('<int:pk>/edit/', views.project_edit, name='project_edit'),
     path('<int:pk>/delete/', views.project_delete, name='project_delete'),
     path('<int:pk>/update-status/', views.update_project_status, name='update_project_status'),
+    path('<int:pk>/api/quick-add-member/', views.quick_add_project_member, name='quick_add_project_member'),
 ]

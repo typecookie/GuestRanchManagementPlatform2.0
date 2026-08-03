@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Delete Maintenance Log | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Saddle Maintenance{% endblock %}
+
+{% block page_title %}Delete Maintenance Log Entry{% endblock %}
+
+{% block content %}
+<div class="form-card max-width-sm">
+    <div class="panel-stack">
+        <p>Are you sure you want to delete the maintenance log entry from <strong>{{ log.date|date:"F j, Y" }}</strong> for saddle <strong>{{ log.saddle.saddle_number }}</strong>?</p>
+        
+        <div class="message message-warning">
+            {{ log.description|truncatewords:20 }}
+        </div>
+
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-actions">
+                <a href="{% url 'horses:saddle_detail' log.saddle.pk %}" class="button button-secondary">Cancel</a>
+                <button type="submit" class="button button-danger">Yes, delete log entry</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

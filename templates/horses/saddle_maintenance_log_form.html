@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Saddle Maintenance{% endblock %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="form-card max-width-md">
+    <form method="post" class="panel-stack">
+        {% csrf_token %}
+        
+        <div class="form-grid">
+            <div class="form-field">
+                {{ form.date.label_tag }}
+                {{ form.date }}
+                {{ form.date.errors }}
+            </div>
+            
+            <div class="form-field form-grid-full">
+                {{ form.description.label_tag }}
+                {{ form.description }}
+                {{ form.description.errors }}
+                <span class="form-help">{{ form.description.help_text }}</span>
+            </div>
+            
+            <div class="form-field form-grid-full">
+                {{ form.notes.label_tag }}
+                {{ form.notes }}
+                {{ form.notes.errors }}
+                <span class="form-help">{{ form.notes.help_text }}</span>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <a href="{% url 'horses:saddle_detail' saddle.pk %}" class="button button-secondary">Cancel</a>
+            <button type="submit" class="button button-primary">Save Log Entry</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

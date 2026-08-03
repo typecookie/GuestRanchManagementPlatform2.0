@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Employee Management{% endblock %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="form-card">
+    <form method="post">
+        {% csrf_token %}
+        
+        <div class="form-grid">
+            <div class="form-field">
+                <label for="{{ form.first_name.id_for_label }}">First Name</label>
+                {{ form.first_name }}
+                {% if form.first_name.errors %}<div class="form-error">{{ form.first_name.errors }}</div>{% endif %}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.last_name.id_for_label }}">Last Name</label>
+                {{ form.last_name }}
+                {% if form.last_name.errors %}<div class="form-error">{{ form.last_name.errors }}</div>{% endif %}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.user.id_for_label }}">Linked User</label>
+                {{ form.user }}
+                <div class="form-help">Link this employee to a system user for dashboard access.</div>
+                {% if form.user.errors %}<div class="form-error">{{ form.user.errors }}</div>{% endif %}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.current_position.id_for_label }}">Current Position</label>
+                {{ form.current_position }}
+                {% if form.current_position.errors %}<div class="form-error">{{ form.current_position.errors }}</div>{% endif %}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.status.id_for_label }}">Status</label>
+                {{ form.status }}
+                {% if form.status.errors %}<div class="form-error">{{ form.status.errors }}</div>{% endif %}
+            </div>
+
+            <div class="form-field form-grid-full" id="status-reason-field" {% if form.status.value == 'active' or not form.status.value %}style="display:none;"{% endif %}>
+                <label for="{{ form.status_reason.id_for_label }}">Reason for Status Change</label>
+                {{ form.status_reason }}
+                <div class="form-help">Explain why the employee is no longer active.</div>
+                {% if form.status_reason.errors %}<div class="form-error">{{ form.status_reason.errors }}</div>{% endif %}
+            </div>
+
+            <div class="form-field form-grid-full">
+                <label for="{{ form.performance_notes.id_for_label }}">Performance Notes</label>
+                {{ form.performance_notes }}
+                <div class="form-help">Internal notes about employee performance and track record.</div>
+                {% if form.performance_notes.errors %}<div class="form-error">{{ form.performance_notes.errors }}</div>{% endif %}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <a href="{% if employee %}{% url 'employees:employee_detail' employee.pk %}{% else %}{% url 'employees:employee_list' %}{% endif %}" class="button button-secondary">Cancel</a>
+            <button type="submit" class="button button-primary">Save Employee</button>
+        </div>
+    </form>
+</div>
+
+{% include "employees/_positions_datalist.html" %}
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const statusSelect = document.querySelector('select[name="status"]');
+        const reasonField = document.getElementById('status-reason-field');
+
+        statusSelect.addEventListener('change', function() {
+            if (this.value === 'active') {
+                reasonField.style.display = 'none';
+            } else {
+                reasonField.style.display = 'block';
+            }
+        });
+    });
+</script>
+{% endblock %}

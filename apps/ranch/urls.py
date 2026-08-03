@@ -12,4 +12,9 @@ urlpatterns = [
         views.weekly_dining_guest_list_report,
         name="weekly_dining_guest_list_report",
     ),
+    path(
+        "office/reports/horse-assignment/",
+        views.weekly_horse_assignment_report,
+        name="weekly_horse_assignment_report",
+    ),
 ]

@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+
+{% block title %}Horse Assignments | Ranch Office{% endblock %}
+
+{% block eyebrow %}Weekly Report{% endblock %}
+
+{% block page_title %}Horse Assignments{% endblock %}
+
+{% block page_subtitle %}
+    Week of {{ week_start|date:"M j, Y" }} to {{ week_end|date:"M j, Y" }}
+{% endblock %}
+
+{% block page_actions %}
+    <div class="no-print" style="display: flex; gap: 12px; align-items: center; margin-right: 12px; background: rgba(255,255,255,0.5); padding: 8px 12px; border-radius: 12px; border: 1px solid var(--color-border);">
+        <label style="display: flex; align-items: center; gap: 6px; font-weight: 800; cursor: pointer; font-size: 0.9rem;">
+            <input type="checkbox" id="toggle-past-horses" checked> Past Horses
+        </label>
+        <label style="display: flex; align-items: center; gap: 6px; font-weight: 800; cursor: pointer; font-size: 0.9rem;">
+            <input type="checkbox" id="toggle-past-saddles" checked> Past Saddles
+        </label>
+    </div>
+    <button type="submit" form="bulk-assignment-form" class="button button-success no-print">
+        Save All Assignments
+    </button>
+    <a href="{% url 'ranch:office_dashboard' %}?week={{ week_start|date:'Y-m-d' }}" class="button button-secondary no-print">
+        Back to Office
+    </a>
+    <button type="button" class="button button-primary no-print" onclick="window.print()">
+        Print Report
+    </button>
+{% endblock %}
+
+{% block content %}
+    <div class="print-report horse-report">
+        <div class="print-report-header">
+            <h2>Horse Assignments</h2>
+            <p>
+                Week of {{ week_start|date:"M j, Y" }} to {{ week_end|date:"M j, Y" }}
+            </p>
+            <p>
+                {{ reservation_count }} reservation(s) · {{ guest_count }} guest(s)
+            </p>
+        </div>
+
+        <form method="post" id="bulk-assignment-form">
+            {% csrf_token %}
+            <input type="hidden" name="save_all" value="1">
+            
+            <div class="panel-stack">
+                {% for section in cabin_sections %}
+                    <section class="table-card">
+                    <div class="section-heading" style="padding: 16px 16px 0;">
+                        <h3 style="margin: 0;">
+                            {% if section.cabin %}
+                                {{ section.cabin.name }}
+                            {% else %}
+                                Unassigned Guests
+                            {% endif %}
+                        </h3>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Guest Name</th>
+                                    <th>Age</th>
+                                    <th>Height</th>
+                                    <th>Weight</th>
+                                    <th>Experience</th>
+                                    <th class="col-past-horses">Past Horses</th>
+                                    <th class="col-past-saddles">Past Saddles</th>
+                                    <th>Horse & Saddle</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for guest in section.guests %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ guest.client.full_name }}</strong>
+                                            <div class="text-muted" style="font-size: 0.8rem;">
+                                                {{ guest.reservation.reservation_name }}
+                                            </div>
+                                        </td>
+                                        <td>{{ guest.age_at_stay|default:"-" }}</td>
+                                        <td>{{ guest.height|default:"-" }}</td>
+                                        <td>{{ guest.weight|default:"-" }}</td>
+                                        <td>
+                                            <span class="badge badge-info">
+                                                {{ guest.get_riding_experience_display }}
+                                            </span>
+                                        </td>
+                                        <td class="col-past-horses">
+                                            <div style="font-size: 0.8rem;">
+                                                {% for horse in guest.past_horses %}
+                                                    <div class="nowrap">• {{ horse.name }}</div>
+                                                {% empty %}
+                                                    <span class="text-muted">None</span>
+                                                {% endfor %}
+                                            </div>
+                                        </td>
+                                        <td class="col-past-saddles">
+                                            <div style="font-size: 0.8rem;">
+                                                {% for saddle in guest.past_saddles %}
+                                                    <div class="nowrap">• Rack {{ saddle.rack_number|default:"?" }} ({{ saddle.seat_size }}" )</div>
+                                                {% empty %}
+                                                    <span class="text-muted">None</span>
+                                                {% endfor %}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <input type="hidden" name="guest_ids" value="{{ guest.pk }}">
+                                            <div class="no-print" style="display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap;">
+                                                <div style="flex: 1; min-width: 180px;">
+                                                    <label style="display: block; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; color: var(--color-muted); margin-bottom: 2px;">Horse</label>
+                                                    {{ guest.horse_form.horse }}
+                                                </div>
+                                                <div style="flex: 1; min-width: 180px;">
+                                                    <label style="display: block; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; color: var(--color-muted); margin-bottom: 2px;">Saddle</label>
+                                                    {{ guest.horse_form.saddle }}
+                                                </div>
+                                            </div>
+                                            <div class="no-print" style="margin-top: 8px; font-size: 0.8rem; display: flex; gap: 10px; flex-wrap: wrap;">
+                                                {% if guest.horse %}
+                                                    <span>Horse: <a href="{% url 'horses:horse_detail' guest.horse.pk %}" style="text-decoration: underline;">{{ guest.horse.name }}</a></span>
+                                                {% endif %}
+                                                {% if guest.saddle %}
+                                                    <span>Saddle: <a href="{% url 'horses:saddle_detail' guest.saddle.pk %}" style="text-decoration: underline;">{{ guest.saddle }}</a></span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="print-only">
+                                                <div>Horse: <strong>{{ guest.horse.name|default:"None" }}</strong></div>
+                                                <div>Saddle: <strong>{{ guest.saddle|default:"None" }}</strong></div>
+                                            </div>
+                                        </td>
+                                    </tr>
+{% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            {% empty %}
+                <div class="empty-state">
+                    <div class="empty-state-content">
+                        <div class="empty-state-icon">🐴</div>
+                        <h2>No guests found</h2>
+                        <p>
+                            No reservation guests were found for this week.
+                        </p>
+                    </div>
+                </div>
+            {% endfor %}
+            </div>
+        </form>
+        
+        <div class="no-print" style="margin-top: 24px; display: flex; justify-content: center;">
+            <button type="submit" form="bulk-assignment-form" class="button button-success button-large">
+                Save All Assignments
+            </button>
+        </div>
+    </div>
+
+    <style>
+        .print-only {
+            display: none;
+        }
+
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            .print-only {
+                display: block !important;
+            }
+            .table-card {
+                box-shadow: none !important;
+                border: 1px solid #ccc !important;
+                margin-bottom: 20px;
+                break-inside: avoid;
+            }
+            .data-table th {
+                background-color: #f0f0f0 !important;
+                -webkit-print-color-adjust: exact;
+            }
+        }
+    </style>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const toggleHorses = document.getElementById('toggle-past-horses');
+            const toggleSaddles = document.getElementById('toggle-past-saddles');
+            
+            function updateVisibility() {
+                const horseCols = document.querySelectorAll('.col-past-horses');
+                const saddleCols = document.querySelectorAll('.col-past-saddles');
+                
+                horseCols.forEach(el => el.style.display = toggleHorses.checked ? '' : 'none');
+                saddleCols.forEach(el => el.style.display = toggleSaddles.checked ? '' : 'none');
+            }
+            
+            toggleHorses.addEventListener('change', updateVisibility);
+            toggleSaddles.addEventListener('change', updateVisibility);
+            
+            // Duplicate detection
+            function highlightDuplicates() {
+                const horseSelects = document.querySelectorAll('.horse-assignment-select');
+                const saddleSelects = document.querySelectorAll('.saddle-assignment-select');
+                
+                checkGroup(horseSelects);
+                checkGroup(saddleSelects);
+            }
+
+            function checkGroup(selects) {
+                const values = {};
+                selects.forEach(s => {
+                    const val = s.value;
+                    if (val) {
+                        values[val] = (values[val] || 0) + 1;
+                    }
+                });
+                
+                selects.forEach(s => {
+                    const val = s.value;
+                    const wrapper = s.closest('.searchable-select');
+                    const input = wrapper ? wrapper.querySelector('.searchable-select-input') : s;
+                    
+                    if (val && values[val] > 1) {
+                        input.style.border = '2px solid var(--color-danger)';
+                        input.style.backgroundColor = '#fff5f5';
+                        input.title = "Duplicate assignment detected!";
+                    } else {
+                        input.style.border = '';
+                        input.style.backgroundColor = '';
+                        input.title = "";
+                    }
+                });
+            }
+
+            document.addEventListener('change', function(e) {
+                if (e.target.classList.contains('horse-assignment-select') || e.target.classList.contains('saddle-assignment-select')) {
+                    highlightDuplicates();
+                }
+            });
+
+            // Initial calls
+            updateVisibility();
+            setTimeout(highlightDuplicates, 100); // Give searchable selects time to build
+        });
+    </script>
+{% endblock %}

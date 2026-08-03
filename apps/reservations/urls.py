@@ -30,6 +30,11 @@ urlpatterns = [
         name="reservation_guest_create",
     ),
     path(
+        "<int:pk>/guests/new-client/",
+        views.reservation_guest_create_new_client,
+        name="reservation_guest_create_new_client",
+    ),
+    path(
         "<int:pk>/guests/add-household/",
         views.reservation_add_household_guests,
         name="reservation_add_household_guests",
@@ -50,6 +55,11 @@ urlpatterns = [
         name="reservation_guest_delete",
     ),
     path(
+        "api/<int:pk>/quick-add-item/",
+        views.quick_add_reservation_item,
+        name="quick_add_reservation_item",
+    ),
+    path(
         "guests/<int:pk>/assign-cabin/",
         views.reservation_guest_assign_cabin,
         name="reservation_guest_assign_cabin",
@@ -58,5 +68,20 @@ urlpatterns = [
         "guests/<int:pk>/unassign-cabin/",
         views.reservation_guest_unassign_cabin,
         name="reservation_guest_unassign_cabin",
+    ),
+    path(
+        "<int:pk>/toggle-deposit-request/",
+        views.reservation_toggle_deposit_request,
+        name="reservation_toggle_deposit_request",
+    ),
+    path(
+        "<int:pk>/toggle-deposit-received/",
+        views.reservation_toggle_deposit_received,
+        name="reservation_toggle_deposit_received",
+    ),
+    path(
+        "guests/<int:pk>/toggle-release/",
+        views.reservation_guest_toggle_release,
+        name="reservation_guest_toggle_release",
     ),
 ]

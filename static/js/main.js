@@ -10,10 +10,13 @@ function buildSearchableSelect(select) {
     const wrapper = document.createElement("div");
     wrapper.className = "searchable-select";
 
+    const placeholder = select.dataset.placeholder || "Search...";
+    const emptyMessage = select.dataset.emptyMessage || "No matching items found.";
+
     const input = document.createElement("input");
     input.type = "text";
     input.className = "searchable-select-input";
-    input.placeholder = "Search clients...";
+    input.placeholder = placeholder;
     input.autocomplete = "off";
 
     const list = document.createElement("div");
@@ -67,11 +70,99 @@ function buildSearchableSelect(select) {
             visibleCount += 1;
         });
 
-        if (visibleCount === 0) {
+        if (visibleCount === 0 && !select.dataset.quickAddUrl) {
             const empty = document.createElement("div");
             empty.className = "searchable-select-empty";
-            empty.textContent = "No matching clients found.";
+            empty.textContent = emptyMessage;
             list.appendChild(empty);
+        }
+
+        if (normalizedFilter && select.dataset.quickAddUrl) {
+            const quickAddItem = document.createElement("button");
+            quickAddItem.type = "button";
+            quickAddItem.className = "searchable-select-item";
+            quickAddItem.style.color = "var(--color-success)";
+            quickAddItem.style.fontWeight = "800";
+            quickAddItem.textContent = `+ Quick Add "${filterText}"`;
+
+            quickAddItem.addEventListener("click", function () {
+                const url = select.dataset.quickAddUrl;
+                const csrfToken = getCsrfToken();
+                const formData = new FormData();
+                formData.append("name", filterText);
+
+                // Add contextual data from other fields
+                const contextFieldsStr = select.dataset.contextFields;
+                if (contextFieldsStr) {
+                    const contextFields = contextFieldsStr.split(",");
+                    const form = select.form;
+                    if (form) {
+                        contextFields.forEach((fieldName) => {
+                            const field = form.elements[fieldName.trim()];
+                            if (field && field.value) {
+                                formData.append(`${fieldName.trim()}_id`, field.value);
+                            }
+                        });
+                    }
+                }
+
+                // Add contextual data from data-context-value-* attributes
+                for (const key in select.dataset) {
+                    if (key.startsWith("contextValue")) {
+                        // contextValueTravelGroup -> travel_group
+                        const fieldName = key
+                            .substring(12)
+                            .replace(/([A-Z])/g, (match, p1, offset) =>
+                                offset > 0 ? "_" + match.toLowerCase() : match.toLowerCase()
+                            );
+                        formData.append(`${fieldName}_id`, select.dataset[key]);
+                    }
+                }
+
+                quickAddItem.disabled = true;
+
+                fetch(url, {
+                    method: "POST",
+                    headers: {
+                        "X-CSRFToken": csrfToken,
+                    },
+                    body: formData,
+                })
+                    .then((response) => response.json())
+                    .then((data) => {
+                        if (data.id) {
+                            // Add new option to the original select
+                            const newOption = new Option(data.name, data.id, true, true);
+                            select.add(newOption);
+                            
+                            // Update the input and value
+                            select.value = data.id;
+                            input.value = data.name;
+                            list.classList.remove("is-open");
+
+                            // Dispatch change event
+                            select.dispatchEvent(new Event("change", { bubbles: true }));
+                        } else if (data.error) {
+                            alert(data.error);
+                        }
+                    })
+                    .catch((error) => {
+                        console.error("Error during quick add:", error);
+                        alert("An error occurred while adding. Please try again.");
+                    });
+            });
+            list.appendChild(quickAddItem);
+        }
+
+        if (select.dataset.createUrl) {
+            const createItem = document.createElement("a");
+            createItem.href = select.dataset.createUrl;
+            createItem.target = "_blank";
+            createItem.className = "searchable-select-item";
+            createItem.style.color = "var(--color-accent)";
+            createItem.style.fontWeight = "800";
+            createItem.textContent = "+ Create New...";
+            list.appendChild(createItem);
         }
     }
 

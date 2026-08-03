@@ -26,6 +26,11 @@ MODULE_MAPPING = {
         ('projects', 'project'),
         ('projects', 'projecthistory'),
     ],
+    'Employees': [
+        ('employees', 'employee'),
+        ('employees', 'positionhistory'),
+        ('employees', 'interview'),
+    ],
     'Ranch': [
         ('ranch', 'ranchpermissions'),
     ],

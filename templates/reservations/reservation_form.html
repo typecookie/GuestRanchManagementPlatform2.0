@@ -37,6 +37,48 @@
         </div>
     {% endif %}
 
+    <div class="quick-add-section" style="margin-bottom: 24px; padding: 18px; background: #fbf7f0; border: 1px solid var(--color-border); border-radius: 18px;">
+        <h3 style="margin-top: 0; font-size: 1rem;">Quick Add</h3>
+        <p style="font-size: 0.85rem; color: var(--color-muted); margin-bottom: 12px;">Create and automatically select a new record without leaving this page.</p>
+        <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 150px;">
+                <label style="font-size: 0.8rem; color: var(--color-muted); font-weight: 800; display: block; margin-bottom: 4px;">Type</label>
+                <select id="quick-add-type" class="form-select">
+                    <option value="client">Individual Client</option>
+                    <option value="household">Household</option>
+                    <option value="travel_group">Travel Group</option>
+                </select>
+            </div>
+            <div style="flex: 2; min-width: 200px;">
+                <label style="font-size: 0.8rem; color: var(--color-muted); font-weight: 800; display: block; margin-bottom: 4px;">Name</label>
+                <input type="text" id="quick-add-name" class="form-control" placeholder="Enter name...">
+            </div>
+
+            <div id="quick-add-tg-container" style="flex: 2; min-width: 200px;">
+                <label style="font-size: 0.8rem; color: var(--color-muted); font-weight: 800; display: block; margin-bottom: 4px;">Add to Travel Group</label>
+                <select id="quick-add-tg" class="form-select">
+                    <option value="">(None)</option>
+                </select>
+            </div>
+
+            <div id="quick-add-hh-container" style="flex: 2; min-width: 200px;">
+                <label style="font-size: 0.8rem; color: var(--color-muted); font-weight: 800; display: block; margin-bottom: 4px;">Add to Household</label>
+                <select id="quick-add-hh" class="form-select">
+                    <option value="">(None)</option>
+                </select>
+            </div>
+
+            <div style="flex: 0 0 auto;">
+                <button type="button" id="quick-add-button" class="button button-primary" 
+                    data-client-url="{% url 'clients:quick_add_client' %}"
+                    data-household-url="{% url 'clients:quick_add_household' %}"
+                    data-travel-group-url="{% url 'clients:quick_add_travel_group' %}">
+                    Quick Add & Select
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div class="form-grid">
         <div class="form-field form-grid-full">
             <label for="{{ form.reservation_name.id_for_label }}">Reservation Name</label>
@@ -63,7 +105,10 @@
         </div>
 
         <div class="form-field">
-            <label for="{{ form.primary_contact.id_for_label }}">Primary Contact</label>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <label for="{{ form.primary_contact.id_for_label }}">Primary Contact</label>
+                <a href="{% url 'clients:client_create' %}" target="_blank" class="button button-small button-secondary" style="font-size: 0.7rem; padding: 4px 8px; min-height: 0;">+ Create New</a>
+            </div>
             {{ form.primary_contact }}
             {% for error in form.primary_contact.errors %}
                 <span class="form-error">{{ error }}</span>
@@ -71,7 +116,10 @@
         </div>
 
         <div class="form-field">
-            <label for="{{ form.household.id_for_label }}">Household</label>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <label for="{{ form.household.id_for_label }}">Household</label>
+                <a href="{% url 'clients:household_create' %}" target="_blank" class="button button-small button-secondary" style="font-size: 0.7rem; padding: 4px 8px; min-height: 0;">+ Create New</a>
+            </div>
             {{ form.household }}
             {% for error in form.household.errors %}
                 <span class="form-error">{{ error }}</span>
@@ -79,7 +127,10 @@
         </div>
 
         <div class="form-field form-grid-full">
-            <label for="{{ form.travel_group.id_for_label }}">Travel Group</label>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <label for="{{ form.travel_group.id_for_label }}">Travel Group</label>
+                <a href="{% url 'clients:travel_group_create' %}" target="_blank" class="button button-small button-secondary" style="font-size: 0.7rem; padding: 4px 8px; min-height: 0;">+ Create New</a>
+            </div>
             {{ form.travel_group }}
             {% for error in form.travel_group.errors %}
                 <span class="form-error">{{ error }}</span>
@@ -142,6 +193,26 @@
             {% endfor %}
         </div>
 
+        <div class="form-field checkbox-field">
+            <label>
+                {{ form.deposit_request_sent }}
+                Deposit request sent
+            </label>
+            {% for error in form.deposit_request_sent.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field checkbox-field">
+            <label>
+                {{ form.deposit_received }}
+                Deposit received
+            </label>
+            {% for error in form.deposit_received.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
         <div class="form-field form-grid-full">
             <label for="{{ form.notes.id_for_label }}">Guest-Facing Notes</label>
             {{ form.notes }}
@@ -169,4 +240,272 @@
         <button type="submit" class="button button-primary">{{ submit_label }}</button>
     </div>
 </form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const travelGroupSelect = document.getElementById("{{ form.travel_group.id_for_label }}");
+    const householdSelect = document.getElementById("{{ form.household.id_for_label }}");
+    const primaryContactSelect = document.getElementById("{{ form.primary_contact.id_for_label }}");
+
+    function updatePrimaryContact(type, id) {
+        if (!id) return;
+        
+        const url = type === 'travel_group' 
+            ? `{% url 'clients:travel_group_detail_api' 0 %}`.replace('0', id)
+            : `{% url 'clients:household_detail_api' 0 %}`.replace('0', id);
+
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                if (data.primary_contact_id) {
+                    // Update the actual select value
+                    primaryContactSelect.value = data.primary_contact_id;
+                    
+                    // Trigger custom searchable select update if it exists
+                    const wrapper = primaryContactSelect.closest('.searchable-select');
+                    if (wrapper) {
+                        const input = wrapper.querySelector('.searchable-select-input');
+                        const option = primaryContactSelect.options[primaryContactSelect.selectedIndex];
+                        if (input && option) {
+                            input.value = option.textContent;
+                        }
+                    }
+                    
+                    // Dispatch change event
+                    primaryContactSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+
+                // If travel group changed, also update Quick Add households
+                if (type === 'travel_group') {
+                    syncQuickAddHouseholds(data.households || []);
+                }
+            });
+    }
+
+    function fetchHouseholdsOnly(id) {
+        if (!id) {
+            syncQuickAddHouseholds([]);
+            return;
+        }
+        const url = `{% url 'clients:travel_group_detail_api' 0 %}`.replace('0', id);
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                syncQuickAddHouseholds(data.households || []);
+            });
+    }
+
+    function syncQuickAddHouseholds(households) {
+        if (!quickAddHH) return;
+        
+        const currentSelectedVal = householdSelect.value;
+        quickAddHH.innerHTML = `<option value="">(None)</option>`;
+        
+        households.forEach(hh => {
+            const opt = document.createElement('option');
+            opt.value = hh.id;
+            opt.textContent = hh.name;
+            if (hh.id.toString() === currentSelectedVal) opt.selected = true;
+            quickAddHH.appendChild(opt);
+        });
+
+        // Also ensure the currently selected household in the main form is present
+        // even if it's not in the travel group (though it should be, usually)
+        if (currentSelectedVal && !households.find(hh => hh.id.toString() === currentSelectedVal)) {
+            const selectedOption = householdSelect.options[householdSelect.selectedIndex];
+            if (selectedOption) {
+                const opt = document.createElement('option');
+                opt.value = currentSelectedVal;
+                opt.textContent = selectedOption.text;
+                opt.selected = true;
+                quickAddHH.appendChild(opt);
+            }
+        }
+    }
+
+    if (travelGroupSelect) {
+        travelGroupSelect.addEventListener("change", function() {
+            if (travelGroupSelect.value) {
+                updatePrimaryContact('travel_group', travelGroupSelect.value);
+            } else {
+                syncQuickAddHouseholds([]);
+                updateQuickAddOptions();
+            }
+        });
+    }
+
+    if (householdSelect) {
+        householdSelect.addEventListener("change", function() {
+            updatePrimaryContact('household', householdSelect.value);
+            updateQuickAddOptions(); // Re-sync HH
+        });
+    }
+
+    // Quick Add logic
+    const quickAddButton = document.getElementById("quick-add-button");
+    const quickAddName = document.getElementById("quick-add-name");
+    const quickAddType = document.getElementById("quick-add-type");
+    const quickAddTGContainer = document.getElementById("quick-add-tg-container");
+    const quickAddHHContainer = document.getElementById("quick-add-hh-container");
+    const quickAddTG = document.getElementById("quick-add-tg");
+    const quickAddHH = document.getElementById("quick-add-hh");
+
+    if (quickAddButton && quickAddName && quickAddType) {
+        function updateQuickAddOptions() {
+            const updateSelect = (source, target) => {
+                const val = source.value;
+                // Get text from the selected option
+                let text = "(None)";
+                if (val) {
+                    const selectedOption = source.options[source.selectedIndex];
+                    text = selectedOption ? selectedOption.text : "(None)";
+                }
+                
+                // For TG, we just keep the single selected one for now
+                if (target === quickAddTG) {
+                    target.innerHTML = `<option value="">(None)</option>`;
+                    if (val) {
+                        const opt = document.createElement('option');
+                        opt.value = val;
+                        opt.textContent = text;
+                        opt.selected = true;
+                        target.appendChild(opt);
+                    }
+                } else if (target === quickAddHH) {
+                    // For HH, if we have a TG selected, we should have already populated it via syncQuickAddHouseholds
+                    // if not, just use the single selected one
+                    if (!travelGroupSelect.value) {
+                        target.innerHTML = `<option value="">(None)</option>`;
+                        if (val) {
+                            const opt = document.createElement('option');
+                            opt.value = val;
+                            opt.textContent = text;
+                            opt.selected = true;
+                            target.appendChild(opt);
+                        }
+                    } else {
+                        // Ensure selection matches
+                        if (val) target.value = val;
+                    }
+                }
+            };
+
+            if (travelGroupSelect && quickAddTG) updateSelect(travelGroupSelect, quickAddTG);
+            if (householdSelect && quickAddHH) updateSelect(householdSelect, quickAddHH);
+        }
+
+        function updateQuickAddUI() {
+            const type = quickAddType.value;
+            if (type === "client") {
+                quickAddTGContainer.style.display = "block";
+                quickAddHHContainer.style.display = "block";
+            } else if (type === "household") {
+                quickAddTGContainer.style.display = "block";
+                quickAddHHContainer.style.display = "none";
+            } else {
+                quickAddTGContainer.style.display = "none";
+                quickAddHHContainer.style.display = "none";
+            }
+            updateQuickAddOptions();
+        }
+
+        quickAddType.addEventListener("change", updateQuickAddUI);
+        
+        // Sync when main form changes
+        travelGroupSelect.addEventListener("change", updateQuickAddOptions);
+        householdSelect.addEventListener("change", updateQuickAddOptions);
+
+        // Initial load
+        if (travelGroupSelect.value) {
+            fetchHouseholdsOnly(travelGroupSelect.value);
+        } else {
+            updateQuickAddOptions();
+        }
+        updateQuickAddUI();
+
+        quickAddButton.addEventListener("click", function() {
+            const name = quickAddName.value.trim();
+            const type = quickAddType.value;
+            if (!name) return;
+
+            let url = "";
+            let targetSelect = null;
+
+            if (type === "client") {
+                url = quickAddButton.dataset.clientUrl;
+                targetSelect = primaryContactSelect;
+            } else if (type === "household") {
+                url = quickAddButton.dataset.householdUrl;
+                targetSelect = householdSelect;
+            } else if (type === "travel_group") {
+                url = quickAddButton.dataset.travelGroupUrl;
+                targetSelect = travelGroupSelect;
+            }
+
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            const formData = new FormData();
+            formData.append("name", name);
+
+            // Add context from the Quick Add selectors
+            if (type === "client") {
+                if (quickAddTG.value) formData.append("travel_group_id", quickAddTG.value);
+                if (quickAddHH.value) formData.append("household_id", quickAddHH.value);
+            } else if (type === "household") {
+                if (quickAddTG.value) formData.append("travel_group_id", quickAddTG.value);
+            }
+
+            quickAddButton.disabled = true;
+
+            fetch(url, {
+                method: "POST",
+                headers: {
+                    "X-CSRFToken": csrfToken,
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.id) {
+                    // Add new option and select it
+                    const option = new Option(data.name, data.id, true, true);
+                    targetSelect.add(option);
+                    targetSelect.value = data.id;
+
+                    // Update UI for searchable select
+                    const wrapper = targetSelect.closest('.searchable-select');
+                    if (wrapper) {
+                        const input = wrapper.querySelector('.searchable-select-input');
+                        if (input) input.value = data.name;
+                    }
+
+                    // Dispatch change event
+                    targetSelect.dispatchEvent(new Event('change', { bubbles: true }));
+
+                    // Reset quick add
+                    quickAddName.value = "";
+                } else if (data.error) {
+                    alert(data.error);
+                }
+                quickAddButton.disabled = false;
+            })
+            .catch(error => {
+                console.error("Error:", error);
+                alert("Error during quick add. Please try again.");
+                quickAddButton.disabled = false;
+            });
+        });
+
+        // Also support Enter key
+        quickAddName.addEventListener("keypress", function(e) {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                quickAddButton.click();
+            }
+        });
+    }
+});
+</script>
 {% endblock %}

@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Ranch Assets{% endblock %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="form-card">
+    <form method="post" class="panel-stack">
+        {% csrf_token %}
+        
+        <div class="form-grid">
+            <div class="form-field">
+                {{ form.saddle_number.label_tag }}
+                {{ form.saddle_number }}
+                {{ form.saddle_number.errors }}
+            </div>
+            
+            <div class="form-field">
+                {{ form.rack_number.label_tag }}
+                {{ form.rack_number }}
+                {{ form.rack_number.errors }}
+            </div>
+            
+            <div class="form-field">
+                {{ form.seat_size.label_tag }}
+                {{ form.seat_size }}
+                {{ form.seat_size.errors }}
+                <span class="form-help">{{ form.seat_size.help_text }}</span>
+            </div>
+            
+            <div class="form-field">
+                {{ form.condition.label_tag }}
+                {{ form.condition }}
+                {{ form.condition.errors }}
+            </div>
+
+            <div class="form-field">
+                {{ form.status.label_tag }}
+                {{ form.status }}
+                {{ form.status.errors }}
+            </div>
+
+            <div class="form-field" id="out_of_service_location_field">
+                {{ form.out_of_service_location.label_tag }}
+                {{ form.out_of_service_location }}
+                {{ form.out_of_service_location.errors }}
+                <span class="form-help">{{ form.out_of_service_location.help_text }}</span>
+            </div>
+
+            <div class="form-field">
+                {{ form.min_stirrup_length.label_tag }}
+                {{ form.min_stirrup_length }}
+                {{ form.min_stirrup_length.errors }}
+            </div>
+
+            <div class="form-field">
+                {{ form.max_stirrup_length.label_tag }}
+                {{ form.max_stirrup_length }}
+                {{ form.max_stirrup_length.errors }}
+            </div>
+
+            <div class="form-field">
+                {{ form.purchase_date.label_tag }}
+                {{ form.purchase_date }}
+                {{ form.purchase_date.errors }}
+            </div>
+            
+            <div class="form-field form-grid-full">
+                {{ form.notes.label_tag }}
+                {{ form.notes }}
+                {{ form.notes.errors }}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <a href="{% if saddle %}{% url 'horses:saddle_detail' saddle.pk %}{% else %}{% url 'horses:saddle_list' %}{% endif %}" class="button button-secondary">Cancel</a>
+            <button type="submit" class="button button-primary">Save Saddle</button>
+        </div>
+    </form>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const statusSelect = document.querySelector('select[name="status"]');
+        const locationField = document.getElementById('out_of_service_location_field');
+        
+        function toggleLocation() {
+            if (statusSelect.value === 'out_of_service') {
+                locationField.style.display = 'flex';
+            } else {
+                locationField.style.display = 'none';
+            }
+        }
+        
+        statusSelect.addEventListener('change', toggleLocation);
+        toggleLocation(); // Initial state
+    });
+</script>
+{% endblock %}

@@ -73,10 +73,43 @@
 
         <section class="details-section">
             <h3>Project Team</h3>
+            
+            {% if can_write %}
+            <div class="quick-add-section" style="margin-bottom: 24px; padding: 18px; background: #fbf7f0; border: 1px solid var(--color-border); border-radius: 12px;">
+                <h4 style="margin-top: 0; font-size: 0.9rem; text-transform: uppercase; color: var(--color-muted); letter-spacing: 0.05em;">Quick Add Staff</h4>
+                <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+                    <div style="flex: 2; min-width: 150px;">
+                        <label style="font-size: 0.8rem; color: var(--color-muted); font-weight: 800; display: block; margin-bottom: 4px;">Name</label>
+                        <input type="text" id="quick-add-name" class="form-control" placeholder="Employee Name...">
+                    </div>
+                    <div style="flex: 2; min-width: 150px;">
+                        <label style="font-size: 0.8rem; color: var(--color-muted); font-weight: 800; display: block; margin-bottom: 4px;">Position / Job Title</label>
+                        <input type="text" id="quick-add-position" class="form-control" placeholder="e.g. Lead Carpenter" list="positions-datalist">
+                    </div>
+                    <div style="flex: 1; min-width: 120px;">
+                        <label style="font-size: 0.8rem; color: var(--color-muted); font-weight: 800; display: block; margin-bottom: 4px;">Role</label>
+                        <select id="quick-add-role" class="form-select">
+                            <option value="assigned">Assigned Staff</option>
+                            <option value="lead">Project Lead</option>
+                        </select>
+                    </div>
+                    <div style="flex: 0 0 auto;">
+                        <button type="button" id="quick-add-button" class="button button-primary" data-url="{% url 'projects:quick_add_project_member' project.pk %}">Add</button>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
             <div class="info-grid">
                 <div class="info-item">
-                    <span class="label">Project Owner</span>
-                    <p>{{ project.project_owner|default:"Not assigned" }}</p>
+                    <span class="label">Project Lead</span>
+                    <p>
+                        {% if project.project_lead %}
+                            <a href="{% url 'employees:employee_detail' project.project_lead.pk %}">{{ project.project_lead.full_name }}</a>
+                        {% else %}
+                            {{ project.project_owner|default:"Not assigned" }}
+                        {% endif %}
+                    </p>
                 </div>
                 <div class="info-item">
                     <span class="label">Primary Worker</span>
@@ -84,9 +117,23 @@
                 </div>
             </div>
             <div class="info-item" style="margin-top: 1rem;">
-                <span class="label">Other Workers</span>
-                <p>{{ project.other_workers|default:"None assigned"|linebreaksbr }}</p>
+                <span class="label">Assigned Employees</span>
+                <p>
+                    {% for emp in project.assigned_employees.all %}
+                        <a href="{% url 'employees:employee_detail' emp.pk %}">{{ emp.full_name }}</a>{% if not forloop.last %}, {% endif %}
+                    {% empty %}
+                        {% if not project.other_workers %}
+                            <span class="text-muted">None assigned</span>
+                        {% endif %}
+                    {% endfor %}
+                </p>
             </div>
+            {% if project.other_workers %}
+            <div class="info-item" style="margin-top: 1rem;">
+                <span class="label">Other Workers (Legacy)</span>
+                <p>{{ project.other_workers|linebreaksbr }}</p>
+            </div>
+            {% endif %}
         </section>
 
         <section class="details-section">
@@ -242,4 +289,68 @@
         }
     }
 </style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const quickAddButton = document.getElementById("quick-add-button");
+    const quickAddName = document.getElementById("quick-add-name");
+    const quickAddPosition = document.getElementById("quick-add-position");
+    const quickAddRole = document.getElementById("quick-add-role");
+
+    if (quickAddButton && quickAddName) {
+        quickAddButton.addEventListener("click", function() {
+            const name = quickAddName.value.trim();
+            const position = quickAddPosition.value.trim();
+            const role = quickAddRole.value;
+            
+            if (!name) return;
+
+            const url = quickAddButton.dataset.url;
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            
+            const formData = new FormData();
+            formData.append("name", name);
+            formData.append("position", position);
+            formData.append("role", role);
+
+            quickAddButton.disabled = true;
+
+            fetch(url, {
+                method: "POST",
+                headers: {
+                    "X-CSRFToken": csrfToken,
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) throw new Error("Network response was not ok");
+                return response.json();
+            })
+            .then(data => {
+                window.location.reload();
+            })
+            .catch(error => {
+                console.error("Error:", error);
+                alert("Error during quick add. Please try again.");
+                quickAddButton.disabled = false;
+            });
+        });
+
+        // Also support Enter key
+        [quickAddName, quickAddPosition].forEach(el => {
+            el.addEventListener("keypress", function(e) {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    quickAddButton.click();
+                }
+            });
+        });
+    }
+    });
+</script>
+
+{% include "employees/_positions_datalist.html" %}
 {% endblock %}

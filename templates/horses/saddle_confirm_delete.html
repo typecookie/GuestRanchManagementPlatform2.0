@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Remove Saddle | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Saddle Inventory{% endblock %}
+
+{% block page_title %}Remove Saddle: {{ saddle.saddle_number }}{% endblock %}
+
+{% block content %}
+<div class="form-card max-width-sm">
+    <div class="panel-stack">
+        <div class="message message-warning">
+            <strong>Warning:</strong> You are about to remove saddle <strong>{{ saddle.saddle_number }}</strong> from the inventory.
+            This will also remove it from any guest assignments. This action cannot be undone.
+        </div>
+
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-actions">
+                <a href="{% url 'horses:saddle_list' %}" class="button button-secondary">Cancel, keep saddle</a>
+                <button type="submit" class="button button-danger">Yes, remove saddle</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
