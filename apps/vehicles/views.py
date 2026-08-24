@@ -39,9 +39,14 @@ def vehicle_list(request):
 def vehicle_detail(request, pk):
     vehicle = get_object_or_404(Vehicle, pk=pk)
     maintenance_records = vehicle.maintenance_records.all().prefetch_related('steps')
+    projects = vehicle.projects.all().select_related('project_lead')
     return render(request, "vehicles/vehicle_detail.html", {
         'vehicle': vehicle,
-        'maintenance_records': maintenance_records
+        'maintenance_records': maintenance_records,
+        'projects': projects,
+        'total_maintenance_records': maintenance_records.count(),
+        'open_maintenance_count': maintenance_records.filter(completion_date__isnull=True).count(),
+        'active_projects_count': projects.exclude(status='finished').count(),
     })
 
 @module_permission_required('Vehicles', 'write')

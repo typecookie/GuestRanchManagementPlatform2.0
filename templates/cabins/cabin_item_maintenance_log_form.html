@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}{{ form_title }} | Cabins{% endblock %}
+
+{% block eyebrow %}<a href="{% url 'cabins:cabin_detail' cabin.pk %}">{{ cabin.name }}</a> &rsaquo; <a href="{% url 'cabins:cabin_inventory_item_detail' item.pk %}">{{ item.name }}</a>{% endblock %}
+
+{% block page_title %}{{ form_title }}{% endblock %}
+
+{% block page_subtitle %}{{ form_subtitle }}{% endblock %}
+
+{% block content %}
+<div class="form-card">
+    <form method="post" class="panel-stack">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <div class="form-alert">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+
+        <div class="form-grid">
+            <div class="form-field">
+                <label for="{{ form.date.id_for_label }}">Service Date *</label>
+                {{ form.date }}
+                {% for error in form.date.errors %}
+                    <span class="form-error">{{ error }}</span>
+                {% endfor %}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.title.id_for_label }}">Service / Repair Title *</label>
+                {{ form.title }}
+                {% for error in form.title.errors %}
+                    <span class="form-error">{{ error }}</span>
+                {% endfor %}
+                <span class="form-help">e.g. Belt Replacement, Filter Cleaning, Annual Inspection</span>
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.performed_by.id_for_label }}">Performed By / Technician</label>
+                {{ form.performed_by }}
+                {% for error in form.performed_by.errors %}
+                    <span class="form-error">{{ error }}</span>
+                {% endfor %}
+                <span class="form-help">Ranch staff or external service contractor</span>
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.cost.id_for_label }}">Cost ($)</label>
+                {{ form.cost }}
+                {% for error in form.cost.errors %}
+                    <span class="form-error">{{ error }}</span>
+                {% endfor %}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.status_update.id_for_label }}">Resulting Item Status</label>
+                {{ form.status_update }}
+                {% for error in form.status_update.errors %}
+                    <span class="form-error">{{ error }}</span>
+                {% endfor %}
+            </div>
+
+            <div class="form-field form-grid-full">
+                <label for="{{ form.work_performed.id_for_label }}">Work & Repairs Performed *</label>
+                {{ form.work_performed }}
+                {% for error in form.work_performed.errors %}
+                    <span class="form-error">{{ error }}</span>
+                {% endfor %}
+            </div>
+
+            <div class="form-field form-grid-full">
+                <label for="{{ form.notes.id_for_label }}">Additional Notes</label>
+                {{ form.notes }}
+                {% for error in form.notes.errors %}
+                    <span class="form-error">{{ error }}</span>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <a href="{% url 'cabins:cabin_inventory_item_detail' item.pk %}" class="button button-secondary">Cancel</a>
+            <button type="submit" class="button button-primary">{{ submit_label }}</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

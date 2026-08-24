@@ -1,16 +1,26 @@
 {% extends "base.html" %}
 {% load group_perms %}
 
-{% block title %}{{ vehicle.name }} | Vehicles | Guest Ranch Management{% endblock %}
+{% block title %}{{ vehicle.name }} | Vehicles{% endblock %}
 
-{% block eyebrow %}Ranch Assets{% endblock %}
+{% block eyebrow %}Vehicle Profile{% endblock %}
 
 {% block page_title %}{{ vehicle.name }}{% endblock %}
+
+{% block page_subtitle %}
+View vehicle details, maintenance history, and linked ranch projects.
+{% endblock %}
 
 {% block page_actions %}
 {% can_do user "Vehicles" "write" as can_write %}
 {% can_do user "Vehicles" "delete" as can_delete %}
+{% can_do user "Projects" "write" as can_write_projects %}
+<a href="{% url 'vehicles:vehicle_list' %}" class="button button-secondary">Back to Vehicles</a>
+{% if can_write_projects %}
+<a href="{% url 'projects:project_create' %}?vehicle={{ vehicle.pk }}" class="button button-secondary">+ New Project</a>
+{% endif %}
 {% if can_write %}
+<a href="{% url 'vehicles:maintenance_record_create' vehicle.pk %}" class="button button-secondary">+ Log Maintenance</a>
 <a href="{% url 'vehicles:vehicle_update' vehicle.pk %}" class="button button-primary">Edit Vehicle</a>
 {% endif %}
 {% if can_delete %}
@@ -20,14 +30,21 @@
 
 {% block content %}
 {% can_do user "Vehicles" "write" as can_write %}
+{% can_do user "Vehicles" "delete" as can_delete %}
+{% can_do user "Projects" "write" as can_write_projects %}
 <div class="detail-layout">
     <section class="panel-stack">
         <div class="detail-card">
-            <h2>Vehicle Information</h2>
+            <h2>Vehicle Details</h2>
 
             <div class="detail-list">
                 <div class="detail-row">
-                    <div class="detail-label">Type</div>
+                    <div class="detail-label">Name</div>
+                    <div class="detail-value">{{ vehicle.name }}</div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Vehicle Type</div>
                     <div class="detail-value">{{ vehicle.get_vehicle_type_display }}</div>
                 </div>
 
@@ -62,27 +79,79 @@
                         {% if vehicle.is_active %}
                             <span class="badge badge-success">Active</span>
                         {% else %}
-                            <span class="badge badge-danger">Inactive</span>
+                            <span class="badge badge-neutral">Inactive</span>
                         {% endif %}
                     </div>
                 </div>
             </div>
         </div>
 
+        <!-- Vehicle Maintenance & Projects Section -->
         <div class="detail-card">
-            <h2>General Notes</h2>
-            {% if vehicle.notes %}
-                {{ vehicle.notes|linebreaks }}
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                <div>
+                    <h2 style="margin-bottom: 0.25rem;">Vehicle Maintenance & Projects</h2>
+                    <p class="text-muted" style="margin-bottom: 0; font-size: 0.85rem;">Ranch projects and work orders linked to this vehicle.</p>
+                </div>
+                {% if can_write_projects %}
+                <a href="{% url 'projects:project_create' %}?vehicle={{ vehicle.pk }}" class="button button-small button-primary">+ New Maintenance Project</a>
+                {% endif %}
+            </div>
+
+            {% if projects %}
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Project Name</th>
+                                <th>Status</th>
+                                <th>Project Lead</th>
+                                <th>Proposed Cost</th>
+                                <th>Actual Cost</th>
+                                <th class="text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for project in projects %}
+                                <tr>
+                                    <td><strong><a href="{% url 'projects:project_detail' project.pk %}">{{ project.name }}</a></strong></td>
+                                    <td><span class="badge badge-neutral">{{ project.get_status_display }}</span></td>
+                                    <td>
+                                        {% if project.project_lead %}
+                                            {{ project.project_lead.full_name }}
+                                        {% else %}
+                                            <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>${{ project.proposed_cost }}</td>
+                                    <td>${{ project.actual_cost }}</td>
+                                    <td>
+                                        <div class="table-actions">
+                                            <a href="{% url 'projects:project_detail' project.pk %}" class="button button-small button-secondary">View</a>
+                                            {% if can_write_projects %}
+                                            <a href="{% url 'projects:project_edit' project.pk %}" class="button button-small button-primary">Edit</a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             {% else %}
-                <p class="text-muted mb-0">No general notes recorded.</p>
+                <p class="text-muted mb-0">No active or historical projects linked to this vehicle.</p>
             {% endif %}
         </div>
-        
+
+        <!-- Maintenance History Section -->
         <div class="detail-card">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                <h2 style="margin-bottom: 0;">Maintenance History</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                <div>
+                    <h2 style="margin-bottom: 0.25rem;">Maintenance & Service History</h2>
+                    <p class="text-muted" style="margin-bottom: 0; font-size: 0.85rem;">Recorded service jobs, diagnostics, and repairs for this vehicle.</p>
+                </div>
                 {% if can_write %}
-                <a href="{% url 'vehicles:maintenance_record_create' vehicle.pk %}" class="button button-small button-primary">New Record</a>
+                <a href="{% url 'vehicles:maintenance_record_create' vehicle.pk %}" class="button button-small button-primary">+ Log Maintenance</a>
                 {% endif %}
             </div>
 
@@ -92,7 +161,7 @@
                         <thead>
                             <tr>
                                 <th>Date Started</th>
-                                <th>Issue/Service</th>
+                                <th>Issue / Service</th>
                                 <th>Status</th>
                                 <th>Latest Update</th>
                                 <th class="text-right">Actions</th>
@@ -119,7 +188,7 @@
                                                     {{ last_step.date }}
                                                 {% endif %}
                                             {% else %}
-                                                —
+                                                <span class="text-muted">—</span>
                                             {% endif %}
                                         {% endwith %}
                                     </td>
@@ -137,40 +206,69 @@
                     </table>
                 </div>
             {% else %}
-                <p class="text-muted">No structured maintenance records found.</p>
+                <p class="text-muted mb-0">No maintenance records found for this vehicle.</p>
                 {% if can_write %}
-                <a href="{% url 'vehicles:maintenance_record_create' vehicle.pk %}" class="button button-secondary">Create First Record</a>
+                <div style="margin-top: 1rem;">
+                    <a href="{% url 'vehicles:maintenance_record_create' vehicle.pk %}" class="button button-secondary">Create First Record</a>
+                </div>
                 {% endif %}
             {% endif %}
         </div>
 
         <div class="detail-card">
-            <h2>Legacy Maintenance Notes</h2>
-            {% if vehicle.maintenance_notes %}
-                {{ vehicle.maintenance_notes|linebreaks }}
+            <h2>Notes</h2>
+            {% if vehicle.notes %}
+                {{ vehicle.notes|linebreaks }}
             {% else %}
-                <p class="text-muted mb-0">No legacy maintenance notes recorded.</p>
+                <p class="text-muted mb-0">No vehicle notes have been added.</p>
             {% endif %}
         </div>
+
+        {% if vehicle.maintenance_notes %}
+        <div class="detail-card">
+            <h2>Legacy Maintenance Notes</h2>
+            {{ vehicle.maintenance_notes|linebreaks }}
+        </div>
+        {% endif %}
     </section>
-    
+
     <aside class="panel-stack">
         <div class="detail-card">
-            <h2>System Info</h2>
+            <h2>Vehicle Overview</h2>
             <div class="detail-list">
                 <div class="detail-row">
-                    <div class="detail-label">Added</div>
-                    <div class="detail-value">{{ vehicle.created_at|date:"M j, Y" }}</div>
+                    <div class="detail-label">Total Records</div>
+                    <div class="detail-value"><strong>{{ total_maintenance_records }}</strong></div>
                 </div>
                 <div class="detail-row">
-                    <div class="detail-label">Last Updated</div>
-                    <div class="detail-value">{{ vehicle.updated_at|date:"M j, Y H:i" }}</div>
+                    <div class="detail-label">Service Status</div>
+                    <div class="detail-value">
+                        {% if open_maintenance_count %}
+                            <span class="badge badge-warning">{{ open_maintenance_count }} in progress</span>
+                        {% else %}
+                            <span class="badge badge-success">All Completed</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Active Projects</div>
+                    <div class="detail-value">{{ active_projects_count }}</div>
                 </div>
             </div>
         </div>
-        
-        <div style="margin-top: 2rem;">
-            <a href="{% url 'vehicles:vehicle_list' %}" class="button button-neutral" style="width: 100%; text-align: center;">Back to List</a>
+
+        <div class="detail-card">
+            <h2>Record Info</h2>
+            <div class="detail-list">
+                <div class="detail-row">
+                    <div class="detail-label">Created</div>
+                    <div class="detail-value">{{ vehicle.created_at }}</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Updated</div>
+                    <div class="detail-value">{{ vehicle.updated_at }}</div>
+                </div>
+            </div>
         </div>
     </aside>
 </div>

@@ -9,18 +9,26 @@
 {% block page_title %}{{ cabin.name }}{% endblock %}
 
 {% block page_subtitle %}
-View cabin details, capacity, housekeeping, and reservation readiness.
+View cabin details, inventory, maintenance history, and linked ranch projects.
 {% endblock %}
 
 {% block page_actions %}
 {% can_do user "Cabins" "write" as can_write %}
+{% can_do user "Projects" "write" as can_write_projects %}
 <a href="{% url 'cabins:cabin_list' %}" class="button button-secondary">Back to Cabins</a>
+{% if can_write_projects %}
+<a href="{% url 'projects:project_create' %}?cabin={{ cabin.pk }}" class="button button-secondary">+ New Project</a>
+{% endif %}
 {% if can_write %}
+<a href="{% url 'cabins:cabin_inventory_item_create' cabin.pk %}" class="button button-secondary">+ Add Inventory Item</a>
 <a href="{% url 'cabins:cabin_update' cabin.pk %}" class="button button-primary">Edit Cabin</a>
 {% endif %}
 {% endblock %}
 
 {% block content %}
+{% can_do user "Cabins" "write" as can_write %}
+{% can_do user "Cabins" "delete" as can_delete %}
+{% can_do user "Projects" "write" as can_write_projects %}
 <div class="detail-layout">
     <section class="panel-stack">
         <div class="detail-card">
@@ -82,6 +90,194 @@ View cabin details, capacity, housekeeping, and reservation readiness.
             </div>
         </div>
 
+        <!-- Cabin Inventory Section -->
+        <div class="detail-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                <div>
+                    <h2 style="margin-bottom: 0.25rem;">Cabin Inventory & Appliances</h2>
+                    <p class="text-muted" style="margin-bottom: 0; font-size: 0.85rem;">Track appliances (washing machines, fridge, AC), furniture, fixtures and maintenance.</p>
+                </div>
+                {% if can_write %}
+                <a href="{% url 'cabins:cabin_inventory_item_create' cabin.pk %}" class="button button-small button-primary">+ Add Inventory Item</a>
+                {% endif %}
+            </div>
+
+            {% if inventory_items %}
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Item Name</th>
+                                <th>Category</th>
+                                <th>Location</th>
+                                <th>Condition</th>
+                                <th>Status</th>
+                                <th>Maintenance Logs</th>
+                                <th class="text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in inventory_items %}
+                                <tr>
+                                    <td>
+                                        <strong><a href="{% url 'cabins:cabin_inventory_item_detail' item.pk %}">{{ item.name }}</a></strong>
+                                        {% if item.brand or item.model_number %}
+                                            <div style="font-size: 0.75rem; color: var(--color-muted);">
+                                                {{ item.brand }} {{ item.model_number }}
+                                            </div>
+                                        {% endif %}
+                                    </td>
+                                    <td><span class="badge badge-neutral">{{ item.get_category_display }}</span></td>
+                                    <td>{{ item.location_in_cabin|default:"—" }}</td>
+                                    <td>
+                                        {% if item.condition == 'excellent' or item.condition == 'good' %}
+                                            <span class="badge badge-success">{{ item.get_condition_display }}</span>
+                                        {% elif item.condition == 'fair' %}
+                                            <span class="badge badge-warning">{{ item.get_condition_display }}</span>
+                                        {% else %}
+                                            <span class="badge badge-danger">{{ item.get_condition_display }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.status == 'operational' %}
+                                            <span class="badge badge-success">{{ item.get_status_display }}</span>
+                                        {% elif item.status == 'maintenance' %}
+                                            <span class="badge badge-warning">{{ item.get_status_display }}</span>
+                                        {% elif item.status == 'out_of_service' %}
+                                            <span class="badge badge-danger">{{ item.get_status_display }}</span>
+                                        {% else %}
+                                            <span class="badge badge-neutral">{{ item.get_status_display }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% with log_count=item.maintenance_logs.count %}
+                                            {% if log_count %}
+                                                <span class="badge badge-neutral">{{ log_count }} record{{ log_count|pluralize }}</span>
+                                            {% else %}
+                                                <span class="text-muted" style="font-size: 0.85rem;">None</span>
+                                            {% endif %}
+                                        {% endwith %}
+                                    </td>
+                                    <td>
+                                        <div class="table-actions">
+                                            <a href="{% url 'cabins:cabin_inventory_item_detail' item.pk %}" class="button button-small button-secondary">View</a>
+                                            {% if can_write %}
+                                            <a href="{% url 'cabins:cabin_item_maintenance_log_create' item.pk %}" class="button button-small button-secondary" title="Log Maintenance">Log Service</a>
+                                            <a href="{% url 'cabins:cabin_inventory_item_update' item.pk %}" class="button button-small button-primary">Edit</a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted">No inventory items or appliances tracked for this cabin yet.</p>
+                {% if can_write %}
+                <a href="{% url 'cabins:cabin_inventory_item_create' cabin.pk %}" class="button button-secondary">Add First Inventory Item</a>
+                {% endif %}
+            {% endif %}
+        </div>
+
+        <!-- Maintenance & Projects Section -->
+        <div class="detail-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                <div>
+                    <h2 style="margin-bottom: 0.25rem;">Cabin Maintenance & Projects</h2>
+                    <p class="text-muted" style="margin-bottom: 0; font-size: 0.85rem;">Ranch projects and work orders linked to this cabin.</p>
+                </div>
+                {% if can_write_projects %}
+                <a href="{% url 'projects:project_create' %}?cabin={{ cabin.pk }}" class="button button-small button-primary">+ New Maintenance Project</a>
+                {% endif %}
+            </div>
+
+            {% if projects %}
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Project Name</th>
+                                <th>Target / Item</th>
+                                <th>Status</th>
+                                <th>Project Lead</th>
+                                <th>Proposed Cost</th>
+                                <th>Actual Cost</th>
+                                <th class="text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for project in projects %}
+                                <tr>
+                                    <td><strong><a href="{% url 'projects:project_detail' project.pk %}">{{ project.name }}</a></strong></td>
+                                    <td>
+                                        {% if project.cabin_item %}
+                                            <a href="{% url 'cabins:cabin_inventory_item_detail' project.cabin_item.pk %}">{{ project.cabin_item.name }}</a>
+                                        {% else %}
+                                            <span class="text-muted">General Cabin</span>
+                                        {% endif %}
+                                    </td>
+                                    <td><span class="badge badge-neutral">{{ project.get_status_display }}</span></td>
+                                    <td>
+                                        {% if project.project_lead %}
+                                            {{ project.project_lead.full_name }}
+                                        {% else %}
+                                            <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>${{ project.proposed_cost }}</td>
+                                    <td>${{ project.actual_cost }}</td>
+                                    <td>
+                                        <div class="table-actions">
+                                            <a href="{% url 'projects:project_detail' project.pk %}" class="button button-small button-secondary">View</a>
+                                            {% if can_write_projects %}
+                                            <a href="{% url 'projects:project_edit' project.pk %}" class="button button-small button-primary">Edit</a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted mb-0">No active or historical projects linked to this cabin.</p>
+            {% endif %}
+        </div>
+
+        <!-- Recent Inventory Maintenance Logs -->
+        {% if item_maintenance_logs %}
+        <div class="detail-card">
+            <h2 style="margin-bottom: 1rem;">Recent Item Maintenance History</h2>
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Item</th>
+                            <th>Service / Issue</th>
+                            <th>Performed By</th>
+                            <th>Cost</th>
+                            <th>Result Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in item_maintenance_logs %}
+                            <tr>
+                                <td><strong>{{ log.date }}</strong></td>
+                                <td><a href="{% url 'cabins:cabin_inventory_item_detail' log.item.pk %}">{{ log.item.name }}</a></td>
+                                <td>{{ log.title }}</td>
+                                <td>{{ log.performed_by|default:"—" }}</td>
+                                <td>${{ log.cost }}</td>
+                                <td><span class="badge badge-neutral">{{ log.get_status_update_display }}</span></td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
         <div class="detail-card">
             <h2>Description</h2>
             {% if cabin.description %}
@@ -102,6 +298,30 @@ View cabin details, capacity, housekeeping, and reservation readiness.
     </section>
 
     <aside class="panel-stack">
+        <div class="detail-card">
+            <h2>Cabin Overview</h2>
+            <div class="detail-list">
+                <div class="detail-row">
+                    <div class="detail-label">Inventory Items</div>
+                    <div class="detail-value"><strong>{{ total_inventory_items }}</strong></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Items In Maintenance</div>
+                    <div class="detail-value">
+                        {% if items_needing_attention %}
+                            <span class="badge badge-warning">{{ items_needing_attention }} item{{ items_needing_attention|pluralize }}</span>
+                        {% else %}
+                            <span class="badge badge-success">All Operational</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Active Projects</div>
+                    <div class="detail-value">{{ active_projects_count }}</div>
+                </div>
+            </div>
+        </div>
+
         <div class="detail-card">
             <h2>Future Reservations</h2>
             <p class="text-muted mb-0">

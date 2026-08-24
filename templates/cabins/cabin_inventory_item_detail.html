@@ -1,0 +1,317 @@
+{% extends "base.html" %}
+{% load group_perms %}
+
+{% block title %}{{ item.name }} | {{ cabin.name }} Inventory{% endblock %}
+
+{% block eyebrow %}<a href="{% url 'cabins:cabin_detail' cabin.pk %}">{{ cabin.name }}</a> &rsaquo; Inventory{% endblock %}
+
+{% block page_title %}{{ item.name }}{% endblock %}
+
+{% block page_subtitle %}
+{{ item.get_category_display }} &bull; Located in {{ item.location_in_cabin|default:cabin.name }}
+{% endblock %}
+
+{% block page_actions %}
+{% can_do user "Cabins" "write" as can_write %}
+{% can_do user "Cabins" "delete" as can_delete %}
+{% can_do user "Projects" "write" as can_write_projects %}
+{% if can_write_projects %}
+<a href="{% url 'projects:project_create' %}?cabin_item={{ item.pk }}" class="button button-secondary">+ Create Project</a>
+{% endif %}
+{% if can_write %}
+<a href="{% url 'cabins:cabin_item_maintenance_log_create' item.pk %}" class="button button-primary">+ Log Maintenance</a>
+<a href="{% url 'cabins:cabin_inventory_item_update' item.pk %}" class="button button-secondary">Edit Item</a>
+{% endif %}
+<a href="{% url 'cabins:cabin_detail' cabin.pk %}" class="button button-secondary">Back to Cabin</a>
+{% endblock %}
+
+{% block content %}
+{% can_do user "Cabins" "write" as can_write %}
+{% can_do user "Cabins" "delete" as can_delete %}
+{% can_do user "Projects" "write" as can_write_projects %}
+<div class="detail-layout">
+    <section class="panel-stack">
+        <div class="detail-card">
+            <h2>Item Specifications</h2>
+            <div class="detail-list">
+                <div class="detail-row">
+                    <div class="detail-label">Cabin</div>
+                    <div class="detail-value"><strong><a href="{% url 'cabins:cabin_detail' cabin.pk %}">{{ cabin.name }}</a></strong></div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Category</div>
+                    <div class="detail-value"><span class="badge badge-neutral">{{ item.get_category_display }}</span></div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Brand / Manufacturer</div>
+                    <div class="detail-value">{{ item.brand|default:"—" }}</div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Model Number</div>
+                    <div class="detail-value">{{ item.model_number|default:"—" }}</div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Serial Number</div>
+                    <div class="detail-value">
+                        {% if item.serial_number %}
+                            <code>{{ item.serial_number }}</code>
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Quantity</div>
+                    <div class="detail-value">{{ item.quantity }}</div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Location in Cabin</div>
+                    <div class="detail-value">{{ item.location_in_cabin|default:"Not specified" }}</div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Physical Condition</div>
+                    <div class="detail-value">
+                        {% if item.condition == 'excellent' or item.condition == 'good' %}
+                            <span class="badge badge-success">{{ item.get_condition_display }}</span>
+                        {% elif item.condition == 'fair' %}
+                            <span class="badge badge-warning">{{ item.get_condition_display }}</span>
+                        {% else %}
+                            <span class="badge badge-danger">{{ item.get_condition_display }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Operational Status</div>
+                    <div class="detail-value">
+                        {% if item.status == 'operational' %}
+                            <span class="badge badge-success">{{ item.get_status_display }}</span>
+                        {% elif item.status == 'maintenance' %}
+                            <span class="badge badge-warning">{{ item.get_status_display }}</span>
+                        {% elif item.status == 'out_of_service' %}
+                            <span class="badge badge-danger">{{ item.get_status_display }}</span>
+                        {% else %}
+                            <span class="badge badge-neutral">{{ item.get_status_display }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Installed Date</div>
+                    <div class="detail-value">{{ item.installed_date|default:"—" }}</div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Warranty Expiration</div>
+                    <div class="detail-value">{{ item.warranty_expiration|default:"—" }}</div>
+                </div>
+            </div>
+        </div>
+
+        {% if item.notes %}
+        <div class="detail-card">
+            <h2>Notes & Specifications</h2>
+            <div class="text-block">
+                {{ item.notes|linebreaks }}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Maintenance History Card -->
+        <div class="detail-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                <h2 style="margin-bottom: 0;">Maintenance & Service History</h2>
+                {% if can_write %}
+                <a href="{% url 'cabins:cabin_item_maintenance_log_create' item.pk %}" class="button button-small button-primary">+ Log Service</a>
+                {% endif %}
+            </div>
+
+            {% if maintenance_logs %}
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Service / Issue</th>
+                                <th>Performed By</th>
+                                <th>Cost</th>
+                                <th>Status Result</th>
+                                <th>Work Details</th>
+                                <th class="text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in maintenance_logs %}
+                                <tr>
+                                    <td style="white-space: nowrap;"><strong>{{ log.date }}</strong></td>
+                                    <td><strong>{{ log.title }}</strong></td>
+                                    <td>{{ log.performed_by|default:"—" }}</td>
+                                    <td>${{ log.cost }}</td>
+                                    <td>
+                                        {% if log.status_update == 'operational' %}
+                                            <span class="badge badge-success">{{ log.get_status_update_display }}</span>
+                                        {% elif log.status_update == 'needs_follow_up' %}
+                                            <span class="badge badge-warning">{{ log.get_status_update_display }}</span>
+                                        {% else %}
+                                            <span class="badge badge-danger">{{ log.get_status_update_display }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ log.work_performed|linebreaksbr }}</td>
+                                    <td>
+                                        <div class="table-actions">
+                                            {% if can_write %}
+                                            <a href="{% url 'cabins:cabin_item_maintenance_log_update' log.pk %}" class="button button-small button-secondary">Edit</a>
+                                            {% endif %}
+                                            {% if can_delete %}
+                                            <a href="{% url 'cabins:cabin_item_maintenance_log_delete' log.pk %}" class="button button-small button-danger">Remove</a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted">No maintenance or service records logged yet for this item.</p>
+            {% endif %}
+
+            <!-- Quick Add Maintenance Form -->
+            {% if can_write %}
+            <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
+                <h3>Quick Log Maintenance Entry</h3>
+                <form method="post" action="{% url 'cabins:cabin_item_maintenance_log_create' item.pk %}">
+                    {% csrf_token %}
+                    <div class="form-grid">
+                        <div class="form-field">
+                            <label for="{{ quick_add_form.date.id_for_label }}">Service Date</label>
+                            {{ quick_add_form.date }}
+                        </div>
+                        <div class="form-field">
+                            <label for="{{ quick_add_form.title.id_for_label }}">Issue / Maintenance Title</label>
+                            {{ quick_add_form.title }}
+                        </div>
+                        <div class="form-field">
+                            <label for="{{ quick_add_form.performed_by.id_for_label }}">Performed By</label>
+                            {{ quick_add_form.performed_by }}
+                        </div>
+                        <div class="form-field">
+                            <label for="{{ quick_add_form.cost.id_for_label }}">Cost ($)</label>
+                            {{ quick_add_form.cost }}
+                        </div>
+                        <div class="form-field">
+                            <label for="{{ quick_add_form.status_update.id_for_label }}">Resulting Item Status</label>
+                            {{ quick_add_form.status_update }}
+                        </div>
+                        <div class="form-field form-grid-full">
+                            <label for="{{ quick_add_form.work_performed.id_for_label }}">Work / Repairs Performed</label>
+                            {{ quick_add_form.work_performed }}
+                        </div>
+                    </div>
+                    <div class="form-actions" style="margin-top: 1rem;">
+                        <button type="submit" class="button button-primary">Save Maintenance Entry</button>
+                    </div>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Linked Projects Section -->
+        <div class="detail-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                <h2 style="margin-bottom: 0;">Linked Maintenance Projects</h2>
+                {% if can_write_projects %}
+                <a href="{% url 'projects:project_create' %}?cabin_item={{ item.pk }}" class="button button-small button-primary">+ New Project</a>
+                {% endif %}
+            </div>
+
+            {% if projects %}
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Project Name</th>
+                                <th>Status</th>
+                                <th>Lead</th>
+                                <th>Proposed Cost</th>
+                                <th>Actual Cost</th>
+                                <th class="text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for project in projects %}
+                                <tr>
+                                    <td><strong><a href="{% url 'projects:project_detail' project.pk %}">{{ project.name }}</a></strong></td>
+                                    <td><span class="badge badge-neutral">{{ project.get_status_display }}</span></td>
+                                    <td>
+                                        {% if project.project_lead %}
+                                            {{ project.project_lead.full_name }}
+                                        {% else %}
+                                            <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>${{ project.proposed_cost }}</td>
+                                    <td>${{ project.actual_cost }}</td>
+                                    <td>
+                                        <div class="table-actions">
+                                            <a href="{% url 'projects:project_detail' project.pk %}" class="button button-small button-secondary">View</a>
+                                            {% if can_write_projects %}
+                                            <a href="{% url 'projects:project_edit' project.pk %}" class="button button-small button-primary">Edit</a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted mb-0">No active or completed projects linked to this inventory item.</p>
+            {% endif %}
+        </div>
+    </section>
+
+    <aside class="panel-stack">
+        <div class="detail-card">
+            <h3>Quick Actions</h3>
+            <div class="sidebar-actions" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                {% if can_write %}
+                <a href="{% url 'cabins:cabin_item_maintenance_log_create' item.pk %}" class="button button-primary" style="width: 100%; text-align: center;">+ Log Maintenance</a>
+                <a href="{% url 'cabins:cabin_inventory_item_update' item.pk %}" class="button button-secondary" style="width: 100%; text-align: center;">Edit Specifications</a>
+                {% endif %}
+                {% if can_write_projects %}
+                <a href="{% url 'projects:project_create' %}?cabin_item={{ item.pk }}" class="button button-secondary" style="width: 100%; text-align: center;">+ Create Project</a>
+                {% endif %}
+                {% if can_delete %}
+                <a href="{% url 'cabins:cabin_inventory_item_delete' item.pk %}" class="button button-danger" style="width: 100%; text-align: center;">Delete Item</a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="detail-card">
+            <h2>Record Info</h2>
+            <div class="detail-list">
+                <div class="detail-row">
+                    <div class="detail-label">Added to System</div>
+                    <div class="detail-value">{{ item.created_at|date:"M j, Y" }}</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Last Updated</div>
+                    <div class="detail-value">{{ item.updated_at|date:"M j, Y H:i" }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <a href="{% url 'cabins:cabin_detail' cabin.pk %}" class="button button-neutral" style="width: 100%; text-align: center;">Back to {{ cabin.name }}</a>
+        </div>
+    </aside>
+</div>
+{% endblock %}

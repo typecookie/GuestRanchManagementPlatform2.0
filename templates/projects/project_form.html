@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load group_perms %}
 
 {% block title %}Create Project{% endblock %}
 
@@ -36,11 +37,17 @@
             {% if form.name.errors %}<div class="form-error">{{ form.name.errors }}</div>{% endif %}
         </div>
         
-        <div class="asset-links" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+        <div class="asset-links" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
             <div class="form-group">
                 <label for="{{ form.cabin.id_for_label }}">Attach to Cabin (Optional)</label>
                 {{ form.cabin }}
                 {% if form.cabin.errors %}<div class="form-error">{{ form.cabin.errors }}</div>{% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="{{ form.cabin_item.id_for_label }}">Attach to Cabin Item (Optional)</label>
+                {{ form.cabin_item }}
+                {% if form.cabin_item.errors %}<div class="form-error">{{ form.cabin_item.errors }}</div>{% endif %}
             </div>
             
             <div class="form-group">

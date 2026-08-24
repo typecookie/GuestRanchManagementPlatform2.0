@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Delete Maintenance Log | {{ item.name }}{% endblock %}
+
+{% block eyebrow %}<a href="{% url 'cabins:cabin_detail' cabin.pk %}">{{ cabin.name }}</a> &rsaquo; <a href="{% url 'cabins:cabin_inventory_item_detail' item.pk %}">{{ item.name }}</a>{% endblock %}
+
+{% block page_title %}Remove Maintenance Record{% endblock %}
+
+{% block content %}
+<div class="form-card">
+    <div class="panel-stack">
+        <p>Are you sure you want to delete the maintenance record for <strong>{{ item.name }}</strong> dated <strong>{{ log.date }}</strong> ({{ log.title }})?</p>
+        
+        <p class="text-muted">This action cannot be undone.</p>
+
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-actions">
+                <a href="{% url 'cabins:cabin_inventory_item_detail' item.pk %}" class="button button-secondary">Cancel</a>
+                <button type="submit" class="button button-danger">Confirm Delete</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -2,7 +2,7 @@ from django import forms
 from django.db.models import Q
 from django.urls import reverse_lazy
 from .models import Project
-from apps.cabins.models import Cabin
+from apps.cabins.models import Cabin, CabinInventoryItem
 from apps.vehicles.models import Vehicle
 from apps.employees.models import Employee
 
@@ -29,10 +29,16 @@ class ProjectForm(forms.ModelForm):
             self.fields['project_lead'].queryset = active_employees
             self.fields['assigned_employees'].queryset = active_employees
 
+        # Populate cabin inventory items
+        self.fields['cabin_item'].queryset = CabinInventoryItem.objects.select_related('cabin').all()
+        self.fields['cabin_item'].required = False
+        self.fields['cabin'].required = False
+        self.fields['vehicle'].required = False
+
     class Meta:
         model = Project
         fields = [
-            'name', 'cabin', 'vehicle', 'equipment', 'parts', 
+            'name', 'cabin', 'cabin_item', 'vehicle', 'equipment', 'parts', 
             'proposed_cost', 'actual_cost', 'notes', 
             'project_lead', 'assigned_employees',
             'project_owner', 'primary_worker', 'other_workers', 
@@ -41,6 +47,7 @@ class ProjectForm(forms.ModelForm):
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'cabin': forms.Select(attrs={'class': 'form-control'}),
+            'cabin_item': forms.Select(attrs={'class': 'form-control'}),
             'vehicle': forms.Select(attrs={'class': 'form-control'}),
             'equipment': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'parts': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),

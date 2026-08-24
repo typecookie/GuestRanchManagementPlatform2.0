@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}{{ form_title }} | Cabins{% endblock %}
+
+{% block eyebrow %}Lodging & Inventory{% endblock %}
+
+{% block page_title %}{{ form_title }}{% endblock %}
+
+{% block page_subtitle %}{{ form_subtitle }}{% endblock %}
+
+{% block content %}
+<div class="form-card">
+    <form method="post" class="panel-stack">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <div class="form-alert">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+
+        <div class="form-grid">
+            <div class="form-field">
+                <label for="{{ form.name.id_for_label }}">Item Name *</label>
+                {{ form.name }}
+                {% for error in form.name.errors %}
+                    <span class="form-error">{{ error }}</span>
+                {% endfor %}
+                <span class="form-help">e.g. Washing Machine, Refrigerator, Stove, King Bed</span>
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.category.id_for_label }}">Category *</label>
+                {{ form.category }}
+                {% for error in form.category.errors %}
+                    <span class="form-error">{{ error }}</span>
+                {% endfor %}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.brand.id_for_label }}">Brand / Manufacturer</label>
+                {{ form.brand }}
+                {% for error in form.brand.errors %}
+                    <span class="form-error">{{ error }}</span>
+                {% endfor %}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.model_number.id_for_label }}">Model Number</label>
+                {{ form.model_number }}
+                {% for error in form.model_number.errors %}
+                    <span class="form-error">{{ error }}</span>
+                {% endfor %}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.serial_number.id_for_label }}">Serial Number</label>
+                {{ form.serial_number }}
+                {% for error in form.serial_number.errors %}
+                    <span class="form-error">{{ error }}</span>
+                {% endfor %}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.quantity.id_for_label }}">Quantity</label>
+                {{ form.quantity }}
+                {% for error in form.quantity.errors %}
+                    <span class="form-error">{{ error }}</span>
+                {% endfor %}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.location_in_cabin.id_for_label }}">Location in Cabin</label>
+                {{ form.location_in_cabin }}
+                {% for error in form.location_in_cabin.errors %}
+                    <span class="form-error">{{ error }}</span>
+                {% endfor %}
+                <span class="form-help">e.g. Laundry Room, Kitchen, Master Bedroom</span>
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.condition.id_for_label }}">Physical Condition</label>
+                {{ form.condition }}
+                {% for error in form.condition.errors %}
+                    <span class="form-error">{{ error }}</span>
+                {% endfor %}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.status.id_for_label }}">Operational Status</label>
+                {{ form.status }}
+                {% for error in form.status.errors %}
+                    <span class="form-error">{{ error }}</span>
+                {% endfor %}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.installed_date.id_for_label }}">Installation / Purchase Date</label>
+                {{ form.installed_date }}
+                {% for error in form.installed_date.errors %}
+                    <span class="form-error">{{ error }}</span>
+                {% endfor %}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.warranty_expiration.id_for_label }}">Warranty Expiration Date</label>
+                {{ form.warranty_expiration }}
+                {% for error in form.warranty_expiration.errors %}
+                    <span class="form-error">{{ error }}</span>
+                {% endfor %}
+            </div>
+
+            <div class="form-field form-grid-full">
+                <label for="{{ form.notes.id_for_label }}">Notes / Specifications</label>
+                {{ form.notes }}
+                {% for error in form.notes.errors %}
+                    <span class="form-error">{{ error }}</span>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            {% if item %}
+                <a href="{% url 'cabins:cabin_inventory_item_detail' item.pk %}" class="button button-secondary">Cancel</a>
+            {% else %}
+                <a href="{% url 'cabins:cabin_detail' cabin.pk %}" class="button button-secondary">Cancel</a>
+            {% endif %}
+            <button type="submit" class="button button-primary">{{ submit_label }}</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -6,6 +6,7 @@ from apps.groups.decorators import module_permission_required
 from .models import Project, ProjectHistory
 from .forms import ProjectForm
 from apps.employees.models import Employee
+from apps.cabins.models import CabinInventoryItem
 
 @module_permission_required('Projects', 'read')
 def kanban_board(request):
@@ -35,10 +36,26 @@ def project_create(request):
     if request.method == 'POST':
         form = ProjectForm(request.POST)
         if form.is_valid():
-            form.save()
+            project = form.save()
+            next_url = request.POST.get('next') or request.GET.get('next')
+            if next_url:
+                return redirect(next_url)
             return redirect('projects:kanban_board')
     else:
-        form = ProjectForm()
+        initial = {}
+        if 'cabin' in request.GET:
+            initial['cabin'] = request.GET.get('cabin')
+        if 'cabin_item' in request.GET:
+            item_id = request.GET.get('cabin_item')
+            initial['cabin_item'] = item_id
+            try:
+                item = CabinInventoryItem.objects.get(pk=item_id)
+                initial['cabin'] = item.cabin_id
+            except (CabinInventoryItem.DoesNotExist, ValueError):
+                pass
+        if 'vehicle' in request.GET:
+            initial['vehicle'] = request.GET.get('vehicle')
+        form = ProjectForm(initial=initial)
     
     return render(request, 'projects/project_form.html', {'form': form})
 

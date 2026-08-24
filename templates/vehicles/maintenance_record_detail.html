@@ -10,6 +10,10 @@
 {% block page_actions %}
 {% can_do user "Vehicles" "write" as can_write %}
 {% can_do user "Vehicles" "delete" as can_delete %}
+{% can_do user "Projects" "write" as can_write_projects %}
+{% if can_write_projects %}
+<a href="{% url 'projects:project_create' %}?vehicle={{ record.vehicle.pk }}" class="button button-secondary">+ Create Project</a>
+{% endif %}
 {% if can_write %}
 <a href="{% url 'vehicles:maintenance_record_update' record.pk %}" class="button button-primary">Edit Record</a>
 {% endif %}

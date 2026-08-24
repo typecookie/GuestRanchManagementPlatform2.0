@@ -41,12 +41,19 @@
                 </div>
             </div>
             
-            {% if project.cabin or project.vehicle or project.show_in_ranch_operations %}
+            {% if project.cabin or project.cabin_item or project.vehicle or project.show_in_ranch_operations %}
             <div class="info-grid" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
                 {% if project.cabin %}
                 <div class="info-item">
                     <span class="label">Linked Cabin</span>
                     <p><a href="{% url 'cabins:cabin_detail' project.cabin.pk %}">{{ project.cabin.name }}</a></p>
+                </div>
+                {% endif %}
+
+                {% if project.cabin_item %}
+                <div class="info-item">
+                    <span class="label">Linked Cabin Item</span>
+                    <p><a href="{% url 'cabins:cabin_inventory_item_detail' project.cabin_item.pk %}">{{ project.cabin_item.name }}</a> ({{ project.cabin_item.get_category_display }})</p>
                 </div>
                 {% endif %}
                 
