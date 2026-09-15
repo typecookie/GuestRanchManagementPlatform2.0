@@ -1,0 +1,566 @@
+{% extends "base.html" %}
+{% load group_perms %}
+
+{% block title %}{{ title }} | Bar Inventory | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}<a href="{% url 'bar:inventory_list' %}">Bar Inventory</a>{% endblock %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block page_subtitle %}
+Enter stock number, description, stock quantities, single & case cost pricing, sale price, and distributor.
+{% endblock %}
+
+{% block content %}
+{% can_do user "Distributors" "write" as can_write_distributors %}
+
+<div class="form-container" style="max-width: 800px;">
+    {% if can_write_distributors %}
+    <div class="quick-add-section" style="margin-bottom: 24px; padding: 18px; background: #fbf7f0; border: 1px solid var(--color-border); border-radius: 12px;">
+        <h4 style="margin-top: 0; font-size: 0.9rem; text-transform: uppercase; color: var(--color-muted); letter-spacing: 0.05em;">Quick Add Beverage Distributor / Supplier</h4>
+        <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+            <div style="flex: 2; min-width: 150px;">
+                <label style="font-size: 0.8rem; color: var(--color-muted); font-weight: 800; display: block; margin-bottom: 4px;">Distributor Name</label>
+                <input type="text" id="form-quick-add-dist-name" class="form-control" placeholder="e.g. Jackson Beverage Distributing">
+            </div>
+            <div style="flex: 2; min-width: 130px;">
+                <label style="font-size: 0.8rem; color: var(--color-muted); font-weight: 800; display: block; margin-bottom: 4px;">Phone Number</label>
+                <input type="text" id="form-quick-add-dist-phone" class="form-control" placeholder="e.g. (307) 555-0188">
+            </div>
+            <div style="flex: 0 0 auto;">
+                <button type="button" id="form-quick-add-dist-button" class="button button-secondary" data-url="{% url 'contractors:quick_add_contractor' %}">Quick Add</button>
+            </div>
+        </div>
+        <p style="font-size: 0.75rem; color: var(--color-muted); margin-top: 8px; margin-bottom: 0;">Adds the distributor to your supplier directory and selects them below.</p>
+    </div>
+    {% endif %}
+
+    <form method="post" class="standard-form">
+        {% csrf_token %}
+        
+        <!-- Primary Item Info -->
+        <div style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem;">
+            <h3 style="margin-top: 0; margin-bottom: 1rem; font-size: 1.1rem;">Item Information</h3>
+            
+            <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group">
+                    <label for="{{ form.stock_number.id_for_label }}">Stock Number *</label>
+                    {{ form.stock_number }}
+                    {% if form.stock_number.errors %}<div class="form-error">{{ form.stock_number.errors }}</div>{% endif %}
+                </div>
+
+                <div class="form-group">
+                    <label for="{{ form.description.id_for_label }}">Description / Item Name *</label>
+                    {{ form.description }}
+                    {% if form.description.errors %}<div class="form-error">{{ form.description.errors }}</div>{% endif %}
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label for="{{ form.category.id_for_label }}">Category *</label>
+                    {{ form.category }}
+                    {% if form.category.errors %}<div class="form-error">{{ form.category.errors }}</div>{% endif %}
+                </div>
+
+                <div class="form-group">
+                    <label for="{{ form.location.id_for_label }}">Storage Location</label>
+                    {{ form.location }}
+                    {% if form.location.errors %}<div class="form-error">{{ form.location.errors }}</div>{% endif %}
+                </div>
+
+                <div class="form-group">
+                    <label for="{{ form.unit_type.id_for_label }}">Unit Type</label>
+                    {{ form.unit_type }}
+                    {% if form.unit_type.errors %}<div class="form-error">{{ form.unit_type.errors }}</div>{% endif %}
+                </div>
+            </div>
+
+            <!-- Tags / Types Section -->
+            <div class="form-group" style="margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--color-border);">
+                <label style="font-weight: 700; display: block; margin-bottom: 6px;">
+                    Item Types / Tags (e.g. Whisky, Rum, Dark Rum, Bourbon, IPA)
+                </label>
+                {{ form.tags }}
+                {{ form.custom_tags }}
+
+                <!-- Selected tags container -->
+                <div id="selected-tags-container" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; min-height: 32px; align-items: center;">
+                    <span id="no-tags-placeholder" style="font-size: 0.85rem; color: var(--color-muted); font-style: italic;">No tags selected yet. Type below or click a suggestion.</span>
+                </div>
+
+                <!-- Tag input & Quick Add row -->
+                <div style="display: flex; gap: 8px; align-items: center; max-width: 520px; margin-bottom: 12px;">
+                    <input type="text" id="tag-input-field" class="form-control" placeholder="Type tag name (e.g. Dark Rum) and press Enter..." autocomplete="off">
+                    <button type="button" id="btn-add-tag" class="button button-secondary" data-quick-add-url="{% url 'bar:quick_add_tag' %}" style="white-space: nowrap;">+ Quick Add Tag</button>
+                </div>
+
+                <!-- Suggestions / Existing tags pills -->
+                <div style="margin-top: 6px;">
+                    <span style="font-size: 0.75rem; color: var(--color-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 8px;">
+                        Quick Tag Suggestions (Click to toggle):
+                    </span>
+                    <div id="quick-tag-suggestions" style="display: flex; flex-wrap: wrap; gap: 6px;">
+                        {% for tag in all_tags %}
+                            <button type="button" class="tag-suggestion-btn button button-small button-secondary" data-tag-id="{{ tag.pk }}" data-tag-name="{{ tag.name }}" style="padding: 4px 12px; font-size: 0.8rem; border-radius: 20px;">
+                                + {{ tag.name }}
+                            </button>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% if form.tags.errors %}<div class="form-error">{{ form.tags.errors }}</div>{% endif %}
+            </div>
+        </div>
+
+        <!-- Inventory Stock & Minimums -->
+        <div style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem;">
+            <h3 style="margin-top: 0; margin-bottom: 1rem; font-size: 1.1rem;">Stock Levels & Thresholds</h3>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group">
+                    <label for="{{ form.on_hand.id_for_label }}">On Hand (Singles / Units) *</label>
+                    {{ form.on_hand }}
+                    <div style="font-size: 0.75rem; color: var(--color-muted); margin-top: 4px;">Current count of bottles/units in stock.</div>
+                    {% if form.on_hand.errors %}<div class="form-error">{{ form.on_hand.errors }}</div>{% endif %}
+                </div>
+
+                <div class="form-group">
+                    <label for="{{ form.minimum_on_hand.id_for_label }}">Minimums On Hand *</label>
+                    {{ form.minimum_on_hand }}
+                    <div style="font-size: 0.75rem; color: var(--color-muted); margin-top: 4px;">Threshold for reorder alerts.</div>
+                    {% if form.minimum_on_hand.errors %}<div class="form-error">{{ form.minimum_on_hand.errors }}</div>{% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Pricing, Case Pack & Valuation -->
+        <div style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem;">
+            <h3 style="margin-top: 0; margin-bottom: 1rem; font-size: 1.1rem;">Sales & Pricing Configuration</h3>
+
+            <!-- Sale Method Selection (By Price vs By Class) -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem; padding-bottom: 1.25rem; border-bottom: 1px solid var(--color-border);">
+                <div class="form-group">
+                    <label for="{{ form.pricing_method.id_for_label }}" style="font-weight: 700;">Pricing / Sale Method *</label>
+                    {{ form.pricing_method }}
+                    <div style="font-size: 0.75rem; color: var(--color-muted); margin-top: 4px;">Choose how this alcohol is sold: <strong>By Class</strong> (Call, Well, Top, etc.) or <strong>By Price</strong>.</div>
+                    {% if form.pricing_method.errors %}<div class="form-error">{{ form.pricing_method.errors }}</div>{% endif %}
+                </div>
+
+                <div class="form-group" id="beverage-class-group">
+                    <label for="{{ form.beverage_class.id_for_label }}" style="font-weight: 700;">Beverage Class / Tier</label>
+                    {{ form.beverage_class }}
+                    <div style="font-size: 0.75rem; color: var(--color-muted); margin-top: 4px;">Select tier: <strong>Call</strong>, <strong>Well</strong>, <strong>Top Shelf</strong>, <strong>Domestic</strong>, or <strong>Import</strong>.</div>
+                    {% if form.beverage_class.errors %}<div class="form-error">{{ form.beverage_class.errors }}</div>{% endif %}
+                </div>
+            </div>
+
+            <div id="class-tier-note" style="display: none; padding: 8px 12px; background: #fdf8e2; border-left: 3px solid #d49826; border-radius: 4px; font-size: 0.85rem; color: #6b4d0e; margin-bottom: 1.25rem;"></div>
+
+            <!-- Cost and Sale Prices -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group">
+                    <label for="{{ form.single_price.id_for_label }}">Single Price ($ Cost) *</label>
+                    {{ form.single_price }}
+                    <div style="font-size: 0.75rem; color: var(--color-muted); margin-top: 4px;">Cost paid per single unit</div>
+                    {% if form.single_price.errors %}<div class="form-error">{{ form.single_price.errors }}</div>{% endif %}
+                </div>
+
+                <div class="form-group">
+                    <label for="{{ form.case_price.id_for_label }}">Case Price ($ Cost)</label>
+                    {{ form.case_price }}
+                    <div style="font-size: 0.75rem; color: var(--color-muted); margin-top: 4px;">Cost paid per whole case</div>
+                    {% if form.case_price.errors %}<div class="form-error">{{ form.case_price.errors }}</div>{% endif %}
+                </div>
+
+                <div class="form-group" id="sale-price-group">
+                    <label for="{{ form.sale_price.id_for_label }}">Sale Price ($)</label>
+                    {{ form.sale_price }}
+                    <div style="font-size: 0.75rem; color: var(--color-muted); margin-top: 4px;">Menu / retail selling price</div>
+                    {% if form.sale_price.errors %}<div class="form-error">{{ form.sale_price.errors }}</div>{% endif %}
+                </div>
+
+                <div class="form-group">
+                    <label for="{{ form.singles_per_case.id_for_label }}">Singles Per Case *</label>
+                    {{ form.singles_per_case }}
+                    <div style="font-size: 0.75rem; color: var(--color-muted); margin-top: 4px;">e.g. 12 or 24 bottles/cans</div>
+                    {% if form.singles_per_case.errors %}<div class="form-error">{{ form.singles_per_case.errors }}</div>{% endif %}
+                </div>
+            </div>
+
+            <!-- Live Total Value Calculator Badge -->
+            <div id="live-total-value-box" style="padding: 12px 16px; background: #f0f7fb; border: 1px solid #d0e3f0; border-radius: 8px; font-size: 0.95rem; color: var(--color-text);">
+                <strong>Total Value:</strong> <span id="live-total-value-display" style="font-weight: 800; color: var(--color-accent); font-size: 1.1rem;">$0.00</span>
+                <span style="font-size: 0.8rem; color: var(--color-muted); margin-left: 8px;">(Calculated: On Hand &times; Single Price)</span>
+            </div>
+        </div>
+
+        <!-- Distributor & Supplier Field -->
+        <div style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem;">
+            <h3 style="margin-top: 0; margin-bottom: 1rem; font-size: 1.1rem;">Distributor / Supplier</h3>
+
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label for="{{ form.distributor.id_for_label }}">Distributor Field</label>
+                {{ form.distributor }}
+                <div style="font-size: 0.75rem; color: var(--color-muted); margin-top: 4px;">Select the primary supplier or distributor for this item.</div>
+                {% if form.distributor.errors %}<div class="form-error">{{ form.distributor.errors }}</div>{% endif %}
+            </div>
+
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label for="{{ form.notes.id_for_label }}">Notes</label>
+                {{ form.notes }}
+                {% if form.notes.errors %}<div class="form-error">{{ form.notes.errors }}</div>{% endif %}
+            </div>
+
+            <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
+                {{ form.is_active }}
+                <label for="{{ form.is_active.id_for_label }}" style="margin-bottom: 0; cursor: pointer;">Active (item is currently stocked / available)</label>
+                {% if form.is_active.errors %}<div class="form-error">{{ form.is_active.errors }}</div>{% endif %}
+            </div>
+        </div>
+
+        <div class="form-actions" style="display: flex; gap: 10px;">
+            <button type="submit" class="button button-primary">Save Bar Item</button>
+            <a href="{% if item %}{% url 'bar:item_detail' item.pk %}{% else %}{% url 'bar:inventory_list' %}{% endif %}" class="button button-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // Dynamic Pricing Method & Beverage Class & Sale Price Visibility
+    const pricingMethodSelect = document.getElementById("id_pricing_method");
+    const beverageClassSelect = document.getElementById("id_beverage_class");
+    const beverageClassGroup = document.getElementById("beverage-class-group");
+    const salePriceGroup = document.getElementById("sale-price-group");
+    const classTierNote = document.getElementById("class-tier-note");
+
+    function updatePricingVisibility() {
+        if (!pricingMethodSelect) return;
+        const method = pricingMethodSelect.value;
+        const bevClass = beverageClassSelect ? beverageClassSelect.value : "";
+
+        if (method === "by_class") {
+            if (beverageClassGroup) beverageClassGroup.style.display = "block";
+            
+            if (bevClass === "top") {
+                if (salePriceGroup) salePriceGroup.style.display = "block";
+                if (classTierNote) {
+                    classTierNote.style.display = "block";
+                    classTierNote.innerHTML = "<strong>Top Shelf:</strong> Sale price is visible and customizable for this top-tier item.";
+                }
+            } else {
+                // Well, Call, Domestic, Import
+                if (salePriceGroup) salePriceGroup.style.display = "none";
+                if (classTierNote) {
+                    classTierNote.style.display = "block";
+                    const selectedText = (beverageClassSelect && beverageClassSelect.selectedIndex >= 0 && beverageClassSelect.options[beverageClassSelect.selectedIndex]?.value) ? beverageClassSelect.options[beverageClassSelect.selectedIndex].text : "class";
+                    classTierNote.innerHTML = `<strong>${selectedText} Tier:</strong> Standard ranch bar tier pricing applies (individual menu sale price is hidden/not tracked).`;
+                }
+            }
+        } else {
+            // by_price
+            if (beverageClassGroup) beverageClassGroup.style.display = "none";
+            if (salePriceGroup) salePriceGroup.style.display = "block";
+            if (classTierNote) {
+                classTierNote.style.display = "none";
+            }
+        }
+    }
+
+    if (pricingMethodSelect) {
+        pricingMethodSelect.addEventListener("change", updatePricingVisibility);
+    }
+    if (beverageClassSelect) {
+        beverageClassSelect.addEventListener("change", updatePricingVisibility);
+    }
+    updatePricingVisibility();
+
+    // Dynamic Total Value live updater
+    const onHandInput = document.getElementById("id_on_hand");
+    const singlePriceInput = document.getElementById("id_single_price");
+    const totalValDisplay = document.getElementById("live-total-value-display");
+
+    function updateTotalValue() {
+        if (!onHandInput || !singlePriceInput || !totalValDisplay) return;
+        const qty = parseFloat(onHandInput.value) || 0;
+        const price = parseFloat(singlePriceInput.value) || 0;
+        const total = qty * price;
+        totalValDisplay.textContent = "$" + total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    if (onHandInput && singlePriceInput) {
+        onHandInput.addEventListener("input", updateTotalValue);
+        singlePriceInput.addEventListener("input", updateTotalValue);
+        updateTotalValue();
+    }
+
+    // Quick Add Distributor handling
+    const quickAddBtn = document.getElementById("form-quick-add-dist-button");
+    const quickAddName = document.getElementById("form-quick-add-dist-name");
+    const quickAddPhone = document.getElementById("form-quick-add-dist-phone");
+    const distSelect = document.getElementById("id_distributor");
+
+    if (quickAddBtn && quickAddName) {
+        quickAddBtn.addEventListener("click", function() {
+            const name = quickAddName.value.trim();
+            const phone = quickAddPhone ? quickAddPhone.value.trim() : "";
+            
+            if (!name) return;
+
+            const url = quickAddBtn.dataset.url;
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            
+            const formData = new FormData();
+            formData.append("name", name);
+            formData.append("phone", phone);
+            formData.append("category", "distributor");
+
+            quickAddBtn.disabled = true;
+
+            fetch(url, {
+                method: "POST",
+                headers: {
+                    "X-CSRFToken": csrfToken,
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) throw new Error("Network response was not ok");
+                return response.json();
+            })
+            .then(data => {
+                if (data.id) {
+                    if (distSelect) {
+                        const opt = new Option(data.name, data.id, true, true);
+                        distSelect.add(opt);
+                        distSelect.value = data.id;
+
+                        const wrapperInput = distSelect.parentNode.querySelector(".searchable-select-input");
+                        if (wrapperInput) {
+                            wrapperInput.value = data.name;
+                        }
+                    }
+
+                    quickAddName.value = "";
+                    if (quickAddPhone) quickAddPhone.value = "";
+                    
+                    alert(`Added distributor "${data.name}" and selected for this item.`);
+                }
+                quickAddBtn.disabled = false;
+            })
+            .catch(error => {
+                console.error("Error:", error);
+                alert("Error during quick add. Please try again.");
+                quickAddBtn.disabled = false;
+            });
+        });
+
+        [quickAddName, quickAddPhone].forEach(el => {
+            if (el) {
+                el.addEventListener("keypress", function(e) {
+                    if (e.key === "Enter") {
+                        e.preventDefault();
+                        quickAddBtn.click();
+                    }
+                });
+            }
+        });
+    }
+
+    // Interactive Tag Manager for Bar Item Types
+    const tagsSelect = document.getElementById("id_tags");
+    const selectedTagsContainer = document.getElementById("selected-tags-container");
+    const noTagsPlaceholder = document.getElementById("no-tags-placeholder");
+    const tagInputField = document.getElementById("tag-input-field");
+    const btnAddTag = document.getElementById("btn-add-tag");
+    const quickTagSuggestions = document.getElementById("quick-tag-suggestions");
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]') ? document.querySelector('[name=csrfmiddlewaretoken]').value : '';
+
+    // Preset popular types if suggestion pool is small
+    const commonPresetTypes = [
+        "Whisky", "Bourbon", "Rye", "Scotch", "Rum", "Dark Rum", "Spiced Rum", 
+        "Vodka", "Gin", "Tequila", "Mezcal", "Red Wine", "White Wine", "IPA", "Lager", "Mixer", "Garnish"
+    ];
+
+    if (quickTagSuggestions) {
+        const existingNames = new Set();
+        quickTagSuggestions.querySelectorAll('.tag-suggestion-btn').forEach(btn => {
+            existingNames.add(btn.dataset.tagName.toLowerCase());
+        });
+
+        commonPresetTypes.forEach(presetName => {
+            if (!existingNames.has(presetName.toLowerCase())) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'tag-suggestion-btn button button-small button-secondary';
+                btn.dataset.tagName = presetName;
+                btn.style.cssText = 'padding: 4px 12px; font-size: 0.8rem; border-radius: 20px;';
+                btn.textContent = '+ ' + presetName;
+                quickTagSuggestions.appendChild(btn);
+            }
+        });
+    }
+
+    function getSelectedTags() {
+        if (!tagsSelect) return [];
+        const result = [];
+        Array.from(tagsSelect.options).forEach(opt => {
+            if (opt.selected) {
+                result.push({ id: opt.value, name: opt.textContent.trim() });
+            }
+        });
+        return result;
+    }
+
+    function renderTagBadges() {
+        if (!selectedTagsContainer || !tagsSelect) return;
+        const selectedTags = getSelectedTags();
+        selectedTagsContainer.innerHTML = "";
+
+        if (selectedTags.length === 0) {
+            if (noTagsPlaceholder) {
+                selectedTagsContainer.appendChild(noTagsPlaceholder);
+            }
+        } else {
+            selectedTags.forEach(tag => {
+                const badge = document.createElement("span");
+                badge.className = "badge badge-accent";
+                badge.style.cssText = "font-size: 0.85rem; padding: 5px 10px; display: inline-flex; align-items: center; gap: 6px; border-radius: 16px; font-weight: 600;";
+                badge.innerHTML = `<span>🏷️ ${tag.name}</span> <button type="button" data-tag-id="${tag.id}" style="background: none; border: none; color: inherit; cursor: pointer; font-size: 0.9rem; line-height: 1; padding: 0; margin-left: 4px;" title="Remove tag">&times;</button>`;
+                
+                const removeBtn = badge.querySelector("button");
+                removeBtn.addEventListener("click", function() {
+                    removeTagById(tag.id);
+                });
+
+                selectedTagsContainer.appendChild(badge);
+            });
+        }
+
+        // Highlight suggestions if currently active
+        const selectedNames = new Set(selectedTags.map(t => t.name.toLowerCase()));
+        if (quickTagSuggestions) {
+            quickTagSuggestions.querySelectorAll('.tag-suggestion-btn').forEach(btn => {
+                const btnName = (btn.dataset.tagName || '').toLowerCase();
+                if (selectedNames.has(btnName)) {
+                    btn.classList.remove('button-secondary');
+                    btn.classList.add('button-primary');
+                    btn.textContent = '✓ ' + btn.dataset.tagName;
+                } else {
+                    btn.classList.remove('button-primary');
+                    btn.classList.add('button-secondary');
+                    btn.textContent = '+ ' + btn.dataset.tagName;
+                }
+            });
+        }
+    }
+
+    function removeTagById(tagId) {
+        if (!tagsSelect) return;
+        Array.from(tagsSelect.options).forEach(opt => {
+            if (opt.value === String(tagId)) {
+                opt.selected = false;
+            }
+        });
+        renderTagBadges();
+    }
+
+    function addOrSelectTag(tagName, tagId = null) {
+        if (!tagName) return;
+        tagName = tagName.trim();
+        if (!tagName) return;
+
+        // Check if tag option already exists in select
+        let option = null;
+        if (tagId) {
+            option = Array.from(tagsSelect.options).find(o => o.value === String(tagId));
+        }
+        if (!option) {
+            option = Array.from(tagsSelect.options).find(o => o.textContent.trim().toLowerCase() === tagName.toLowerCase());
+        }
+
+        if (option) {
+            option.selected = true;
+            renderTagBadges();
+            return Promise.resolve();
+        }
+
+        // If tag needs to be created on server
+        const quickAddUrl = btnAddTag ? btnAddTag.dataset.quickAddUrl : '/bar/tags/quick-add/';
+        const formData = new FormData();
+        formData.append("name", tagName);
+
+        return fetch(quickAddUrl, {
+            method: "POST",
+            headers: {
+                "X-CSRFToken": csrfToken,
+                "X-Requested-With": "XMLHttpRequest"
+            },
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.id) {
+                const newOpt = new Option(data.name, data.id, true, true);
+                tagsSelect.add(newOpt);
+                renderTagBadges();
+            } else if (data.error) {
+                alert(data.error);
+            }
+        })
+        .catch(err => {
+            console.error("Error adding tag:", err);
+            // Fallback: add to select as custom tag
+            const newOpt = new Option(tagName, tagName, true, true);
+            tagsSelect.add(newOpt);
+            renderTagBadges();
+        });
+    }
+
+    if (quickTagSuggestions) {
+        quickTagSuggestions.addEventListener('click', function(e) {
+            const btn = e.target.closest('.tag-suggestion-btn');
+            if (!btn) return;
+            const tagName = btn.dataset.tagName;
+            const tagId = btn.dataset.tagId;
+
+            const selectedTags = getSelectedTags();
+            const isSelected = selectedTags.some(t => t.name.toLowerCase() === tagName.toLowerCase());
+
+            if (isSelected) {
+                const found = selectedTags.find(t => t.name.toLowerCase() === tagName.toLowerCase());
+                if (found) removeTagById(found.id);
+            } else {
+                addOrSelectTag(tagName, tagId);
+            }
+        });
+    }
+
+    if (btnAddTag && tagInputField) {
+        btnAddTag.addEventListener('click', function() {
+            const val = tagInputField.value.trim();
+            if (!val) return;
+            btnAddTag.disabled = true;
+            addOrSelectTag(val).finally(() => {
+                tagInputField.value = "";
+                btnAddTag.disabled = false;
+                tagInputField.focus();
+            });
+        });
+
+        tagInputField.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                btnAddTag.click();
+            }
+        });
+    }
+
+    // Initial render of existing tags on form load
+    renderTagBadges();
+});
+</script>
+{% endblock %}

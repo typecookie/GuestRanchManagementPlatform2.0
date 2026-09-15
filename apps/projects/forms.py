@@ -5,6 +5,7 @@ from .models import Project
 from apps.cabins.models import Cabin, CabinInventoryItem
 from apps.vehicles.models import Vehicle
 from apps.employees.models import Employee
+from apps.contractors.models import Contractor
 
 class ProjectForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
@@ -34,11 +35,12 @@ class ProjectForm(forms.ModelForm):
         self.fields['cabin_item'].required = False
         self.fields['cabin'].required = False
         self.fields['vehicle'].required = False
+        self.fields['contractor'].required = False
 
     class Meta:
         model = Project
         fields = [
-            'name', 'cabin', 'cabin_item', 'vehicle', 'equipment', 'parts', 
+            'name', 'cabin', 'cabin_item', 'vehicle', 'contractor', 'equipment', 'parts', 
             'proposed_cost', 'actual_cost', 'notes', 
             'project_lead', 'assigned_employees',
             'project_owner', 'primary_worker', 'other_workers', 
@@ -49,6 +51,11 @@ class ProjectForm(forms.ModelForm):
             'cabin': forms.Select(attrs={'class': 'form-control'}),
             'cabin_item': forms.Select(attrs={'class': 'form-control'}),
             'vehicle': forms.Select(attrs={'class': 'form-control'}),
+            'contractor': forms.Select(attrs={
+                'class': 'form-select js-searchable-select',
+                'data-placeholder': 'Search distributor or contractor...',
+                'data-quick-add-url': reverse_lazy('contractors:quick_add_contractor')
+            }),
             'equipment': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'parts': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'proposed_cost': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),

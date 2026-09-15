@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+{% load group_perms %}
+
+{% block title %}{{ item.description }} | Bar Inventory | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}<a href="{% url 'bar:inventory_list' %}">Bar Inventory</a>{% endblock %}
+
+{% block page_title %}{{ item.description }}{% endblock %}
+
+{% block page_subtitle %}
+Stock # {{ item.stock_number }} &bull; {{ item.get_category_display }} &bull; {{ item.location|default:"Main Bar" }}
+{% endblock %}
+
+{% block page_actions %}
+{% can_do user "Bar" "write" as can_write %}
+{% can_do user "Bar" "delete" as can_delete %}
+<a href="{% url 'bar:inventory_list' %}" class="button button-secondary">Back to Inventory</a>
+{% if can_write %}
+<a href="{% url 'bar:item_edit' item.pk %}" class="button button-primary">Edit Item</a>
+{% endif %}
+{% if can_delete %}
+<a href="{% url 'bar:item_delete' item.pk %}" class="button button-secondary" style="color: var(--color-danger);">Delete</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; align-items: start;">
+    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        <!-- Stock & Valuation Card -->
+        <div style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+                <h3 style="margin: 0; font-size: 1.15rem;">Stock Levels & Valuation</h3>
+                {% if item.is_low_stock %}
+                    <span class="badge badge-danger">Low Stock Warning</span>
+                {% elif item.on_hand <= 0 %}
+                    <span class="badge badge-danger">Out of Stock</span>
+                {% else %}
+                    <span class="badge badge-success">Stock Adequate</span>
+                {% endif %}
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
+                <div style="padding: 1rem; background: #fbf7f0; border-radius: 8px;">
+                    <span style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; font-weight: 700; display: block;">On Hand</span>
+                    <span style="font-size: 1.8rem; font-weight: 800; color: {% if item.is_low_stock %}var(--color-danger){% else %}var(--color-text){% endif %};">
+                        {{ item.on_hand|floatformat:0 }}
+                    </span>
+                    <span style="font-size: 0.85rem; color: var(--color-muted);">{{ item.unit_type|default:"singles" }}</span>
+                </div>
+
+                <div style="padding: 1rem; background: #fbf7f0; border-radius: 8px;">
+                    <span style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; font-weight: 700; display: block;">Minimum Threshold</span>
+                    <span style="font-size: 1.8rem; font-weight: 800; color: var(--color-text);">{{ item.minimum_on_hand|floatformat:0 }}</span>
+                    <span style="font-size: 0.85rem; color: var(--color-muted);">{{ item.unit_type|default:"singles" }}</span>
+                </div>
+
+                <div style="padding: 1rem; background: #fbf7f0; border-radius: 8px;">
+                    <span style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; font-weight: 700; display: block;">Total Inventory Value</span>
+                    <span style="font-size: 1.8rem; font-weight: 800; color: var(--color-success);">${{ item.total_value|floatformat:2 }}</span>
+                    <span style="font-size: 0.85rem; color: var(--color-muted);">({{ item.on_hand|floatformat:0 }} &times; ${{ item.single_price|floatformat:2 }})</span>
+                </div>
+            </div>
+
+            {% if item.is_low_stock %}
+            <div style="padding: 1rem; background: #fff3cd; border-left: 4px solid #b97825; border-radius: 6px; margin-top: 0.5rem; font-size: 0.95rem;">
+                <strong>⚠️ Reorder Recommended:</strong> Currently {{ item.reorder_needed|floatformat:0 }} single unit(s) below minimum.
+                {% if item.singles_per_case and item.singles_per_case > 1 %}
+                    Suggested order: <strong>{{ item.suggested_cases_to_order }} case(s)</strong> ({{ item.singles_per_case }} singles/case).
+                {% endif %}
+                {% if item.estimated_reorder_cost > 0 %}
+                    Estimated restock cost: <strong>${{ item.estimated_reorder_cost|floatformat:2 }}</strong>.
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Pricing and Packaging Breakdown -->
+        <div style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.5rem;">
+            <h3 style="margin-top: 0; margin-bottom: 1.25rem; font-size: 1.15rem;">Sales, Pricing & Packaging</h3>
+
+            <!-- Pricing method banner -->
+            <div style="padding: 12px 16px; background: #fafafa; border: 1px solid var(--color-border); border-radius: 8px; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                <div>
+                    <span style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; font-weight: 700; display: block;">Sales / Pricing Method</span>
+                    <strong style="font-size: 1.05rem; color: var(--color-text);">
+                        {% if item.is_by_class %}
+                            🏷️ Sold By Class: <span class="badge {% if item.is_top_shelf %}badge-accent{% else %}badge-neutral{% endif %}">{{ item.get_beverage_class_display|default:"Class Tier" }}</span>
+                        {% else %}
+                            💵 Sold By Price (Direct List Price)
+                        {% endif %}
+                    </strong>
+                </div>
+                <div>
+                    {% if item.is_by_class %}
+                        {% if item.is_top_shelf %}
+                            <span style="font-size: 0.85rem; color: var(--color-muted); font-style: italic;">Top shelf item with individual menu pricing.</span>
+                        {% else %}
+                            <span style="font-size: 0.85rem; color: var(--color-muted); font-style: italic;">Standard ranch bar {{ item.get_beverage_class_display }} tier pricing applies.</span>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem;">
+                <div style="padding: 1rem; background: #fafafa; border: 1px solid var(--color-border); border-radius: 8px;">
+                    <span style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; font-weight: 700; display: block;">Single Cost (Cost Price)</span>
+                    <span style="font-size: 1.4rem; font-weight: 800; color: var(--color-text);">${{ item.single_price|floatformat:2 }}</span>
+                    <span style="font-size: 0.8rem; color: var(--color-muted); display: block;">per single unit</span>
+                </div>
+
+                <div style="padding: 1rem; background: #fafafa; border: 1px solid var(--color-border); border-radius: 8px;">
+                    <span style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; font-weight: 700; display: block;">Case Cost (Case Price)</span>
+                    <span style="font-size: 1.4rem; font-weight: 800; color: var(--color-text);">${{ item.case_price|floatformat:2 }}</span>
+                    <span style="font-size: 0.8rem; color: var(--color-muted); display: block;">per whole case</span>
+                </div>
+
+                <div style="padding: 1rem; background: #fafafa; border: 1px solid var(--color-border); border-radius: 8px;">
+                    <span style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; font-weight: 700; display: block;">Sale / Retail Price</span>
+                    <span style="font-size: 1.4rem; font-weight: 800; color: var(--color-success);">
+                        {% if item.is_by_class %}
+                            {% if item.is_top_shelf and item.sale_price > 0 %}
+                                ${{ item.sale_price|floatformat:2 }}
+                            {% elif item.is_top_shelf %}
+                                Top Shelf
+                            {% else %}
+                                Tier Price
+                            {% endif %}
+                        {% else %}
+                            {% if item.sale_price > 0 %}${{ item.sale_price|floatformat:2 }}{% else %}—{% endif %}
+                        {% endif %}
+                    </span>
+                    <span style="font-size: 0.8rem; color: var(--color-muted); display: block;">
+                        {% if item.is_by_class and not item.is_top_shelf %}Class charge{% else %}Menu / Bar charge{% endif %}
+                    </span>
+                </div>
+
+                <div style="padding: 1rem; background: #fafafa; border: 1px solid var(--color-border); border-radius: 8px;">
+                    <span style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; font-weight: 700; display: block;">Singles Per Case</span>
+                    <span style="font-size: 1.4rem; font-weight: 800; color: var(--color-text);">{{ item.singles_per_case }}</span>
+                    <span style="font-size: 0.8rem; color: var(--color-muted); display: block;">units in one pack</span>
+                </div>
+            </div>
+
+            {% if item.notes %}
+            <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--color-border);">
+                <span style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; font-weight: 700; display: block; margin-bottom: 0.25rem;">Ordering & Item Notes</span>
+                <p style="margin: 0; white-space: pre-line;">{{ item.notes }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Distributor / Supplier Sidebar Card -->
+    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        <div style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.5rem;">
+            <h3 style="margin-top: 0; margin-bottom: 1rem; font-size: 1.15rem;">Distributor & Supplier</h3>
+
+            {% if item.distributor %}
+                <div style="margin-bottom: 1rem;">
+                    <span style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; font-weight: 700; display: block;">Company</span>
+                    <a href="{% url 'contractors:contractor_detail' item.distributor.pk %}" style="font-size: 1.15rem; font-weight: 700; color: var(--color-accent); text-decoration: underline;">
+                        {{ item.distributor.name }}
+                    </a>
+                </div>
+
+                {% if item.distributor.contact_name %}
+                <div style="margin-bottom: 1rem;">
+                    <span style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; font-weight: 700; display: block;">Contact Person</span>
+                    <span>{{ item.distributor.contact_name }}</span>
+                </div>
+                {% endif %}
+
+                {% if item.distributor.phone %}
+                <div style="margin-bottom: 1rem;">
+                    <span style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; font-weight: 700; display: block;">Phone Number</span>
+                    <a href="tel:{{ item.distributor.phone }}" style="font-size: 1.1rem; font-weight: 700; color: var(--color-accent);">📞 {{ item.distributor.phone }}</a>
+                </div>
+                {% endif %}
+
+                {% if item.distributor.email %}
+                <div style="margin-bottom: 1rem;">
+                    <span style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; font-weight: 700; display: block;">Email</span>
+                    <a href="mailto:{{ item.distributor.email }}" style="color: var(--color-accent); text-decoration: underline;">{{ item.distributor.email }}</a>
+                </div>
+                {% endif %}
+
+                <div style="margin-bottom: 1rem;">
+                    <span style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; font-weight: 700; display: block;">Supplier Location / Address</span>
+                    {% if item.distributor.full_address %}
+                        <p style="margin: 0.25rem 0 0; line-height: 1.4;">
+                            {{ item.distributor.full_address }}
+                        </p>
+                    {% else %}
+                        <span class="table-muted">No address on file</span>
+                    {% endif %}
+                </div>
+
+                <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--color-border);">
+                    <a href="{% url 'contractors:contractor_detail' item.distributor.pk %}" class="button button-small button-secondary" style="width: 100%; text-align: center;">View Distributor Profile</a>
+                </div>
+            {% else %}
+                <div style="padding: 1rem; background: #fbf7f0; border-radius: 8px; text-align: center;">
+                    <p class="table-muted" style="margin-top: 0; margin-bottom: 0.75rem;">No distributor linked yet.</p>
+                    {% if can_write %}
+                    <a href="{% url 'bar:item_edit' item.pk %}" class="button button-small button-secondary">Assign Distributor</a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Item Specifications Sidebar -->
+        <div style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.5rem;">
+            <h3 style="margin-top: 0; margin-bottom: 1rem; font-size: 1.15rem;">Item Details</h3>
+            
+            <div style="margin-bottom: 0.75rem;">
+                <span style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; font-weight: 700; display: block;">Stock Number</span>
+                <span style="font-weight: 700;">{{ item.stock_number }}</span>
+            </div>
+
+            <div style="margin-bottom: 0.75rem;">
+                <span style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; font-weight: 700; display: block;">Category</span>
+                <span>{{ item.get_category_display }}</span>
+            </div>
+
+            <div style="margin-bottom: 0.75rem;">
+                <span style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; font-weight: 700; display: block;">Pricing / Class Tier</span>
+                <span>
+                    {% if item.is_by_class %}
+                        <span class="badge {% if item.is_top_shelf %}badge-accent{% else %}badge-neutral{% endif %}">Class: {{ item.get_beverage_class_display }}</span>
+                    {% else %}
+                        <span class="badge badge-neutral">By Price</span>
+                    {% endif %}
+                </span>
+            </div>
+
+            <div style="margin-bottom: 0.75rem;">
+                <span style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; font-weight: 700; display: block; margin-bottom: 4px;">Types / Tags</span>
+                <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                    {% for tag in item.tags.all %}
+                        <a href="{% url 'bar:inventory_list' %}?tag={{ tag.pk }}" class="badge badge-accent" style="text-decoration: none;" title="Filter inventory by {{ tag.name }}">🏷️ {{ tag.name }}</a>
+                    {% empty %}
+                        <span class="table-muted">No tags</span>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div style="margin-bottom: 0.75rem;">
+                <span style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; font-weight: 700; display: block;">Storage Location</span>
+                <span>{{ item.location|default:"Main Bar" }}</span>
+            </div>
+
+            <div style="margin-bottom: 0.75rem;">
+                <span style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; font-weight: 700; display: block;">Status</span>
+                {% if item.is_active %}
+                    <span class="badge badge-success">Active Item</span>
+                {% else %}
+                    <span class="badge badge-neutral">Inactive / Discontinued</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

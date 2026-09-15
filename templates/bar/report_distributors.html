@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}Distributor Summary Report | Bar Reports | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}<a href="{% url 'bar:reports_dashboard' %}">Bar Reports</a>{% endblock %}
+
+{% block page_title %}Distributor Summary Report{% endblock %}
+
+{% block page_subtitle %}
+Overview of beverage distributors, supplier contacts, locations, and asset valuation of supplied bar inventory.
+{% endblock %}
+
+{% block page_actions %}
+<button onclick="window.print()" class="button button-secondary">🖨️ Print Report</button>
+<a href="{% url 'bar:reports_dashboard' %}" class="button button-secondary">All Reports</a>
+<a href="{% url 'bar:inventory_list' %}" class="button button-secondary">Back to Inventory</a>
+{% endblock %}
+
+{% block content %}
+<!-- Overview Metrics -->
+<div class="metrics-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="metric-card" style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.25rem;">
+        <span class="metric-label" style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">Active Suppliers</span>
+        <div class="metric-value" style="font-size: 2rem; font-weight: 800; color: var(--color-text); margin-top: 0.25rem;">{{ distributor_data|length }}</div>
+    </div>
+    <div class="metric-card" style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.25rem;">
+        <span class="metric-label" style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">Supplied Inventory Value</span>
+        <div class="metric-value" style="font-size: 2rem; font-weight: 800; color: var(--color-success); margin-top: 0.25rem;">${{ grand_total_value|floatformat:2 }}</div>
+    </div>
+    <div class="metric-card" style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.25rem;">
+        <span class="metric-label" style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">Total Units Supplied</span>
+        <div class="metric-value" style="font-size: 2rem; font-weight: 800; color: var(--color-accent); margin-top: 0.25rem;">{{ grand_total_units|floatformat:0 }} <span style="font-size: 1rem; font-weight: 500; color: var(--color-muted);">units</span></div>
+    </div>
+</div>
+
+{% for data in distributor_data %}
+    <div style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; margin-bottom: 2rem; overflow: hidden;">
+        <!-- Distributor Contact & Location Header -->
+        <div style="background: #fbf7f0; padding: 1.25rem; border-bottom: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+            <div>
+                <h3 style="margin: 0; font-size: 1.25rem;">
+                    <a href="{% url 'contractors:contractor_detail' data.distributor.pk %}" style="text-decoration: underline;">{{ data.distributor.name }}</a>
+                </h3>
+                <div style="margin-top: 0.4rem; font-size: 0.9rem; color: var(--color-muted); display: flex; gap: 18px; flex-wrap: wrap;">
+                    {% if data.distributor.contact_name %}
+                        <span>👤 Rep: <strong>{{ data.distributor.contact_name }}</strong></span>
+                    {% endif %}
+                    {% if data.distributor.phone %}
+                        <span>📞 Phone: <a href="tel:{{ data.distributor.phone }}" style="font-weight: 700; color: var(--color-accent);">{{ data.distributor.phone }}</a></span>
+                    {% endif %}
+                    {% if data.distributor.email %}
+                        <span>✉️ <a href="mailto:{{ data.distributor.email }}">{{ data.distributor.email }}</a></span>
+                    {% endif %}
+                </div>
+                {% if data.distributor.full_address %}
+                <div style="margin-top: 0.3rem; font-size: 0.85rem; color: var(--color-muted);">
+                    📍 Supplier Location: {{ data.distributor.full_address }}
+                </div>
+                {% endif %}
+            </div>
+            <div style="text-align: right;">
+                <span style="font-size: 1.25rem; font-weight: 800; color: var(--color-success);">${{ data.total_value|floatformat:2 }}</span>
+                <span style="font-size: 0.85rem; color: var(--color-muted); display: block;">{{ data.item_count }} item(s) &bull; {{ data.total_units|floatformat:0 }} units</span>
+                {% if data.low_stock_count > 0 %}
+                    <span class="badge badge-danger" style="margin-top: 4px;">{{ data.low_stock_count }} Low Stock Item(s)</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Supplied Items Table -->
+        {% if data.items %}
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Stock #</th>
+                        <th>Description</th>
+                        <th>Category</th>
+                        <th>On Hand</th>
+                        <th>Min Req.</th>
+                        <th>Single Price</th>
+                        <th>Case Price</th>
+                        <th>Singles / Case</th>
+                        <th class="text-right">Total Asset Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in data.items %}
+                        <tr>
+                            <td><strong>{{ item.stock_number }}</strong></td>
+                            <td><a href="{% url 'bar:item_detail' item.pk %}">{{ item.description }}</a></td>
+                            <td>{{ item.get_category_display }}</td>
+                            <td>
+                                <span {% if item.is_low_stock %}style="color: var(--color-danger); font-weight: 700;"{% endif %}>
+                                    {{ item.on_hand|floatformat:0 }}
+                                </span>
+                                {% if item.is_low_stock %}
+                                    <span class="badge badge-danger" style="font-size: 0.65rem;">Low</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ item.minimum_on_hand|floatformat:0 }}</td>
+                            <td>${{ item.single_price|floatformat:2 }}</td>
+                            <td>${{ item.case_price|floatformat:2 }}</td>
+                            <td>{{ item.singles_per_case }}</td>
+                            <td class="text-right"><strong>${{ item.total_value|floatformat:2 }}</strong></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div style="padding: 1.25rem; text-align: center; color: var(--color-muted);">
+            No active bar inventory items currently associated with this distributor.
+        </div>
+        {% endif %}
+    </div>
+{% endfor %}
+{% endblock %}

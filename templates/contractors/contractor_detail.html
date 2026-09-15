@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% load group_perms %}
+
+{% block title %}{{ contractor.name }} | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}<a href="{% url 'contractors:contractor_list' %}">Distributors & Contractors</a>{% endblock %}
+
+{% block page_title %}{{ contractor.name }}{% endblock %}
+
+{% block page_subtitle %}
+{{ contractor.get_category_display }} details, contact info, linked bar inventory, and ranch projects.
+{% endblock %}
+
+{% block page_actions %}
+{% can_do user "Distributors" "write" as can_write %}
+{% can_do user "Distributors" "delete" as can_delete %}
+<a href="{% url 'contractors:contractor_list' %}" class="button button-secondary">Back to List</a>
+{% if can_write %}
+<a href="{% url 'contractors:contractor_edit' contractor.pk %}" class="button button-primary">Edit</a>
+{% endif %}
+{% if can_delete %}
+<a href="{% url 'contractors:contractor_delete' contractor.pk %}" class="button button-secondary" style="color: var(--color-danger);">Delete</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+{% can_do user "Distributors" "write" as can_write %}
+
+<div style="display: grid; grid-template-columns: 1fr 2fr; gap: 1.5rem; align-items: start;">
+    <!-- Contact and Address Card -->
+    <div style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="margin: 0; font-size: 1.15rem;">Partner Information</h3>
+            {% if contractor.is_active %}
+                <span class="badge badge-success">Active</span>
+            {% else %}
+                <span class="badge badge-neutral">Inactive</span>
+            {% endif %}
+        </div>
+
+        <div style="margin-bottom: 1rem;">
+            <span style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; font-weight: 700; display: block;">Category</span>
+            <span style="font-weight: 600;">{{ contractor.get_category_display }}</span>
+        </div>
+
+        {% if contractor.contact_name %}
+        <div style="margin-bottom: 1rem;">
+            <span style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; font-weight: 700; display: block;">Contact Person</span>
+            <span>{{ contractor.contact_name }}</span>
+        </div>
+        {% endif %}
+
+        <div style="margin-bottom: 1rem;">
+            <span style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; font-weight: 700; display: block;">Phone Number</span>
+            {% if contractor.phone %}
+                <a href="tel:{{ contractor.phone }}" style="font-size: 1.1rem; font-weight: 700; color: var(--color-accent);">{{ contractor.phone }}</a>
+            {% else %}
+                <span class="table-muted">No phone provided</span>
+            {% endif %}
+        </div>
+
+        {% if contractor.email %}
+        <div style="margin-bottom: 1rem;">
+            <span style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; font-weight: 700; display: block;">Email Address</span>
+            <a href="mailto:{{ contractor.email }}" style="color: var(--color-accent); text-decoration: underline;">{{ contractor.email }}</a>
+        </div>
+        {% endif %}
+
+        <div style="margin-bottom: 1rem;">
+            <span style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; font-weight: 700; display: block;">Location / Address</span>
+            {% if contractor.full_address %}
+                <p style="margin: 0.25rem 0 0; line-height: 1.4;">
+                    {% if contractor.address_line_1 %}{{ contractor.address_line_1 }}<br>{% endif %}
+                    {% if contractor.address_line_2 %}{{ contractor.address_line_2 }}<br>{% endif %}
+                    {% if contractor.city or contractor.state or contractor.postal_code %}
+                        {{ contractor.city }}{% if contractor.city and contractor.state %}, {% endif %}{{ contractor.state }} {{ contractor.postal_code }}
+                    {% endif %}
+                </p>
+            {% else %}
+                <span class="table-muted">No address on file</span>
+            {% endif %}
+        </div>
+
+        {% if contractor.website %}
+        <div style="margin-bottom: 1rem;">
+            <span style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; font-weight: 700; display: block;">Website</span>
+            <a href="{{ contractor.website }}" target="_blank" rel="noopener noreferrer" style="color: var(--color-accent); text-decoration: underline;">{{ contractor.website }}</a>
+        </div>
+        {% endif %}
+
+        {% if contractor.notes %}
+        <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--color-border);">
+            <span style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; font-weight: 700; display: block; margin-bottom: 0.25rem;">Notes & Terms</span>
+            <div style="white-space: pre-line; font-size: 0.9rem; color: var(--color-text);">{{ contractor.notes }}</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Linked Items Section -->
+    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        <!-- Linked Bar Inventory Items -->
+        <div style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="margin: 0; font-size: 1.15rem;">🍸 Supplied Bar Inventory Items ({{ bar_items.count }})</h3>
+                {% can_do user "Bar" "write" as can_write_bar %}
+                {% if can_write_bar %}
+                <a href="{% url 'bar:item_create' %}?distributor={{ contractor.pk }}" class="button button-small button-secondary">+ Add Bar Item</a>
+                {% endif %}
+            </div>
+
+            {% if bar_items %}
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Stock #</th>
+                                <th>Description</th>
+                                <th>Category</th>
+                                <th>On Hand</th>
+                                <th>Single Cost</th>
+                                <th>Case Cost</th>
+                                <th>Total Value</th>
+                                <th class="text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in bar_items %}
+                                <tr>
+                                    <td><strong>{{ item.stock_number }}</strong></td>
+                                    <td><a href="{% url 'bar:item_detail' item.pk %}" style="text-decoration: underline;">{{ item.description }}</a></td>
+                                    <td>{{ item.get_category_display }}</td>
+                                    <td>
+                                        <span {% if item.is_low_stock %}style="color: var(--color-danger); font-weight: 700;"{% endif %}>
+                                            {{ item.on_hand|floatformat:0 }}
+                                        </span>
+                                        {% if item.is_low_stock %}
+                                            <span class="badge badge-danger" style="font-size: 0.7rem;">Low</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>${{ item.single_price|floatformat:2 }}</td>
+                                    <td>${{ item.case_price|floatformat:2 }}</td>
+                                    <td><strong>${{ item.total_value|floatformat:2 }}</strong></td>
+                                    <td class="text-right">
+                                        <a href="{% url 'bar:item_detail' item.pk %}" class="button button-small button-secondary">View</a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="table-muted" style="margin: 0;">No bar inventory items currently linked to this distributor.</p>
+            {% endif %}
+        </div>
+
+        <!-- Linked Ranch Projects -->
+        <div style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="margin: 0; font-size: 1.15rem;">🔨 Linked Ranch Projects ({{ projects.count }})</h3>
+                {% can_do user "Projects" "write" as can_write_projects %}
+                {% if can_write_projects %}
+                <a href="{% url 'projects:project_create' %}?contractor={{ contractor.pk }}" class="button button-small button-secondary">+ New Project</a>
+                {% endif %}
+            </div>
+
+            {% if projects %}
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Project</th>
+                                <th>Status</th>
+                                <th>Lead / Worker</th>
+                                <th>Proposed Cost</th>
+                                <th>Actual Cost</th>
+                                <th class="text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in projects %}
+                                <tr>
+                                    <td>
+                                        <strong><a href="{% url 'projects:project_detail' p.pk %}" style="text-decoration: underline;">{{ p.name }}</a></strong>
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-neutral">{{ p.get_status_display }}</span>
+                                    </td>
+                                    <td>{{ p.project_lead|default:p.primary_worker|default:"—" }}</td>
+                                    <td>${{ p.proposed_cost|floatformat:2 }}</td>
+                                    <td>${{ p.actual_cost|floatformat:2 }}</td>
+                                    <td class="text-right">
+                                        <a href="{% url 'projects:project_detail' p.pk %}" class="button button-small button-secondary">View</a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="table-muted" style="margin: 0;">No projects currently assigned to this contractor.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

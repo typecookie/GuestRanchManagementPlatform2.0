@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% load group_perms %}
+
+{% block title %}Distributors & Contractors | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Suppliers & Contractors{% endblock %}
+
+{% block page_title %}Distributors & Contractors{% endblock %}
+
+{% block page_subtitle %}
+Manage beverage distributors, maintenance contractors, equipment suppliers, and service providers.
+{% endblock %}
+
+{% block page_actions %}
+{% can_do user "Distributors" "write" as can_write %}
+{% if can_write %}
+<a href="{% url 'contractors:contractor_create' %}" class="button button-primary">+ Add Distributor / Contractor</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+{% can_do user "Distributors" "write" as can_write %}
+
+<div class="metrics-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="metric-card" style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.25rem;">
+        <span class="metric-label" style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">Total Partners</span>
+        <div class="metric-value" style="font-size: 1.75rem; font-weight: 800; color: var(--color-text); margin-top: 0.25rem;">{{ total_count }}</div>
+    </div>
+    <div class="metric-card" style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.25rem;">
+        <span class="metric-label" style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">Active Distributors</span>
+        <div class="metric-value" style="font-size: 1.75rem; font-weight: 800; color: var(--color-accent); margin-top: 0.25rem;">{{ distributor_count }}</div>
+    </div>
+    <div class="metric-card" style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.25rem;">
+        <span class="metric-label" style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">Active Contractors</span>
+        <div class="metric-value" style="font-size: 1.75rem; font-weight: 800; color: var(--color-success); margin-top: 0.25rem;">{{ contractor_count }}</div>
+    </div>
+    <div class="metric-card" style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.25rem;">
+        <span class="metric-label" style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">Suppliers & Vendors</span>
+        <div class="metric-value" style="font-size: 1.75rem; font-weight: 800; color: var(--color-text); margin-top: 0.25rem;">{{ supplier_count }}</div>
+    </div>
+</div>
+
+<div class="page-toolbar" style="margin-bottom: 1.25rem;">
+    <div class="page-toolbar-main">
+        <form class="search-form" method="get" style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <input
+                type="search"
+                name="q"
+                class="search-input"
+                placeholder="Search by name, contact, phone, city..."
+                value="{{ query }}"
+                style="min-width: 260px;"
+            >
+
+            <select name="category" class="form-select">
+                <option value="">All Categories</option>
+                {% for val, label in category_choices %}
+                    <option value="{{ val }}" {% if selected_category == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+
+            <select name="status" class="form-select">
+                <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Active Only</option>
+                <option value="inactive" {% if selected_status == 'inactive' %}selected{% endif %}>Inactive Only</option>
+                <option value="all" {% if selected_status == 'all' %}selected{% endif %}>All Records</option>
+            </select>
+
+            <button type="submit" class="button button-secondary">Filter</button>
+
+            {% if query or selected_category or selected_status != 'active' %}
+                <a href="{% url 'contractors:contractor_list' %}" class="button button-secondary">Reset</a>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+{% if contractors %}
+    <div class="table-card">
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Name / Company</th>
+                        <th>Type</th>
+                        <th>Contact Person</th>
+                        <th>Phone</th>
+                        <th>Location / Address</th>
+                        <th>Linked Items</th>
+                        <th>Status</th>
+                        <th class="text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in contractors %}
+                        <tr>
+                            <td>
+                                <strong><a href="{% url 'contractors:contractor_detail' c.pk %}" style="text-decoration: underline;">{{ c.name }}</a></strong>
+                                {% if c.email %}
+                                    <div style="font-size: 0.8rem; color: var(--color-muted);">{{ c.email }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if c.category == 'distributor' %}
+                                    <span class="badge badge-info">Distributor</span>
+                                {% elif c.category == 'contractor' %}
+                                    <span class="badge badge-success">Contractor</span>
+                                {% elif c.category == 'supplier' %}
+                                    <span class="badge badge-warning">Supplier</span>
+                                {% else %}
+                                    <span class="badge badge-neutral">{{ c.get_category_display }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ c.contact_name|default:"—" }}</td>
+                            <td>
+                                {% if c.phone %}
+                                    <a href="tel:{{ c.phone }}" style="font-weight: 600;">{{ c.phone }}</a>
+                                {% else %}
+                                    <span class="table-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if c.full_address %}
+                                    <span>{{ c.full_address }}</span>
+                                {% elif c.city or c.state %}
+                                    <span>{{ c.city }}{% if c.city and c.state %}, {% endif %}{{ c.state }}</span>
+                                {% else %}
+                                    <span class="table-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                                    {% if c.bar_item_count > 0 %}
+                                        <span class="badge badge-neutral" title="Linked Bar Inventory Items">🍸 {{ c.bar_item_count }} Bar Items</span>
+                                    {% endif %}
+                                    {% if c.project_count > 0 %}
+                                        <span class="badge badge-neutral" title="Linked Projects">🔨 {{ c.project_count }} Projects</span>
+                                    {% endif %}
+                                    {% if c.bar_item_count == 0 and c.project_count == 0 %}
+                                        <span class="table-muted">0</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                {% if c.is_active %}
+                                    <span class="badge badge-success">Active</span>
+                                {% else %}
+                                    <span class="badge badge-neutral">Inactive</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="table-actions">
+                                    <a href="{% url 'contractors:contractor_detail' c.pk %}" class="button button-small button-secondary">View</a>
+                                    {% if can_write %}
+                                    <a href="{% url 'contractors:contractor_edit' c.pk %}" class="button button-small button-secondary">Edit</a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% else %}
+    <div class="empty-state">
+        <div class="empty-state-content">
+            <div class="empty-state-icon">🏢</div>
+            <h2>No distributors or contractors found</h2>
+            <p>
+                {% if query or selected_category %}
+                    No records match your search criteria.
+                {% else %}
+                    Keep track of liquor distributors, maintenance contractors, and ranch suppliers with their phone and address.
+                {% endif %}
+            </p>
+            {% if can_write %}
+                <a href="{% url 'contractors:contractor_create' %}" class="button button-primary">+ Add Distributor / Contractor</a>
+            {% endif %}
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

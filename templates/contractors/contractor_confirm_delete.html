@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Delete {{ contractor.name }} | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}<a href="{% url 'contractors:contractor_list' %}">Distributors & Contractors</a>{% endblock %}
+
+{% block page_title %}Delete Distributor / Contractor{% endblock %}
+
+{% block content %}
+<div class="form-container" style="max-width: 600px;">
+    <div style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.5rem;">
+        <h3 style="margin-top: 0; color: var(--color-danger);">Confirm Deletion</h3>
+        <p>Are you sure you want to delete <strong>{{ contractor.name }}</strong> ({{ contractor.get_category_display }})?</p>
+        
+        {% if contractor.bar_items.count > 0 or contractor.projects.count > 0 %}
+        <div style="padding: 12px; background: #fff3cd; border-radius: 8px; margin-bottom: 1rem; color: #856404; font-size: 0.9rem;">
+            ⚠️ This partner is currently linked to:
+            <ul style="margin: 0.5rem 0 0; padding-left: 1.25rem;">
+                {% if contractor.bar_items.count > 0 %}
+                <li>{{ contractor.bar_items.count }} Bar Inventory item(s)</li>
+                {% endif %}
+                {% if contractor.projects.count > 0 %}
+                <li>{{ contractor.projects.count }} Ranch Project(s)</li>
+                {% endif %}
+            </ul>
+            Deleting will remove the partner link from these records.
+        </div>
+        {% endif %}
+
+        <form method="post" style="display: flex; gap: 10px; margin-top: 1.5rem;">
+            {% csrf_token %}
+            <button type="submit" class="button button-danger" style="background: var(--color-danger); color: #fff;">Yes, Delete</button>
+            <a href="{% url 'contractors:contractor_detail' contractor.pk %}" class="button button-secondary">Cancel</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

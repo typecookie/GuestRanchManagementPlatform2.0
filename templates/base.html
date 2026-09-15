@@ -88,6 +88,20 @@
                         Projects
                     </a>
 
+                    <a
+                        href="{% url 'bar:inventory_list' %}"
+                        class="sidebar-link {% if request.resolver_match.namespace == 'bar' %}is-active{% endif %}"
+                    >
+                        Bar
+                    </a>
+
+                    <a
+                        href="{% url 'contractors:contractor_list' %}"
+                        class="sidebar-link {% if request.resolver_match.namespace == 'contractors' %}is-active{% endif %}"
+                    >
+                        Distributors & Contractors
+                    </a>
+
                     {% if perms.employees.view_employee %}
                     <a
                         href="{% url 'employees:employee_list' %}"

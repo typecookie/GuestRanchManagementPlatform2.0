@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+
+{% block title %}Low Stock & Reorder Report | Bar Reports | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}<a href="{% url 'bar:reports_dashboard' %}">Bar Reports</a>{% endblock %}
+
+{% block page_title %}Low Stock & Reorder Report{% endblock %}
+
+{% block page_subtitle %}
+Items at or below minimum threshold, organized by distributor with contact phone, address, and case pack reorder calculations.
+{% endblock %}
+
+{% block page_actions %}
+<button onclick="window.print()" class="button button-secondary">🖨️ Print Reorder Schedule</button>
+<a href="{% url 'bar:reports_dashboard' %}" class="button button-secondary">All Reports</a>
+<a href="{% url 'bar:inventory_list' %}" class="button button-secondary">Back to Inventory</a>
+{% endblock %}
+
+{% block content %}
+<!-- Reorder Overview Metrics -->
+<div class="metrics-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="metric-card" style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.25rem;">
+        <span class="metric-label" style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">Items Requiring Reorder</span>
+        <div class="metric-value" style="font-size: 2rem; font-weight: 800; color: {% if total_low_stock_items > 0 %}var(--color-danger){% else %}var(--color-success){% endif %}; margin-top: 0.25rem;">
+            {{ total_low_stock_items }} <span style="font-size: 1rem; font-weight: 500; color: var(--color-muted);">items</span>
+        </div>
+    </div>
+    <div class="metric-card" style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.25rem;">
+        <span class="metric-label" style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">Suggested Cases to Order</span>
+        <div class="metric-value" style="font-size: 2rem; font-weight: 800; color: var(--color-accent); margin-top: 0.25rem;">
+            {{ grand_reorder_cases }} <span style="font-size: 1rem; font-weight: 500; color: var(--color-muted);">cases</span>
+        </div>
+    </div>
+    <div class="metric-card" style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.25rem;">
+        <span class="metric-label" style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">Estimated Restock Spend</span>
+        <div class="metric-value" style="font-size: 2rem; font-weight: 800; color: var(--color-success); margin-top: 0.25rem;">
+            ${{ grand_estimated_cost|floatformat:2 }}
+        </div>
+    </div>
+</div>
+
+{% if distributor_groups or unassigned_items %}
+    <!-- Grouped by Distributor -->
+    {% for group in distributor_groups %}
+    <div style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; margin-bottom: 2rem; overflow: hidden;">
+        <!-- Distributor Information Header -->
+        <div style="background: #fbf7f0; padding: 1.25rem; border-bottom: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+            <div>
+                <h3 style="margin: 0; font-size: 1.25rem;">
+                    <a href="{% url 'contractors:contractor_detail' group.distributor.pk %}" style="text-decoration: underline;">{{ group.distributor.name }}</a>
+                </h3>
+                <div style="margin-top: 0.4rem; font-size: 0.9rem; color: var(--color-muted); display: flex; gap: 18px; flex-wrap: wrap;">
+                    {% if group.distributor.contact_name %}
+                        <span>👤 Contact: <strong>{{ group.distributor.contact_name }}</strong></span>
+                    {% endif %}
+                    {% if group.distributor.phone %}
+                        <span>📞 Phone: <a href="tel:{{ group.distributor.phone }}" style="font-weight: 700; color: var(--color-accent);">{{ group.distributor.phone }}</a></span>
+                    {% endif %}
+                    {% if group.distributor.email %}
+                        <span>✉️ <a href="mailto:{{ group.distributor.email }}">{{ group.distributor.email }}</a></span>
+                    {% endif %}
+                </div>
+                {% if group.distributor.full_address %}
+                <div style="margin-top: 0.25rem; font-size: 0.85rem; color: var(--color-muted);">
+                    📍 Location: {{ group.distributor.full_address }}
+                </div>
+                {% endif %}
+            </div>
+            <div style="text-align: right;">
+                <span style="font-size: 1.25rem; font-weight: 800; color: var(--color-accent);">{{ group.total_cases }} case(s)</span>
+                <span style="font-size: 1rem; font-weight: 700; color: var(--color-success); display: block;">Est: ${{ group.total_cost|floatformat:2 }}</span>
+            </div>
+        </div>
+
+        <!-- Items Table -->
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Stock #</th>
+                        <th>Description</th>
+                        <th>Category</th>
+                        <th>On Hand</th>
+                        <th>Min Req.</th>
+                        <th>Shortage</th>
+                        <th>Pack Size</th>
+                        <th>Order Qty</th>
+                        <th>Case Price</th>
+                        <th class="text-right">Est. Cost</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in group.items %}
+                        <tr>
+                            <td><strong>{{ item.stock_number }}</strong></td>
+                            <td>
+                                <strong><a href="{% url 'bar:item_detail' item.pk %}">{{ item.description }}</a></strong>
+                            </td>
+                            <td>{{ item.get_category_display }}</td>
+                            <td>
+                                <span style="color: var(--color-danger); font-weight: 700;">{{ item.on_hand|floatformat:0 }}</span>
+                            </td>
+                            <td>{{ item.minimum_on_hand|floatformat:0 }}</td>
+                            <td>
+                                <span style="font-weight: 700; color: var(--color-danger);">
+                                    -{{ item.reorder_needed|floatformat:0 }} {{ item.unit_type|default:"units" }}
+                                </span>
+                            </td>
+                            <td>{{ item.singles_per_case }} / case</td>
+                            <td>
+                                <span class="badge badge-warning" style="font-weight: 800; font-size: 0.85rem;">
+                                    {{ item.suggested_cases_to_order }} case(s)
+                                </span>
+                            </td>
+                            <td>${{ item.case_price|floatformat:2 }}</td>
+                            <td class="text-right">
+                                <strong>${{ item.estimated_reorder_cost|floatformat:2 }}</strong>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr style="background: #fafafa; font-weight: 700; border-top: 2px solid var(--color-border);">
+                        <td colspan="7">Distributor Order Total: {{ group.distributor.name }}</td>
+                        <td>{{ group.total_cases }} cases</td>
+                        <td></td>
+                        <td class="text-right" style="color: var(--color-success); font-size: 1.1rem;">
+                            ${{ group.total_cost|floatformat:2 }}
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+    {% endfor %}
+
+    <!-- Unassigned Low Stock Items -->
+    {% if unassigned_items %}
+    <div style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; margin-bottom: 2rem; overflow: hidden;">
+        <div style="background: #fff3cd; padding: 1rem 1.25rem; border-bottom: 1px solid var(--color-border);">
+            <h3 style="margin: 0; font-size: 1.15rem; color: #856404;">⚠️ Items Without Assigned Distributor</h3>
+            <span style="font-size: 0.85rem; color: #856404;">Assign a distributor to these items for streamlined supplier ordering.</span>
+        </div>
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Stock #</th>
+                        <th>Description</th>
+                        <th>Category</th>
+                        <th>On Hand</th>
+                        <th>Min Req.</th>
+                        <th>Shortage</th>
+                        <th>Single Price</th>
+                        <th class="text-right">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in unassigned_items %}
+                        <tr>
+                            <td><strong>{{ item.stock_number }}</strong></td>
+                            <td><a href="{% url 'bar:item_detail' item.pk %}">{{ item.description }}</a></td>
+                            <td>{{ item.get_category_display }}</td>
+                            <td><span style="color: var(--color-danger); font-weight: 700;">{{ item.on_hand|floatformat:0 }}</span></td>
+                            <td>{{ item.minimum_on_hand|floatformat:0 }}</td>
+                            <td><span style="color: var(--color-danger); font-weight: 700;">-{{ item.reorder_needed|floatformat:0 }}</span></td>
+                            <td>${{ item.single_price|floatformat:2 }}</td>
+                            <td class="text-right">
+                                <a href="{% url 'bar:item_edit' item.pk %}" class="button button-small button-secondary">Assign Distributor</a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Summary Total Card -->
+    <div style="background: var(--color-panel); border: 2px solid var(--color-accent); border-radius: 12px; padding: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div>
+            <h3 style="margin: 0; font-size: 1.3rem;">Total Estimated Purchase Reorder Budget</h3>
+            <p style="margin: 0.25rem 0 0; color: var(--color-muted);">Calculated across {{ grand_reorder_cases }} case packs for {{ total_low_stock_items }} depleted inventory lines.</p>
+        </div>
+        <div style="font-size: 2.2rem; font-weight: 900; color: var(--color-success);">
+            ${{ grand_estimated_cost|floatformat:2 }}
+        </div>
+    </div>
+{% else %}
+    <div class="empty-state">
+        <div class="empty-state-content">
+            <div class="empty-state-icon">✅</div>
+            <h2>All Stock Levels Are Healthy</h2>
+            <p>No bar items are currently at or below their minimum thresholds. Everything is fully stocked!</p>
+            <a href="{% url 'bar:inventory_list' %}" class="button button-primary">View Full Inventory</a>
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

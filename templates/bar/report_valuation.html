@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block title %}Bar Inventory Valuation Report | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}<a href="{% url 'bar:reports_dashboard' %}">Bar Reports</a>{% endblock %}
+
+{% block page_title %}Inventory Valuation Report{% endblock %}
+
+{% block page_subtitle %}
+Comprehensive asset valuation breakdown by category, unit cost, case price, and current stock on hand.
+{% endblock %}
+
+{% block page_actions %}
+<button onclick="window.print()" class="button button-secondary">🖨️ Print Report</button>
+<a href="{% url 'bar:reports_dashboard' %}" class="button button-secondary">All Reports</a>
+<a href="{% url 'bar:inventory_list' %}" class="button button-secondary">Back to Inventory</a>
+{% endblock %}
+
+{% block content %}
+<!-- Grand Total Cards -->
+<div class="metrics-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="metric-card" style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.25rem;">
+        <span class="metric-label" style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">Grand Total Valuation</span>
+        <div class="metric-value" style="font-size: 2rem; font-weight: 800; color: var(--color-success); margin-top: 0.25rem;">${{ grand_total_value|floatformat:2 }}</div>
+    </div>
+    <div class="metric-card" style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.25rem;">
+        <span class="metric-label" style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">Total Stock Count</span>
+        <div class="metric-value" style="font-size: 2rem; font-weight: 800; color: var(--color-accent); margin-top: 0.25rem;">{{ grand_total_units|floatformat:0 }} <span style="font-size: 1rem; font-weight: 500; color: var(--color-muted);">units</span></div>
+    </div>
+    <div class="metric-card" style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.25rem;">
+        <span class="metric-label" style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">Total Stock Items</span>
+        <div class="metric-value" style="font-size: 2rem; font-weight: 800; color: var(--color-text); margin-top: 0.25rem;">{{ grand_total_items }} <span style="font-size: 1rem; font-weight: 500; color: var(--color-muted);">lines</span></div>
+    </div>
+</div>
+
+<!-- Filter Bar -->
+<div class="page-toolbar" style="margin-bottom: 1.5rem;">
+    <form class="search-form" method="get" style="display: flex; gap: 10px; align-items: center;">
+        <label style="font-weight: 700; font-size: 0.85rem; color: var(--color-muted);">Filter Category:</label>
+        <select name="category" class="form-select" onchange="this.form.submit()">
+            <option value="">All Categories</option>
+            {% for val, label in category_choices %}
+                <option value="{{ val }}" {% if selected_category == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        {% if selected_category %}
+            <a href="{% url 'bar:report_valuation' %}" class="button button-secondary">Reset</a>
+        {% endif %}
+    </form>
+</div>
+
+<!-- Category Sections -->
+{% for cat in categories_data %}
+    {% if cat.items %}
+    <div style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; margin-bottom: 2rem; overflow: hidden;">
+        <!-- Category Header -->
+        <div style="background: #fbf7f0; padding: 1rem 1.25rem; border-bottom: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div>
+                <h3 style="margin: 0; font-size: 1.2rem; color: var(--color-text);">{{ cat.category_label }}</h3>
+                <span style="font-size: 0.85rem; color: var(--color-muted);">{{ cat.item_count }} item(s) &bull; {{ cat.total_units|floatformat:0 }} units in stock</span>
+            </div>
+            <div style="text-align: right;">
+                <span style="font-size: 1.25rem; font-weight: 800; color: var(--color-success);">${{ cat.total_value|floatformat:2 }}</span>
+                <span style="font-size: 0.85rem; color: var(--color-muted); display: block;">{{ cat.percent_of_total|floatformat:1 }}% of total bar inventory</span>
+            </div>
+        </div>
+
+        <!-- Items Table -->
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Stock #</th>
+                        <th>Description</th>
+                        <th>Location</th>
+                        <th>On Hand</th>
+                        <th>Min On Hand</th>
+                        <th>Single Price</th>
+                        <th>Case Price</th>
+                        <th>Sale Price</th>
+                        <th>Distributor</th>
+                        <th class="text-right">Total Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in cat.items %}
+                        <tr>
+                            <td><strong>{{ item.stock_number }}</strong></td>
+                            <td>
+                                <a href="{% url 'bar:item_detail' item.pk %}" style="text-decoration: underline;">{{ item.description }}</a>
+                            </td>
+                            <td>{{ item.location|default:"Main Bar" }}</td>
+                            <td>
+                                <span {% if item.is_low_stock %}style="color: var(--color-danger); font-weight: 700;"{% endif %}>
+                                    {{ item.on_hand|floatformat:0 }}
+                                </span>
+                                {% if item.is_low_stock %}
+                                    <span class="badge badge-danger" style="font-size: 0.65rem;">Low</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ item.minimum_on_hand|floatformat:0 }}</td>
+                            <td>${{ item.single_price|floatformat:2 }}</td>
+                            <td>${{ item.case_price|floatformat:2 }}</td>
+                            <td>
+                                {% if item.sale_price > 0 %}
+                                    ${{ item.sale_price|floatformat:2 }}
+                                {% else %}
+                                    <span class="table-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.distributor %}
+                                    <a href="{% url 'contractors:contractor_detail' item.distributor.pk %}">{{ item.distributor.name }}</a>
+                                {% else %}
+                                    <span class="table-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-right">
+                                <strong>${{ item.total_value|floatformat:2 }}</strong>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr style="background: #fafafa; font-weight: 700; border-top: 2px solid var(--color-border);">
+                        <td colspan="3">Subtotal {{ cat.category_label }}</td>
+                        <td>{{ cat.total_units|floatformat:0 }}</td>
+                        <td colspan="5"></td>
+                        <td class="text-right" style="color: var(--color-success); font-size: 1.05rem;">
+                            ${{ cat.total_value|floatformat:2 }}
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+{% endfor %}
+
+<!-- Grand Total Summary Box -->
+<div style="background: var(--color-panel); border: 2px solid var(--color-accent); border-radius: 12px; padding: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+    <div>
+        <h3 style="margin: 0; font-size: 1.3rem;">Total Bar Inventory Asset Value</h3>
+        <p style="margin: 0.25rem 0 0; color: var(--color-muted);">Calculated across {{ grand_total_items }} active inventory stock lines ({{ grand_total_units|floatformat:0 }} total units).</p>
+    </div>
+    <div style="font-size: 2rem; font-weight: 900; color: var(--color-success);">
+        ${{ grand_total_value|floatformat:2 }}
+    </div>
+</div>
+{% endblock %}

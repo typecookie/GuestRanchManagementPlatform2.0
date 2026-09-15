@@ -55,6 +55,8 @@ def project_create(request):
                 pass
         if 'vehicle' in request.GET:
             initial['vehicle'] = request.GET.get('vehicle')
+        if 'contractor' in request.GET:
+            initial['contractor'] = request.GET.get('contractor')
         form = ProjectForm(initial=initial)
     
     return render(request, 'projects/project_form.html', {'form': form})

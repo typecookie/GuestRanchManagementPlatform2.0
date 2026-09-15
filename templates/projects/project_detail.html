@@ -41,7 +41,7 @@
                 </div>
             </div>
             
-            {% if project.cabin or project.cabin_item or project.vehicle or project.show_in_ranch_operations %}
+            {% if project.cabin or project.cabin_item or project.vehicle or project.contractor or project.show_in_ranch_operations %}
             <div class="info-grid" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
                 {% if project.cabin %}
                 <div class="info-item">
@@ -61,6 +61,19 @@
                 <div class="info-item">
                     <span class="label">Linked Vehicle</span>
                     <p><a href="{% url 'vehicles:vehicle_detail' project.vehicle.pk %}">{{ project.vehicle.name }}</a></p>
+                </div>
+                {% endif %}
+
+                {% if project.contractor %}
+                <div class="info-item">
+                    <span class="label">Assigned Distributor / Contractor</span>
+                    <p>
+                        <a href="{% url 'contractors:contractor_detail' project.contractor.pk %}"><strong>{{ project.contractor.name }}</strong></a>
+                        <span class="badge badge-neutral" style="font-size: 0.75rem;">{{ project.contractor.get_category_display }}</span>
+                        {% if project.contractor.phone %}
+                            <br><a href="tel:{{ project.contractor.phone }}" style="font-size: 0.85rem; color: var(--color-muted);">📞 {{ project.contractor.phone }}</a>
+                        {% endif %}
+                    </p>
                 </div>
                 {% endif %}
 

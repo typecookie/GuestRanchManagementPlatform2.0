@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Delete {{ item.description }} | Bar Inventory | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}<a href="{% url 'bar:inventory_list' %}">Bar Inventory</a>{% endblock %}
+
+{% block page_title %}Delete Bar Item{% endblock %}
+
+{% block content %}
+<div class="form-container" style="max-width: 600px;">
+    <div style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.5rem;">
+        <h3 style="margin-top: 0; color: var(--color-danger);">Confirm Deletion</h3>
+        <p>Are you sure you want to delete <strong>{{ item.description }}</strong> (Stock # <strong>{{ item.stock_number }}</strong>)?</p>
+        
+        <p style="color: var(--color-muted); font-size: 0.9rem;">
+            Current stock on hand: <strong>{{ item.on_hand|floatformat:0 }}</strong> units &bull; Total valuation: <strong>${{ item.total_value|floatformat:2 }}</strong>.
+        </p>
+
+        <form method="post" style="display: flex; gap: 10px; margin-top: 1.5rem;">
+            {% csrf_token %}
+            <button type="submit" class="button button-danger" style="background: var(--color-danger); color: #fff;">Yes, Delete Item</button>
+            <a href="{% url 'bar:item_detail' item.pk %}" class="button button-secondary">Cancel</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

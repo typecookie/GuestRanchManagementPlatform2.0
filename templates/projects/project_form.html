@@ -8,9 +8,10 @@
 
 {% block content %}
 {% can_do user "Employees" "write" as can_write_employees %}
+{% can_do user "Distributors" "write" as can_write_contractors %}
 <div class="form-container">
     {% if can_write_employees %}
-    <div class="quick-add-section" style="margin-bottom: 24px; padding: 18px; background: #fbf7f0; border: 1px solid var(--color-border); border-radius: 12px;">
+    <div class="quick-add-section" style="margin-bottom: 16px; padding: 18px; background: #fbf7f0; border: 1px solid var(--color-border); border-radius: 12px;">
         <h4 style="margin-top: 0; font-size: 0.9rem; text-transform: uppercase; color: var(--color-muted); letter-spacing: 0.05em;">Quick Add Staff to Database</h4>
         <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
             <div style="flex: 2; min-width: 150px;">
@@ -26,6 +27,26 @@
             </div>
         </div>
         <p style="font-size: 0.75rem; color: var(--color-muted); margin-top: 8px; margin-bottom: 0;">This adds the employee to the system so you can select them below.</p>
+    </div>
+    {% endif %}
+
+    {% if can_write_contractors %}
+    <div class="quick-add-section" style="margin-bottom: 24px; padding: 18px; background: #f0f7fb; border: 1px solid var(--color-border); border-radius: 12px;">
+        <h4 style="margin-top: 0; font-size: 0.9rem; text-transform: uppercase; color: var(--color-muted); letter-spacing: 0.05em;">Quick Add Contractor / Distributor to Database</h4>
+        <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+            <div style="flex: 2; min-width: 150px;">
+                <label style="font-size: 0.8rem; color: var(--color-muted); font-weight: 800; display: block; margin-bottom: 4px;">Company / Contractor Name</label>
+                <input type="text" id="form-quick-add-contractor-name" class="form-control" placeholder="e.g. Acme Plumbing & Repair">
+            </div>
+            <div style="flex: 2; min-width: 130px;">
+                <label style="font-size: 0.8rem; color: var(--color-muted); font-weight: 800; display: block; margin-bottom: 4px;">Phone Number</label>
+                <input type="text" id="form-quick-add-contractor-phone" class="form-control" placeholder="e.g. (307) 555-0144">
+            </div>
+            <div style="flex: 0 0 auto;">
+                <button type="button" id="form-quick-add-contractor-button" class="button button-secondary" data-url="{% url 'contractors:quick_add_contractor' %}">Quick Add</button>
+            </div>
+        </div>
+        <p style="font-size: 0.75rem; color: var(--color-muted); margin-top: 8px; margin-bottom: 0;">This adds the contractor to the system so you can assign them below.</p>
     </div>
     {% endif %}
 
@@ -55,6 +76,12 @@
                 {{ form.vehicle }}
                 {% if form.vehicle.errors %}<div class="form-error">{{ form.vehicle.errors }}</div>{% endif %}
             </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1rem;">
+            <label for="{{ form.contractor.id_for_label }}">Assigned Distributor / Contractor / Supplier (Optional)</label>
+            {{ form.contractor }}
+            {% if form.contractor.errors %}<div class="form-error">{{ form.contractor.errors }}</div>{% endif %}
         </div>
         
         <div class="form-group">
@@ -219,6 +246,79 @@ document.addEventListener("DOMContentLoaded", function() {
                     quickAddButton.click();
                 }
             });
+        });
+    }
+
+    const quickAddContractorBtn = document.getElementById("form-quick-add-contractor-button");
+    const quickAddContractorName = document.getElementById("form-quick-add-contractor-name");
+    const quickAddContractorPhone = document.getElementById("form-quick-add-contractor-phone");
+    const contractorSelect = document.getElementById("id_contractor");
+
+    if (quickAddContractorBtn && quickAddContractorName) {
+        quickAddContractorBtn.addEventListener("click", function() {
+            const name = quickAddContractorName.value.trim();
+            const phone = quickAddContractorPhone ? quickAddContractorPhone.value.trim() : "";
+            
+            if (!name) return;
+
+            const url = quickAddContractorBtn.dataset.url;
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            
+            const formData = new FormData();
+            formData.append("name", name);
+            formData.append("phone", phone);
+            formData.append("category", "contractor");
+
+            quickAddContractorBtn.disabled = true;
+
+            fetch(url, {
+                method: "POST",
+                headers: {
+                    "X-CSRFToken": csrfToken,
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) throw new Error("Network response was not ok");
+                return response.json();
+            })
+            .then(data => {
+                if (data.id) {
+                    if (contractorSelect) {
+                        const opt = new Option(data.name, data.id, true, true);
+                        contractorSelect.add(opt);
+                        contractorSelect.value = data.id;
+                        // Trigger change for searchable-select wrapper if initialized
+                        const wrapperInput = contractorSelect.parentNode.querySelector(".searchable-select-input");
+                        if (wrapperInput) {
+                            wrapperInput.value = data.name;
+                        }
+                    }
+
+                    quickAddContractorName.value = "";
+                    if (quickAddContractorPhone) quickAddContractorPhone.value = "";
+                    
+                    alert(`Added "${data.name}" to database and selected them for this project.`);
+                }
+                quickAddContractorBtn.disabled = false;
+            })
+            .catch(error => {
+                console.error("Error:", error);
+                alert("Error during quick add. Please try again.");
+                quickAddContractorBtn.disabled = false;
+            });
+        });
+
+        [quickAddContractorName, quickAddContractorPhone].forEach(el => {
+            if (el) {
+                el.addEventListener("keypress", function(e) {
+                    if (e.key === "Enter") {
+                        e.preventDefault();
+                        quickAddContractorBtn.click();
+                    }
+                });
+            }
         });
     }
     });

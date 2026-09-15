@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}Bar Reports & Analytics | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}<a href="{% url 'bar:inventory_list' %}">Saloon & Bar</a>{% endblock %}
+
+{% block page_title %}Bar Reports & Analytics{% endblock %}
+
+{% block page_subtitle %}
+Inventory valuation summaries, low stock reorder schedules, distributor orders, and physical count audit sheets.
+{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'bar:inventory_list' %}" class="button button-secondary">Back to Inventory</a>
+{% endblock %}
+
+{% block content %}
+<!-- Metrics Overview -->
+<div class="metrics-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+    <div class="metric-card" style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.25rem;">
+        <span class="metric-label" style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">Total Inventory Value</span>
+        <div class="metric-value" style="font-size: 1.75rem; font-weight: 800; color: var(--color-success); margin-top: 0.25rem;">${{ total_value|floatformat:2 }}</div>
+    </div>
+    <div class="metric-card" style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.25rem;">
+        <span class="metric-label" style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">Stock On Hand</span>
+        <div class="metric-value" style="font-size: 1.75rem; font-weight: 800; color: var(--color-text); margin-top: 0.25rem;">{{ total_units|floatformat:0 }} units</div>
+    </div>
+    <div class="metric-card" style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.25rem;">
+        <span class="metric-label" style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">Low Stock Items</span>
+        <div class="metric-value" style="font-size: 1.75rem; font-weight: 800; color: {% if low_stock_count > 0 %}var(--color-danger){% else %}var(--color-text){% endif %}; margin-top: 0.25rem;">{{ low_stock_count }} items</div>
+    </div>
+    <div class="metric-card" style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.25rem;">
+        <span class="metric-label" style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">Active Distributors</span>
+        <div class="metric-value" style="font-size: 1.75rem; font-weight: 800; color: var(--color-accent); margin-top: 0.25rem;">{{ distributors_count }}</div>
+    </div>
+</div>
+
+<!-- Report Navigation Cards -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
+    <!-- Valuation Report Card -->
+    <div style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.75rem; display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 0.75rem;">
+                <span style="font-size: 1.75rem;">💰</span>
+                <h3 style="margin: 0; font-size: 1.25rem;">Inventory Valuation Report</h3>
+            </div>
+            <p style="color: var(--color-muted); line-height: 1.5; margin-bottom: 1.5rem;">
+                Detailed inventory dollar valuation breakdown by spirits, beer, wine, mixers, and supplies. Shows unit costs, case prices, quantities on hand, and total financial valuation.
+            </p>
+        </div>
+        <div>
+            <a href="{% url 'bar:report_valuation' %}" class="button button-primary" style="width: 100%; text-align: center;">View Valuation Report &rarr;</a>
+        </div>
+    </div>
+
+    <!-- Low Stock Reorder Report Card -->
+    <div style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.75rem; display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 0.75rem;">
+                <span style="font-size: 1.75rem;">📦</span>
+                <h3 style="margin: 0; font-size: 1.25rem;">Low Stock & Reorder Report</h3>
+            </div>
+            <p style="color: var(--color-muted); line-height: 1.5; margin-bottom: 1.5rem;">
+                Automated purchasing schedule for items at or below minimum threshold. Grouped by beverage distributor with supplier phone, address, singles/case calculations, and estimated order costs.
+            </p>
+        </div>
+        <div>
+            <a href="{% url 'bar:report_low_stock' %}" class="button button-primary" style="width: 100%; text-align: center;">View Reorder Report &rarr;</a>
+        </div>
+    </div>
+
+    <!-- Distributor Breakdown Card -->
+    <div style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.75rem; display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 0.75rem;">
+                <span style="font-size: 1.75rem;">🚚</span>
+                <h3 style="margin: 0; font-size: 1.25rem;">Distributor Summary Report</h3>
+            </div>
+            <p style="color: var(--color-muted); line-height: 1.5; margin-bottom: 1.5rem;">
+                Overview of all distributors supplying the saloon. Shows items stocked per distributor, current on-hand asset value, rep contacts, phone numbers, and physical location addresses.
+            </p>
+        </div>
+        <div>
+            <a href="{% url 'bar:report_distributors' %}" class="button button-primary" style="width: 100%; text-align: center;">View Distributor Report &rarr;</a>
+        </div>
+    </div>
+
+    <!-- Physical Count Audit Sheet Card -->
+    <div style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.75rem; display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 0.75rem;">
+                <span style="font-size: 1.75rem;">📋</span>
+                <h3 style="margin: 0; font-size: 1.25rem;">Physical Count Worksheet</h3>
+            </div>
+            <p style="color: var(--color-muted); line-height: 1.5; margin-bottom: 1.5rem;">
+                Printable inventory count audit sheet organized by storage location (Main Bar, Cooler, Back Stock) with blank entry spaces for manual physical audits and manager sign-off.
+            </p>
+        </div>
+        <div>
+            <a href="{% url 'bar:report_count_sheet' %}" class="button button-primary" style="width: 100%; text-align: center;">Print Count Worksheet &rarr;</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -31,6 +31,13 @@ MODULE_MAPPING = {
         ('employees', 'positionhistory'),
         ('employees', 'interview'),
     ],
+    'Bar': [
+        ('bar', 'barinventoryitem'),
+        ('bar', 'baritemtag'),
+    ],
+    'Distributors': [
+        ('contractors', 'contractor'),
+    ],
     'Ranch': [
         ('ranch', 'ranchpermissions'),
     ],

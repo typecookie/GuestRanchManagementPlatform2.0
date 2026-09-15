@@ -16,6 +16,7 @@ class Project(models.Model):
     cabin = models.ForeignKey('cabins.Cabin', on_delete=models.SET_NULL, null=True, blank=True, related_name='projects')
     cabin_item = models.ForeignKey('cabins.CabinInventoryItem', on_delete=models.SET_NULL, null=True, blank=True, related_name='projects')
     vehicle = models.ForeignKey('vehicles.Vehicle', on_delete=models.SET_NULL, null=True, blank=True, related_name='projects')
+    contractor = models.ForeignKey('contractors.Contractor', on_delete=models.SET_NULL, null=True, blank=True, related_name='projects', verbose_name="Distributor / Contractor", help_text="Assigned contractor, supplier or distributor")
     
     equipment = models.TextField(blank=True, help_text="Equipment needed for the project")
     parts = models.TextField(blank=True, help_text="Parts needed for the project")

@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+{% load group_perms %}
+
+{% block title %}Bar Inventory | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Saloon & Bar{% endblock %}
+
+{% block page_title %}Bar Inventory{% endblock %}
+
+{% block page_subtitle %}
+Manage bar stock, track single/case/sale pricing, total inventory valuation, and distributor suppliers.
+{% endblock %}
+
+{% block page_actions %}
+{% can_do user "Bar" "write" as can_write %}
+<a href="{% url 'bar:reports_dashboard' %}" class="button button-secondary">📊 Bar Reports</a>
+{% if can_write %}
+<a href="{% url 'bar:item_create' %}" class="button button-primary">+ Add Bar Item</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+{% can_do user "Bar" "write" as can_write %}
+
+<!-- KPI Cards -->
+<div class="metrics-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="metric-card" style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.25rem;">
+        <span class="metric-label" style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">Total Active Items</span>
+        <div class="metric-value" style="font-size: 1.75rem; font-weight: 800; color: var(--color-text); margin-top: 0.25rem;">{{ total_items_count }}</div>
+    </div>
+    <div class="metric-card" style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.25rem;">
+        <span class="metric-label" style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">Total Units On Hand</span>
+        <div class="metric-value" style="font-size: 1.75rem; font-weight: 800; color: var(--color-accent); margin-top: 0.25rem;">{{ total_units_on_hand|floatformat:0 }}</div>
+    </div>
+    <div class="metric-card" style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.25rem;">
+        <span class="metric-label" style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">Total Inventory Value</span>
+        <div class="metric-value" style="font-size: 1.75rem; font-weight: 800; color: var(--color-success); margin-top: 0.25rem;">${{ total_inventory_value|floatformat:2 }}</div>
+    </div>
+    <div class="metric-card" style="background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.25rem;">
+        <span class="metric-label" style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">Low Stock Alerts</span>
+        <div class="metric-value" style="font-size: 1.75rem; font-weight: 800; color: {% if low_stock_count > 0 %}var(--color-danger){% else %}var(--color-text){% endif %}; margin-top: 0.25rem;">
+            {{ low_stock_count }}
+            {% if low_stock_count > 0 %}
+                <a href="{% url 'bar:report_low_stock' %}" style="font-size: 0.8rem; font-weight: 600; color: var(--color-danger); text-decoration: underline; margin-left: 6px;">Reorder List &rarr;</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Search and Filter Toolbar -->
+<div class="page-toolbar" style="margin-bottom: 1.25rem;">
+    <div class="page-toolbar-main">
+        <form class="search-form" method="get" style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <input
+                type="search"
+                name="q"
+                class="search-input"
+                placeholder="Search stock #, description, distributor..."
+                value="{{ query }}"
+                style="min-width: 260px;"
+            >
+
+            <select name="category" class="form-select">
+                <option value="">All Categories</option>
+                {% for val, label in category_choices %}
+                    <option value="{{ val }}" {% if selected_category == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+
+            <select name="pricing_method" class="form-select">
+                <option value="">All Pricing Methods</option>
+                {% for val, label in pricing_method_choices %}
+                    <option value="{{ val }}" {% if selected_pricing_method == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+
+            <select name="beverage_class" class="form-select">
+                <option value="">All Classes / Tiers</option>
+                {% for val, label in beverage_class_choices %}
+                    <option value="{{ val }}" {% if selected_beverage_class == val %}selected{% endif %}>Class: {{ label }}</option>
+                {% endfor %}
+            </select>
+
+            <select name="tag" class="form-select">
+                <option value="">All Types / Tags</option>
+                {% for t in tags %}
+                    <option value="{{ t.pk }}" {% if selected_tag == t.pk|stringformat:"i" %}selected{% endif %}>🏷️ {{ t.name }}</option>
+                {% endfor %}
+            </select>
+
+            <select name="distributor" class="form-select">
+                <option value="">All Distributors</option>
+                {% for d in distributors %}
+                    <option value="{{ d.pk }}" {% if selected_distributor == d.pk|stringformat:"i" %}selected{% endif %}>{{ d.name }}</option>
+                {% endfor %}
+            </select>
+
+            <select name="stock_status" class="form-select">
+                <option value="">Stock Status</option>
+                <option value="low" {% if selected_stock_status == 'low' %}selected{% endif %}>Low Stock Only</option>
+                <option value="out" {% if selected_stock_status == 'out' %}selected{% endif %}>Out of Stock (0)</option>
+                <option value="ok" {% if selected_stock_status == 'ok' %}selected{% endif %}>Above Minimum</option>
+            </select>
+
+            <select name="sort" class="form-select">
+                <option value="category" {% if sort_by == 'category' %}selected{% endif %}>Sort by Category</option>
+                <option value="description" {% if sort_by == 'description' %}selected{% endif %}>Sort by Description</option>
+                <option value="stock_number" {% if sort_by == 'stock_number' %}selected{% endif %}>Sort by Stock #</option>
+                <option value="-on_hand" {% if sort_by == '-on_hand' %}selected{% endif %}>Highest Quantity</option>
+                <option value="on_hand" {% if sort_by == 'on_hand' %}selected{% endif %}>Lowest Quantity</option>
+                <option value="-single_price" {% if sort_by == '-single_price' %}selected{% endif %}>Highest Cost</option>
+                <option value="pricing_method" {% if sort_by == 'pricing_method' %}selected{% endif %}>Sort by Pricing / Class</option>
+            </select>
+
+            <button type="submit" class="button button-secondary">Apply Filter</button>
+
+            {% if query or selected_category or selected_pricing_method or selected_beverage_class or selected_tag or selected_distributor or selected_stock_status or sort_by != 'category' %}
+                <a href="{% url 'bar:inventory_list' %}" class="button button-secondary">Reset</a>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+{% if items %}
+    <div class="table-card">
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Stock #</th>
+                        <th>Description</th>
+                        <th>Category</th>
+                        <th>Pricing / Class</th>
+                        <th>On Hand</th>
+                        <th>Min On Hand</th>
+                        <th>Single Cost</th>
+                        <th>Case Cost</th>
+                        <th>Sale Price</th>
+                        <th>Singles / Case</th>
+                        <th>Total Value</th>
+                        <th>Distributor</th>
+                        <th class="text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                        <tr {% if item.is_low_stock %}style="background: #fff8f6;"{% endif %}>
+                            <td>
+                                <strong>{{ item.stock_number }}</strong>
+                            </td>
+                            <td>
+                                <strong><a href="{% url 'bar:item_detail' item.pk %}" style="text-decoration: underline;">{{ item.description }}</a></strong>
+                                {% if not item.is_active %}
+                                    <span class="badge badge-neutral" style="font-size: 0.7rem;">Inactive</span>
+                                {% endif %}
+                                {% if item.tags.all %}
+                                    <div style="display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px;">
+                                        {% for t in item.tags.all %}
+                                            <a href="{% url 'bar:inventory_list' %}?tag={{ t.pk }}" class="badge badge-accent" style="font-size: 0.7rem; padding: 2px 6px; text-decoration: none;" title="Filter by {{ t.name }}">🏷️ {{ t.name }}</a>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge badge-neutral">{{ item.get_category_display }}</span>
+                            </td>
+                            <td>
+                                {% if item.is_by_class %}
+                                    <span class="badge {% if item.is_top_shelf %}badge-accent{% else %}badge-neutral{% endif %}" style="font-size: 0.75rem;">
+                                        {{ item.get_beverage_class_display|default:"Class" }}
+                                    </span>
+                                {% else %}
+                                    <span class="badge badge-neutral" style="font-size: 0.75rem;">By Price</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span style="font-weight: 700; {% if item.is_low_stock %}color: var(--color-danger);{% endif %}">
+                                    {{ item.on_hand|floatformat:0 }}
+                                </span>
+                                {% if item.is_low_stock %}
+                                    <span class="badge badge-danger" style="font-size: 0.7rem; margin-left: 4px;">Low</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ item.minimum_on_hand|floatformat:0 }}</td>
+                            <td>${{ item.single_price|floatformat:2 }}</td>
+                            <td>${{ item.case_price|floatformat:2 }}</td>
+                            <td>
+                                {% if item.is_by_class %}
+                                    {% if item.is_top_shelf and item.sale_price > 0 %}
+                                        <span style="color: var(--color-success); font-weight: 600;">${{ item.sale_price|floatformat:2 }}</span>
+                                    {% else %}
+                                        <span class="table-muted" title="Standard class tier pricing applies">—</span>
+                                    {% endif %}
+                                {% else %}
+                                    {% if item.sale_price > 0 %}
+                                        <span style="color: var(--color-success); font-weight: 600;">${{ item.sale_price|floatformat:2 }}</span>
+                                    {% else %}
+                                        <span class="table-muted">—</span>
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                            <td>{{ item.singles_per_case }}</td>
+                            <td>
+                                <strong>${{ item.total_value|floatformat:2 }}</strong>
+                            </td>
+                            <td>
+                                {% if item.distributor %}
+                                    <a href="{% url 'contractors:contractor_detail' item.distributor.pk %}" style="text-decoration: underline;">
+                                        {{ item.distributor.name }}
+                                    </a>
+                                {% else %}
+                                    <span class="table-muted">Unassigned</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="table-actions">
+                                    <a href="{% url 'bar:item_detail' item.pk %}" class="button button-small button-secondary">View</a>
+                                    {% if can_write %}
+                                    <a href="{% url 'bar:item_edit' item.pk %}" class="button button-small button-secondary">Edit</a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% else %}
+    <div class="empty-state">
+        <div class="empty-state-content">
+            <div class="empty-state-icon">🍸</div>
+            <h2>No bar inventory items found</h2>
+            <p>
+                {% if query or selected_category or selected_distributor or selected_stock_status %}
+                    No inventory records match your active search or filters.
+                {% else %}
+                    Add spirits, beers, wines, mixers, and bar supplies with stock numbers, costs, case sizes, and distributor links.
+                {% endif %}
+            </p>
+            {% if can_write %}
+                <a href="{% url 'bar:item_create' %}" class="button button-primary">+ Add Bar Item</a>
+            {% endif %}
+        </div>
+    </div>
+{% endif %}
+{% endblock %}
