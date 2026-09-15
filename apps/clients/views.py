@@ -1,5 +1,7 @@
+import json
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -15,6 +17,8 @@ from .forms import (
     TravelGroupMemberForm,
 )
 from .models import Client, Household, HouseholdMember, TravelGroup, TravelGroupMember
+from apps.reservations.models import Reservation, ReservationGuest
+from apps.cabins.models import Cabin
 
 
 @module_permission_required('Clients', 'read')
@@ -727,3 +731,557 @@ def quick_add_travel_group_member(request, pk):
             'id': client.pk,
             'name': client.full_name
         })
+
+
+@module_permission_required('Clients', 'write')
+def group_builder(request):
+    """
+    Unified interactive Group Builder:
+    - Mode 'both': Create a Travel Group containing multiple Households & direct guests with drag-and-drop client assignment.
+    - Mode 'household': Create a Household with drag-and-drop client assignment.
+    - Mode 'travel_group': Create a Travel Group with drag-and-drop client & household assignment.
+    """
+    mode = request.GET.get("mode", request.POST.get("mode", "both")).strip()
+    if mode not in ["both", "household", "travel_group"]:
+        mode = "both"
+
+    clients_param = request.GET.get("clients", "").strip()
+    reservation_id_param = request.GET.get("reservation_id", "").strip()
+    cabin_id_param = request.GET.get("cabin_id", "").strip()
+    name_param = request.GET.get("name", "").strip()
+
+    # Preselected client IDs from query
+    preselected_client_ids = set()
+    if clients_param:
+        for cid in clients_param.split(","):
+            try:
+                preselected_client_ids.add(int(cid.strip()))
+            except ValueError:
+                pass
+
+    reservation = None
+    if reservation_id_param:
+        try:
+            reservation = Reservation.objects.prefetch_related("guests__client").filter(pk=int(reservation_id_param)).first()
+            if reservation:
+                for g in reservation.guests.all():
+                    if g.client_id:
+                        preselected_client_ids.add(g.client_id)
+        except (ValueError, TypeError):
+            pass
+
+    cabin = None
+    if cabin_id_param:
+        try:
+            cabin = Cabin.objects.filter(pk=int(cabin_id_param)).first()
+            if cabin and not preselected_client_ids:
+                for g in ReservationGuest.objects.filter(cabin=cabin).exclude(reservation__status=Reservation.ReservationStatus.CANCELLED):
+                    if g.client_id:
+                        preselected_client_ids.add(g.client_id)
+        except (ValueError, TypeError):
+            pass
+
+    if request.method == "POST":
+        is_json = request.content_type == "application/json" or request.headers.get("x-requested-with") == "XMLHttpRequest"
+
+        post_data = request.POST
+        if is_json and request.body:
+            try:
+                post_data = json.loads(request.body)
+            except Exception:
+                post_data = request.POST
+
+        post_mode = post_data.get("mode", mode)
+        reservation_id = post_data.get("reservation_id") or reservation_id_param
+        cabin_id = post_data.get("cabin_id") or cabin_id_param
+
+        def link_reservations(tg=None, created_hhs=None, single_hh=None, assigned_cids=None):
+            affected = set()
+            if reservation_id:
+                try:
+                    r = Reservation.objects.filter(pk=int(reservation_id)).first()
+                    if r:
+                        affected.add(r)
+                except (ValueError, TypeError):
+                    pass
+            if cabin_id:
+                try:
+                    for r in Reservation.objects.filter(
+                        Q(cabin_assignments__cabin_id=int(cabin_id)) | Q(guests__cabin_id=int(cabin_id))
+                    ).exclude(status=Reservation.ReservationStatus.CANCELLED):
+                        affected.add(r)
+                except (ValueError, TypeError):
+                    pass
+            if assigned_cids:
+                for r in Reservation.objects.filter(
+                    Q(guests__client_id__in=assigned_cids) | Q(primary_contact_id__in=assigned_cids)
+                ).exclude(status=Reservation.ReservationStatus.CANCELLED):
+                    affected.add(r)
+
+            for r in affected:
+                changed = False
+                if tg and r.travel_group_id != tg.id:
+                    r.travel_group = tg
+                    changed = True
+
+                if single_hh:
+                    if r.household_id != single_hh.id:
+                        r.household = single_hh
+                        changed = True
+                elif created_hhs:
+                    target_hh = None
+                    if len(created_hhs) == 1:
+                        target_hh = created_hhs[0]
+                    else:
+                        for hh in created_hhs:
+                            if r.primary_contact_id and hh.memberships.filter(client_id=r.primary_contact_id).exists():
+                                target_hh = hh
+                                break
+                        if not target_hh:
+                            r_guest_client_ids = set(r.guests.values_list("client_id", flat=True))
+                            best_match_count = 0
+                            for hh in created_hhs:
+                                match_count = hh.memberships.filter(client_id__in=r_guest_client_ids).count()
+                                if match_count > best_match_count:
+                                    best_match_count = match_count
+                                    target_hh = hh
+                    if target_hh and r.household_id != target_hh.id:
+                        r.household = target_hh
+                        changed = True
+
+                if changed:
+                    r.save()
+
+        try:
+            with transaction.atomic():
+                if post_mode == "both":
+                    tg_name = post_data.get("travel_group_name", "").strip()
+                    group_type = post_data.get("group_type", TravelGroup.GroupType.MULTI_FAMILY_TRIP)
+                    tg_notes = post_data.get("travel_group_notes", "").strip()
+                    tg_years_raw = post_data.get("travel_group_years_return") or post_data.get("years_return")
+                    tg_years = None
+                    if tg_years_raw:
+                        try:
+                            tg_years = int(tg_years_raw)
+                        except (ValueError, TypeError):
+                            pass
+
+                    if not tg_name:
+                        tg_name = "New Travel Group"
+
+                    travel_group = TravelGroup.objects.create(
+                        name=tg_name,
+                        group_type=group_type,
+                        notes=tg_notes,
+                        years_return=tg_years,
+                    )
+
+                    households_payload = post_data.get("households")
+                    if isinstance(households_payload, str):
+                        try:
+                            households_payload = json.loads(households_payload)
+                        except Exception:
+                            households_payload = []
+                    elif not households_payload:
+                        households_payload = []
+
+                    created_households = []
+                    all_assigned_client_ids = set()
+
+                    for idx, hh_item in enumerate(households_payload, start=1):
+                        hh_name = hh_item.get("name", "").strip() or f"Household {idx}"
+                        hh_notes = hh_item.get("notes", "").strip()
+                        hh_years_raw = hh_item.get("years_return")
+                        hh_years = None
+                        if hh_years_raw:
+                            try:
+                                hh_years = int(hh_years_raw)
+                            except (ValueError, TypeError):
+                                pass
+                        addr1 = hh_item.get("address_line_1", "").strip()
+                        addr2 = hh_item.get("address_line_2", "").strip()
+                        city = hh_item.get("city", "").strip()
+                        state = hh_item.get("state", "").strip()
+                        postal_code = hh_item.get("postal_code", "").strip()
+                        country = hh_item.get("country", "United States").strip()
+                        primary_contact_id = hh_item.get("primary_contact_id")
+                        billing_contact_id = hh_item.get("billing_contact_id")
+
+                        household = Household.objects.create(
+                            name=hh_name,
+                            address_line_1=addr1,
+                            address_line_2=addr2,
+                            city=city,
+                            state=state,
+                            postal_code=postal_code,
+                            country=country,
+                            notes=hh_notes,
+                            years_return=hh_years,
+                        )
+                        created_households.append(household)
+
+                        # Add household to travel group as family unit
+                        TravelGroupMember.objects.create(
+                            travel_group=travel_group,
+                            household=household,
+                            role=TravelGroupMember.Role.FAMILY_UNIT,
+                        )
+
+                        # Add members to household
+                        hh_clients = hh_item.get("clients", [])
+                        for client_item in hh_clients:
+                            if isinstance(client_item, dict):
+                                cid = client_item.get("id") or client_item.get("client_id")
+                                rel = client_item.get("relationship", HouseholdMember.Relationship.UNKNOWN)
+                            else:
+                                cid = client_item
+                                rel = HouseholdMember.Relationship.UNKNOWN
+
+                            if not cid:
+                                continue
+                            try:
+                                cid_int = int(cid)
+                                is_prim = (str(cid_int) == str(primary_contact_id)) if primary_contact_id else False
+                                is_bill = (str(cid_int) == str(billing_contact_id)) if billing_contact_id else False
+
+                                HouseholdMember.objects.create(
+                                    household=household,
+                                    client_id=cid_int,
+                                    relationship=rel,
+                                    is_primary_contact=is_prim,
+                                    is_billing_contact=is_bill,
+                                )
+                                all_assigned_client_ids.add(cid_int)
+
+                                if is_prim or not household.primary_contact_id:
+                                    household.primary_contact_id = cid_int
+                                if is_bill:
+                                    household.billing_contact_id = cid_int
+                            except (ValueError, TypeError, Client.DoesNotExist):
+                                continue
+
+                        household.save()
+
+                    # Direct travel group clients
+                    direct_clients = post_data.get("direct_clients", [])
+                    if isinstance(direct_clients, str):
+                        try:
+                            direct_clients = json.loads(direct_clients)
+                        except Exception:
+                            direct_clients = []
+
+                    for dc in direct_clients:
+                        if isinstance(dc, dict):
+                            cid = dc.get("id") or dc.get("client_id")
+                            role = dc.get("role", TravelGroupMember.Role.GUEST)
+                        else:
+                            cid = dc
+                            role = TravelGroupMember.Role.GUEST
+                        if not cid:
+                            continue
+                        try:
+                            cid_int = int(cid)
+                            TravelGroupMember.objects.create(
+                                travel_group=travel_group,
+                                client_id=cid_int,
+                                role=role,
+                            )
+                            all_assigned_client_ids.add(cid_int)
+                        except (ValueError, TypeError, Client.DoesNotExist):
+                            continue
+
+                    # Set primary contact for travel group
+                    tg_primary_id = post_data.get("travel_group_primary_contact_id")
+                    if tg_primary_id:
+                        try:
+                            travel_group.primary_contact_id = int(tg_primary_id)
+                        except (ValueError, TypeError):
+                            pass
+                    elif created_households and created_households[0].primary_contact_id:
+                        travel_group.primary_contact_id = created_households[0].primary_contact_id
+                    elif all_assigned_client_ids:
+                        travel_group.primary_contact_id = list(all_assigned_client_ids)[0]
+                    travel_group.save()
+
+                    # Link all affected reservations
+                    link_reservations(tg=travel_group, created_hhs=created_households, assigned_cids=all_assigned_client_ids)
+
+                    msg = f"Created Travel Group '{travel_group.name}' with {len(created_households)} household(s) and {len(all_assigned_client_ids)} guest(s)."
+                    messages.success(request, msg)
+
+                    if is_json:
+                        return JsonResponse({
+                            "success": True,
+                            "redirect_url": reverse("clients:travel_group_detail", args=[travel_group.pk]),
+                            "message": msg,
+                        })
+                    return redirect("clients:travel_group_detail", pk=travel_group.pk)
+
+                elif post_mode == "household":
+                    hh_name = post_data.get("household_name", "").strip() or "New Household"
+                    addr1 = post_data.get("address_line_1", "").strip()
+                    addr2 = post_data.get("address_line_2", "").strip()
+                    city = post_data.get("city", "").strip()
+                    state = post_data.get("state", "").strip()
+                    postal_code = post_data.get("postal_code", "").strip()
+                    country = post_data.get("country", "United States").strip()
+                    notes = post_data.get("notes", "").strip()
+                    hh_years_raw = post_data.get("household_years_return") or post_data.get("years_return")
+                    hh_years = None
+                    if hh_years_raw:
+                        try:
+                            hh_years = int(hh_years_raw)
+                        except (ValueError, TypeError):
+                            pass
+                    primary_contact_id = post_data.get("primary_contact_id")
+                    billing_contact_id = post_data.get("billing_contact_id")
+
+                    household = Household.objects.create(
+                        name=hh_name,
+                        address_line_1=addr1,
+                        address_line_2=addr2,
+                        city=city,
+                        state=state,
+                        postal_code=postal_code,
+                        country=country,
+                        notes=notes,
+                        years_return=hh_years,
+                    )
+
+                    clients_payload = post_data.get("clients", [])
+                    if isinstance(clients_payload, str):
+                        try:
+                            clients_payload = json.loads(clients_payload)
+                        except Exception:
+                            clients_payload = []
+
+                    all_assigned_client_ids = set()
+                    for client_item in clients_payload:
+                        if isinstance(client_item, dict):
+                            cid = client_item.get("id") or client_item.get("client_id")
+                            rel = client_item.get("relationship", HouseholdMember.Relationship.UNKNOWN)
+                        else:
+                            cid = client_item
+                            rel = HouseholdMember.Relationship.UNKNOWN
+                        if not cid:
+                            continue
+                        try:
+                            cid_int = int(cid)
+                            is_prim = (str(cid_int) == str(primary_contact_id)) if primary_contact_id else False
+                            is_bill = (str(cid_int) == str(billing_contact_id)) if billing_contact_id else False
+
+                            HouseholdMember.objects.create(
+                                household=household,
+                                client_id=cid_int,
+                                relationship=rel,
+                                is_primary_contact=is_prim,
+                                is_billing_contact=is_bill,
+                            )
+                            all_assigned_client_ids.add(cid_int)
+                            if is_prim or not household.primary_contact_id:
+                                household.primary_contact_id = cid_int
+                            if is_bill:
+                                household.billing_contact_id = cid_int
+                        except (ValueError, TypeError, Client.DoesNotExist):
+                            continue
+
+                    household.save()
+
+                    # Link all affected reservations
+                    link_reservations(single_hh=household, assigned_cids=all_assigned_client_ids)
+
+                    msg = f"Created Household '{household.name}'."
+                    messages.success(request, msg)
+
+                    if is_json:
+                        return JsonResponse({
+                            "success": True,
+                            "redirect_url": reverse("clients:household_detail", args=[household.pk]),
+                            "message": msg,
+                        })
+                    return redirect("clients:household_detail", pk=household.pk)
+
+                elif post_mode == "travel_group":
+                    tg_name = post_data.get("travel_group_name", "").strip() or "New Travel Group"
+                    group_type = post_data.get("group_type", TravelGroup.GroupType.MULTI_FAMILY_TRIP)
+                    notes = post_data.get("notes", "").strip()
+                    tg_years_raw = post_data.get("travel_group_years_return") or post_data.get("years_return")
+                    tg_years = None
+                    if tg_years_raw:
+                        try:
+                            tg_years = int(tg_years_raw)
+                        except (ValueError, TypeError):
+                            pass
+
+                    travel_group = TravelGroup.objects.create(
+                        name=tg_name,
+                        group_type=group_type,
+                        notes=notes,
+                        years_return=tg_years,
+                    )
+
+                    clients_payload = post_data.get("clients", [])
+                    if isinstance(clients_payload, str):
+                        try:
+                            clients_payload = json.loads(clients_payload)
+                        except Exception:
+                            clients_payload = []
+
+                    all_assigned_client_ids = set()
+                    for client_item in clients_payload:
+                        if isinstance(client_item, dict):
+                            cid = client_item.get("id") or client_item.get("client_id")
+                            role = client_item.get("role", TravelGroupMember.Role.GUEST)
+                        else:
+                            cid = client_item
+                            role = TravelGroupMember.Role.GUEST
+                        if not cid:
+                            continue
+                        try:
+                            cid_int = int(cid)
+                            TravelGroupMember.objects.create(
+                                travel_group=travel_group,
+                                client_id=cid_int,
+                                role=role,
+                            )
+                            all_assigned_client_ids.add(cid_int)
+                            if not travel_group.primary_contact_id:
+                                travel_group.primary_contact_id = cid_int
+                        except (ValueError, TypeError):
+                            continue
+
+                    hh_ids = post_data.get("households", [])
+                    if isinstance(hh_ids, str):
+                        try:
+                            hh_ids = json.loads(hh_ids)
+                        except Exception:
+                            hh_ids = []
+
+                    for hid in hh_ids:
+                        try:
+                            hid_int = int(hid)
+                            TravelGroupMember.objects.create(
+                                travel_group=travel_group,
+                                household_id=hid_int,
+                                role=TravelGroupMember.Role.FAMILY_UNIT,
+                            )
+                        except (ValueError, TypeError):
+                            continue
+
+                    travel_group.save()
+
+                    # Link all affected reservations
+                    link_reservations(tg=travel_group, assigned_cids=all_assigned_client_ids)
+
+                    msg = f"Created Travel Group '{travel_group.name}'."
+                    messages.success(request, msg)
+
+                    if is_json:
+                        return JsonResponse({
+                            "success": True,
+                            "redirect_url": reverse("clients:travel_group_detail", args=[travel_group.pk]),
+                            "message": msg,
+                        })
+                    return redirect("clients:travel_group_detail", pk=travel_group.pk)
+
+        except Exception as e:
+            if is_json:
+                return JsonResponse({"error": str(e)}, status=400)
+            messages.error(request, f"Error creating group: {str(e)}")
+
+    # GET context
+    all_clients = Client.objects.filter(is_active=True).prefetch_related(
+        "household_memberships__household",
+        "travel_group_memberships__travel_group",
+    ).order_by("last_name", "first_name")
+
+    all_households = Household.objects.filter(is_active=True).prefetch_related(
+        "memberships__client"
+    ).order_by("name")
+
+    # Serialize clients for JavaScript drag-and-drop
+    clients_json_data = []
+    for c in all_clients:
+        first_hh_membership = c.household_memberships.first()
+        first_hh = first_hh_membership.household if first_hh_membership else None
+        hh_names = [m.household.name for m in c.household_memberships.all() if m.household]
+        tg_names = [m.travel_group.name for m in c.travel_group_memberships.all() if m.travel_group]
+        clients_json_data.append({
+            "id": c.id,
+            "first_name": c.first_name,
+            "last_name": c.last_name,
+            "full_name": c.full_name,
+            "display_name": c.display_name,
+            "email": c.email,
+            "phone": c.phone,
+            "client_type": c.get_client_type_display(),
+            "client_type_raw": c.client_type,
+            "riding_level": c.get_riding_level_display(),
+            "riding_level_raw": c.riding_level,
+            "years_return": c.years_return,
+            "years_display": c.years_display,
+            "dietary_notes": c.dietary_notes,
+            "medical_notes": c.medical_notes,
+            "general_notes": c.general_notes,
+            "address_line_1": first_hh.address_line_1 if first_hh else "",
+            "address_line_2": first_hh.address_line_2 if first_hh else "",
+            "city": first_hh.city if first_hh else "",
+            "state": first_hh.state if first_hh else "",
+            "postal_code": first_hh.postal_code if first_hh else "",
+            "country": first_hh.country if first_hh else "United States",
+            "household_id": first_hh.id if first_hh else None,
+            "household_name": first_hh.name if first_hh else "",
+            "households": hh_names,
+            "household_display": ", ".join(hh_names) if hh_names else "",
+            "travel_groups": tg_names,
+            "is_preselected": c.id in preselected_client_ids,
+        })
+
+    households_json_data = []
+    for h in all_households:
+        member_names = [m.client.full_name for m in h.memberships.all() if m.client]
+        households_json_data.append({
+            "id": h.id,
+            "name": h.name,
+            "city": h.city,
+            "state": h.state,
+            "years_return": h.years_return,
+            "years_display": h.years_display,
+            "member_count": len(member_names),
+            "members_summary": ", ".join(member_names),
+        })
+
+    group_type_choices = [
+        {"value": choice[0], "label": choice[1]}
+        for choice in TravelGroup.GroupType.choices
+    ]
+
+    relationship_choices = [
+        {"value": choice[0], "label": choice[1]}
+        for choice in HouseholdMember.Relationship.choices
+    ]
+
+    role_choices = [
+        {"value": choice[0], "label": choice[1]}
+        for choice in TravelGroupMember.Role.choices
+    ]
+
+    context = {
+        "mode": mode,
+        "clients_json": json.dumps(clients_json_data),
+        "households_json": json.dumps(households_json_data),
+        "group_type_choices": group_type_choices,
+        "relationship_choices": relationship_choices,
+        "role_choices": role_choices,
+        "group_type_choices_json": json.dumps(group_type_choices),
+        "relationship_choices_json": json.dumps(relationship_choices),
+        "role_choices_json": json.dumps(role_choices),
+        "preselected_client_ids": list(preselected_client_ids),
+        "preselected_client_ids_json": json.dumps(list(preselected_client_ids)),
+        "reservation": reservation,
+        "cabin": cabin,
+        "name_param": name_param,
+        "total_clients_count": len(clients_json_data),
+    }
+
+    return render(request, "clients/group_builder.html", context)

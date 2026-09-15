@@ -13,6 +13,16 @@ urlpatterns = [
         name="weekly_dining_guest_list_report",
     ),
     path(
+        "office/reports/special-requests/",
+        views.weekly_special_requests_report,
+        name="weekly_special_requests_report",
+    ),
+    path(
+        "office/reports/special-needs/",
+        views.weekly_special_requests_report,
+        name="weekly_special_needs_report",
+    ),
+    path(
         "office/reports/horse-assignment/",
         views.weekly_horse_assignment_report,
         name="weekly_horse_assignment_report",

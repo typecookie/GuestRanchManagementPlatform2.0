@@ -3,6 +3,16 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 
+def format_years_ordinal(num):
+    if not num or num < 1:
+        return "1st year"
+    if 11 <= (num % 100) <= 13:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(num % 10, "th")
+    return f"{num}{suffix} year"
+
+
 class Client(models.Model):
     class ClientType(models.TextChoices):
         UNKNOWN = "unknown", "Unknown"
@@ -45,6 +55,13 @@ class Client(models.Model):
     medical_notes = models.TextField(blank=True)
     general_notes = models.TextField(blank=True)
 
+    years_return = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Years Return",
+        help_text="Number of years returning/visiting Paradise Ranch",
+    )
+
     is_active = models.BooleanField(default=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -77,6 +94,31 @@ class Client(models.Model):
 
         return self.full_name
 
+    @property
+    def effective_years_count(self):
+        if self.years_return is not None:
+            return self.years_return
+        membership = self.household_memberships.select_related("household").first()
+        if membership and membership.household.years_return is not None:
+            return membership.household.years_return
+        tg_member = self.travel_group_memberships.select_related("travel_group").first()
+        if tg_member and tg_member.travel_group.years_return is not None:
+            return tg_member.travel_group.years_return
+        if membership:
+            tg_hh_member = membership.household.travel_group_memberships.select_related("travel_group").first()
+            if tg_hh_member and tg_hh_member.travel_group.years_return is not None:
+                return tg_hh_member.travel_group.years_return
+        import re
+        match = re.search(r"(\d+)(?:st|nd|rd|th)?\s+year", self.general_notes or "", re.IGNORECASE)
+        if match:
+            return int(match.group(1))
+        return None
+
+    @property
+    def years_display(self):
+        count = self.effective_years_count
+        return format_years_ordinal(count) if count is not None else "1st year"
+
 
 class Household(models.Model):
     name = models.CharField(max_length=150)
@@ -105,6 +147,13 @@ class Household(models.Model):
 
     notes = models.TextField(blank=True)
 
+    years_return = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Years Return",
+        help_text="Default number of years returning/visiting Paradise Ranch for this household",
+    )
+
     is_active = models.BooleanField(default=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -118,6 +167,22 @@ class Household(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def effective_years_count(self):
+        if self.years_return is not None:
+            return self.years_return
+        tg_member = self.travel_group_memberships.select_related("travel_group").first()
+        if tg_member and tg_member.travel_group.years_return is not None:
+            return tg_member.travel_group.years_return
+        if self.primary_contact and self.primary_contact.years_return is not None:
+            return self.primary_contact.years_return
+        return None
+
+    @property
+    def years_display(self):
+        count = self.effective_years_count
+        return format_years_ordinal(count) if count is not None else "1st year"
 
 
 class HouseholdMember(models.Model):
@@ -200,6 +265,13 @@ class TravelGroup(models.Model):
 
     notes = models.TextField(blank=True)
 
+    years_return = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Years Return",
+        help_text="Default number of years returning/visiting Paradise Ranch for this travel group",
+    )
+
     is_active = models.BooleanField(default=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -214,6 +286,19 @@ class TravelGroup(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def effective_years_count(self):
+        if self.years_return is not None:
+            return self.years_return
+        if self.primary_contact and self.primary_contact.years_return is not None:
+            return self.primary_contact.years_return
+        return None
+
+    @property
+    def years_display(self):
+        count = self.effective_years_count
+        return format_years_ordinal(count) if count is not None else "1st year"
 
 
 class TravelGroupMember(models.Model):

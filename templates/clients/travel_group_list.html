@@ -13,6 +13,7 @@ View and manage multi-family trips, reunions, retreats, weddings, and other conn
 {% block page_actions %}
 <a href="{% url 'clients:client_list' %}" class="button button-secondary">Clients</a>
 <a href="{% url 'clients:household_list' %}" class="button button-secondary">Households</a>
+<a href="{% url 'clients:group_builder' %}" class="button button-secondary">Create Both (Group Builder)</a>
 <a href="{% url 'clients:travel_group_create' %}" class="button button-primary">Add Travel Group</a>
 {% endblock %}
 
@@ -74,6 +75,7 @@ View and manage multi-family trips, reunions, retreats, weddings, and other conn
     </div>
 
     <div class="page-toolbar-actions">
+        <a href="{% url 'clients:group_builder' %}" class="button button-secondary">Create Both (Group Builder)</a>
         <a href="{% url 'clients:travel_group_create' %}" class="button button-primary">Add Travel Group</a>
     </div>
 </div>
@@ -87,6 +89,7 @@ View and manage multi-family trips, reunions, retreats, weddings, and other conn
                         <th>Travel Group</th>
                         <th>Type</th>
                         <th>Primary Contact</th>
+                        <th>Years</th>
                         <th>Status</th>
                         <th class="text-right">Actions</th>
                     </tr>
@@ -106,6 +109,14 @@ View and manage multi-family trips, reunions, retreats, weddings, and other conn
                                     </a>
                                 {% else %}
                                     <span class="table-muted">—</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if travel_group.effective_years_count %}
+                                    <span class="badge badge-neutral">{{ travel_group.years_display }}</span>
+                                {% else %}
+                                    <span class="table-muted">1st year</span>
                                 {% endif %}
                             </td>
 

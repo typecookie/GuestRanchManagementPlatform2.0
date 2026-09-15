@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}Special Request Lists | Ranch Office{% endblock %}
+
+{% block eyebrow %}Weekly Report{% endblock %}
+
+{% block page_title %}Special Request Lists{% endblock %}
+
+{% block page_subtitle %}
+    Week of {{ week_start|date:"M j, Y" }} to {{ week_end|date:"M j, Y" }}
+{% endblock %}
+
+{% block page_actions %}
+    <div class="report-week-nav no-print">
+        <a href="?week={{ previous_week|date:'Y-m-d' }}" class="button button-secondary" title="Previous Week">
+            &larr; Prev Week
+        </a>
+        <a href="?week={{ next_week|date:'Y-m-d' }}" class="button button-secondary" title="Next Week">
+            Next Week &rarr;
+        </a>
+        <a href="{% url 'ranch:office_dashboard' %}?week={{ week_start|date:'Y-m-d' }}" class="button button-secondary">
+            Back to Office
+        </a>
+        <button type="button" class="button button-primary" onclick="window.print()">
+            Print Report
+        </button>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="print-report special-requests-container">
+        <div class="special-requests-header">
+            <h1 class="special-requests-title">Special Request Lists</h1>
+            <h2 class="special-requests-dates">{{ week_start|date:"F j" }} - {{ week_end|date:"F j, Y" }}</h2>
+        </div>
+
+        <div class="special-requests-body">
+            {% for section in cabin_sections %}
+                <section class="special-requests-cabin-block">
+                    <h3 class="cabin-heading">
+                        {% if section.cabin %}
+                            <u>{{ section.cabin.name }}</u>
+                        {% else %}
+                            <u>Unassigned Guests</u>
+                        {% endif %}
+                    </h3>
+
+                    {% for party in section.parties %}
+                        <div class="special-requests-party-block">
+                            <div class="party-name">
+                                <strong>{{ party.party_name }}</strong>
+                            </div>
+
+                            <div class="party-contact-info">
+                                {% if party.address_line_1 %}
+                                    <div class="contact-line">{{ party.address_line_1 }}</div>
+                                {% endif %}
+                                {% if party.address_line_2 %}
+                                    <div class="contact-line">{{ party.address_line_2 }}</div>
+                                {% endif %}
+                                {% if party.city_state_zip %}
+                                    <div class="contact-line">{{ party.city_state_zip }}</div>
+                                {% endif %}
+                                {% if party.country %}
+                                    <div class="contact-line">{{ party.country }}</div>
+                                {% endif %}
+                                {% for phone in party.phones %}
+                                    <div class="contact-line">{{ phone }}</div>
+                                {% endfor %}
+                                {% for email in party.emails %}
+                                    <div class="contact-line">
+                                        <a href="mailto:{{ email }}" class="email-link">{{ email }}</a>
+                                    </div>
+                                {% endfor %}
+                            </div>
+
+                            {% if party.bullet_lines %}
+                                <ul class="special-requests-list">
+                                    {% for item in party.bullet_lines %}
+                                        <li>
+                                            <span class="request-item-text {{ item.highlight_class }}">{{ item.text }}</span>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+                        </div>
+                    {% empty %}
+                        <p class="text-muted">No guests assigned to this cabin.</p>
+                    {% endfor %}
+                </section>
+            {% empty %}
+                <div class="empty-state">
+                    <div class="empty-state-content">
+                        <h2>No reservations found</h2>
+                        <p>
+                            No reservations or guests were found for the week of
+                            {{ week_start|date:"M j, Y" }} to {{ week_end|date:"M j, Y" }}.
+                        </p>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        {% if cabin_sections %}
+            <div class="special-requests-footer">
+                <div class="total-guests-count">
+                    Total Guests: {{ guest_count }}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}

@@ -50,6 +50,19 @@ View contact details, preferences, household connections, travel groups, and not
                 </div>
 
                 <div class="detail-row">
+                    <div class="detail-label">Years Return</div>
+                    <div class="detail-value">
+                        {% if client.years_return %}
+                            <strong>{{ client.years_display }}</strong> (Explicit: {{ client.years_return }})
+                        {% elif client.effective_years_count %}
+                            <strong>{{ client.years_display }}</strong> <span class="text-muted">(Inherited / Notes)</span>
+                        {% else %}
+                            <span class="text-muted">1st year (Default)</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="detail-row">
                     <div class="detail-label">Date of Birth</div>
                     <div class="detail-value">
                         {% if client.date_of_birth %}

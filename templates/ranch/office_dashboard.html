@@ -11,6 +11,9 @@ Weekly office dashboard for guest assignments, reservation cleanup, and reports.
 {% endblock %}
 
 {% block page_actions %}
+<a href="{% url 'clients:group_builder' %}" class="button button-primary">+ Create Both (Group Builder)</a>
+<a href="{% url 'clients:group_builder' %}?mode=household" class="button button-secondary">+ Create Household</a>
+<a href="{% url 'clients:group_builder' %}?mode=travel_group" class="button button-secondary">+ Create Travel Group</a>
 <a href="{% url 'ranch:ranch_operations' %}" class="button button-secondary">Ranch Operations</a>
 <a href="{% url 'reservations:reservation_grid' %}?year={{ week_start.year }}&month={{ week_start.month }}" class="button button-secondary">Reservation Grid</a>
 {% endblock %}
@@ -39,6 +42,7 @@ Weekly office dashboard for guest assignments, reservation cleanup, and reports.
     </div>
 
     <div class="page-toolbar-actions">
+        <a href="{% url 'clients:group_builder' %}" class="button button-secondary">Group &amp; Household Builder</a>
         <a href="{% url 'ranch:office_dashboard' %}" class="button button-primary">Current Week</a>
     </div>
 </div>
@@ -63,10 +67,66 @@ Weekly office dashboard for guest assignments, reservation cleanup, and reports.
         <span>Occupied Cabins</span>
         <strong>{{ occupied_cabin_count }}</strong>
     </div>
+
+    <div class="stat-card {% if booking_alert_count %}stat-card-warning{% endif %}">
+        <span>Booking Alerts</span>
+        <strong class="{% if booking_alert_count %}text-warning{% else %}text-success{% endif %}">
+            {{ booking_alert_count }}
+        </strong>
+    </div>
 </div>
 
 <div class="detail-layout">
     <section class="panel-stack">
+        <div class="detail-card booking-alerts-card">
+            <div class="section-heading">
+                <div>
+                    <h2>Data &amp; Booking Alerts (Operational Oddities)</h2>
+                    <p>High-level warnings for ungrouped cabin sharing, multi-guest reservations without travel groups, reservation overlaps, and data oddities.</p>
+                </div>
+                <div>
+                    {% if booking_alert_count %}
+                        <span class="badge badge-warning">{{ booking_alert_count }} Alert{{ booking_alert_count|pluralize }} Found</span>
+                    {% else %}
+                        <span class="badge badge-success">✓ All Clear — No Oddities</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if booking_alerts %}
+                <div class="alert-feed">
+                    {% for alert in booking_alerts %}
+                        <div class="alert-feed-item alert-feed-{{ alert.severity }}">
+                            <div class="alert-feed-main">
+                                <div class="alert-feed-header">
+                                    <span class="badge {{ alert.badge_class }}">{{ alert.category }}</span>
+                                    <strong class="alert-feed-title">{{ alert.title }}</strong>
+                                </div>
+                                <p class="alert-feed-desc">{{ alert.description }}</p>
+                            </div>
+                            {% if alert.quick_actions %}
+                                <div class="alert-feed-actions">
+                                    {% for action in alert.quick_actions %}
+                                        <a href="{{ action.url }}" class="button button-small {{ action.btn_class }}">
+                                            {{ action.label }}
+                                        </a>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <div class="empty-state-content">
+                        <div class="empty-state-icon"></div>
+                        <h2>No operational oddities found</h2>
+                        <p>All cabin assignments and multi-guest reservations for this week have organized travel groups, matching guest counts, and clean bookings.</p>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+
         <div class="detail-card">
             <div class="section-heading">
                 <div>
@@ -141,6 +201,296 @@ Weekly office dashboard for guest assignments, reservation cleanup, and reports.
             {% endif %}
         </div>
 
+        <div class="detail-card task-card-carousel" id="horse-saddle-task-card">
+            <div class="section-heading">
+                <div>
+                    <h2>Horse &amp; Saddle Assignments &amp; Rider Readiness</h2>
+                    <p>Track rider readiness, missing physical info (height, weight, experience), and horse/saddle assignments week by week.</p>
+                </div>
+                <div>
+                    <a href="{% url 'ranch:weekly_horse_assignment_report' %}?week={{ week_start|date:'Y-m-d' }}" class="button button-small button-secondary">
+                        Horse Assignment Report
+                    </a>
+                </div>
+            </div>
+
+            <div class="card-week-toolbar">
+                <div class="card-week-nav-group">
+                    <button type="button" class="button button-small button-secondary card-week-prev">
+                        ← Prev Week
+                    </button>
+                    <div class="card-week-indicator">
+                        <span class="card-week-label">Week of {{ horse_saddle_weeks.0.week_start|date:"M j, Y" }}</span>
+                        <span class="card-week-dates">{{ horse_saddle_weeks.0.week_start|date:"M j" }} to {{ horse_saddle_weeks.0.week_end|date:"M j, Y" }}</span>
+                    </div>
+                    <button type="button" class="button button-small button-secondary card-week-next">
+                        Next Week →
+                    </button>
+                </div>
+
+                <div class="card-week-pills">
+                    {% for week_item in horse_saddle_weeks %}
+                        <button type="button" class="card-week-pill {% if forloop.first %}is-active{% endif %}" data-week-index="{{ forloop.counter0 }}">
+                            Week {{ forloop.counter }}
+                        </button>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="card-week-panes">
+                {% for week_item in horse_saddle_weeks %}
+                    <div class="card-week-pane {% if forloop.first %}is-active{% endif %}"
+                         data-week-index="{{ forloop.counter0 }}"
+                         data-week-title="Week of {{ week_item.week_start|date:'M j, Y' }}"
+                         data-week-dates="{{ week_item.week_start|date:'M j' }} to {{ week_item.week_end|date:'M j, Y' }}">
+                        <div class="card-week-badges mb-3">
+                            <span class="badge badge-info">{{ week_item.total_riders }} Rider{{ week_item.total_riders|pluralize }}</span>
+                            {% if week_item.missing_horses > 0 %}
+                                <span class="badge badge-danger">{{ week_item.missing_horses }} Unassigned Horse{{ week_item.missing_horses|pluralize }}</span>
+                            {% else %}
+                                <span class="badge badge-success">{{ week_item.horses_assigned }}/{{ week_item.total_riders }} Horses Assigned</span>
+                            {% endif %}
+                            {% if week_item.missing_saddles > 0 %}
+                                <span class="badge badge-danger">{{ week_item.missing_saddles }} Unassigned Saddle{{ week_item.missing_saddles|pluralize }}</span>
+                            {% else %}
+                                <span class="badge badge-success">{{ week_item.saddles_assigned }}/{{ week_item.total_riders }} Saddles Assigned</span>
+                            {% endif %}
+                            {% if week_item.missing_info_count > 0 %}
+                                <span class="badge badge-warning">{{ week_item.missing_info_count }} Missing Rider Info</span>
+                            {% else %}
+                                <span class="badge badge-success">Rider Info Complete</span>
+                            {% endif %}
+                        </div>
+
+                        {% if week_item.has_records %}
+                            <div class="table-card">
+                                <div class="table-responsive">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Reservation / Cabin</th>
+                                                <th>Guest</th>
+                                                <th>Rider Status</th>
+                                                <th>Horse</th>
+                                                <th>Saddle</th>
+                                                <th>Missing Info</th>
+                                                <th class="text-right">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for r_item in week_item.reservations %}
+                                                {% for guest in r_item.guests %}
+                                                    <tr>
+                                                        <td>
+                                                            <strong>{{ r_item.reservation.reservation_name }}</strong>
+                                                            {% if guest.cabin %}
+                                                                <div class="text-muted small">Cabin: {{ guest.cabin.name }}</div>
+                                                            {% else %}
+                                                                <div class="text-danger small font-weight-bold">Cabin: Unassigned</div>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            <strong>{{ guest.client.full_name }}</strong>
+                                                            {% if guest.age_at_stay %}
+                                                                <span class="text-muted small">(Age {{ guest.age_at_stay }})</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            {% if guest.is_rider %}
+                                                                <span class="badge badge-info">Rider ({{ guest.get_riding_experience_display }})</span>
+                                                            {% else %}
+                                                                <span class="badge badge-light">Non-Rider</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            {% if guest.is_rider %}
+                                                                {% if guest.horse %}
+                                                                    <span class="badge badge-success">{{ guest.horse.name }}</span>
+                                                                {% else %}
+                                                                    <span class="badge badge-danger">Unassigned</span>
+                                                                {% endif %}
+                                                            {% else %}
+                                                                <span class="text-muted">—</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            {% if guest.is_rider %}
+                                                                {% if guest.saddle %}
+                                                                    <span class="badge badge-success">#{{ guest.saddle.saddle_number }}{% if guest.saddle.rack_number %} ({{ guest.saddle.rack_number }}){% endif %}</span>
+                                                                {% else %}
+                                                                    <span class="badge badge-danger">Unassigned</span>
+                                                                {% endif %}
+                                                            {% else %}
+                                                                <span class="text-muted">—</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            {% if guest.is_rider %}
+                                                                {% if guest.missing_rider_fields %}
+                                                                    {% for field in guest.missing_rider_fields %}
+                                                                        <span class="badge badge-warning">Missing {{ field }}</span>
+                                                                    {% endfor %}
+                                                                {% else %}
+                                                                    <span class="badge badge-success">Complete</span>
+                                                                {% endif %}
+                                                            {% else %}
+                                                                <span class="text-muted">N/A</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            <div class="table-actions">
+                                                                <a href="{% url 'ranch:weekly_horse_assignment_report' %}?week={{ week_item.week_start|date:'Y-m-d' }}" class="button button-small button-secondary">
+                                                                    Assign
+                                                                </a>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                {% endfor %}
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        {% else %}
+                            <p class="text-muted p-3 mb-0">No reservations or guests found for this week.</p>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="detail-card task-card-carousel" id="intake-task-card">
+            <div class="section-heading">
+                <div>
+                    <h2>Guest Intake: Release &amp; Deposit Status</h2>
+                    <p>Track liability release forms, deposit collection, and missing guest intake/contact info week by week.</p>
+                </div>
+            </div>
+
+            <div class="card-week-toolbar">
+                <div class="card-week-nav-group">
+                    <button type="button" class="button button-small button-secondary card-week-prev">
+                        ← Prev Week
+                    </button>
+                    <div class="card-week-indicator">
+                        <span class="card-week-label">Week of {{ intake_weeks.0.week_start|date:"M j, Y" }}</span>
+                        <span class="card-week-dates">{{ intake_weeks.0.week_start|date:"M j" }} to {{ intake_weeks.0.week_end|date:"M j, Y" }}</span>
+                    </div>
+                    <button type="button" class="button button-small button-secondary card-week-next">
+                        Next Week →
+                    </button>
+                </div>
+
+                <div class="card-week-pills">
+                    {% for week_item in intake_weeks %}
+                        <button type="button" class="card-week-pill {% if forloop.first %}is-active{% endif %}" data-week-index="{{ forloop.counter0 }}">
+                            Week {{ forloop.counter }}
+                        </button>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="card-week-panes">
+                {% for week_item in intake_weeks %}
+                    <div class="card-week-pane {% if forloop.first %}is-active{% endif %}"
+                         data-week-index="{{ forloop.counter0 }}"
+                         data-week-title="Week of {{ week_item.week_start|date:'M j, Y' }}"
+                         data-week-dates="{{ week_item.week_start|date:'M j' }} to {{ week_item.week_end|date:'M j, Y' }}">
+                        <div class="card-week-badges mb-3">
+                            <span class="badge badge-info">{{ week_item.total_reservations }} Reservation{{ week_item.total_reservations|pluralize }}</span>
+                            {% if week_item.deposits_needed > 0 %}
+                                <span class="badge badge-danger">{{ week_item.deposits_needed }} Deposit{{ week_item.deposits_needed|pluralize }} Needed</span>
+                            {% else %}
+                                <span class="badge badge-success">{{ week_item.deposits_received }}/{{ week_item.total_reservations }} Deposits Received</span>
+                            {% endif %}
+                            {% if week_item.total_unsigned_releases > 0 %}
+                                <span class="badge badge-danger">{{ week_item.total_unsigned_releases }} Unsigned Release{{ week_item.total_unsigned_releases|pluralize }}</span>
+                            {% else %}
+                                <span class="badge badge-success">{{ week_item.total_signed_releases }}/{{ week_item.total_guests }} Releases Signed</span>
+                            {% endif %}
+                        </div>
+
+                        {% if week_item.has_records %}
+                            <div class="table-card">
+                                <div class="table-responsive">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Reservation</th>
+                                                <th>Contact / Household</th>
+                                                <th>Dates</th>
+                                                <th>Deposit Status</th>
+                                                <th>Liability Release</th>
+                                                <th>Missing Info</th>
+                                                <th class="text-right">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for r_item in week_item.reservations %}
+                                                <tr>
+                                                    <td>
+                                                        <strong>{{ r_item.reservation.reservation_name }}</strong>
+                                                        <div class="text-muted small">{{ r_item.total_guests }} guest{{ r_item.total_guests|pluralize }}</div>
+                                                    </td>
+                                                    <td>
+                                                        {% if r_item.reservation.primary_contact %}
+                                                            <div>{{ r_item.reservation.primary_contact.full_name }}</div>
+                                                            <div class="text-muted small">
+                                                                {{ r_item.reservation.primary_contact.phone|default:r_item.reservation.primary_contact.email|default:"No direct contact" }}
+                                                            </div>
+                                                        {% elif r_item.reservation.household %}
+                                                            <div>{{ r_item.reservation.household.name }}</div>
+                                                        {% else %}
+                                                            <span class="text-muted">—</span>
+                                                        {% endif %}
+                                                    </td>
+                                                    <td>
+                                                        {{ r_item.reservation.arrival_date|date:"M j" }} to {{ r_item.reservation.departure_date|date:"M j, Y" }}
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge {{ r_item.deposit_badge }}">{{ r_item.deposit_label }}</span>
+                                                    </td>
+                                                    <td>
+                                                        {% if r_item.unsigned_count == 0 and r_item.total_guests > 0 %}
+                                                            <span class="badge badge-success">All Signed ({{ r_item.signed_count }}/{{ r_item.total_guests }})</span>
+                                                        {% elif r_item.signed_count > 0 %}
+                                                            <span class="badge badge-warning">{{ r_item.signed_count }}/{{ r_item.total_guests }} Signed</span>
+                                                            <div class="text-danger small mt-1">Unsigned: {% for g in r_item.unsigned_guests %}{{ g.client.full_name }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>
+                                                        {% else %}
+                                                            <span class="badge badge-danger">0/{{ r_item.total_guests }} Signed</span>
+                                                            <div class="text-danger small mt-1">Unsigned: {% for g in r_item.unsigned_guests %}{{ g.client.full_name }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>
+                                                        {% endif %}
+                                                    </td>
+                                                    <td>
+                                                        {% if r_item.missing_items %}
+                                                            {% for item in r_item.missing_items %}
+                                                                <span class="badge badge-warning">{{ item }}</span>
+                                                            {% endfor %}
+                                                        {% else %}
+                                                            <span class="badge badge-success">Intake Complete</span>
+                                                        {% endif %}
+                                                    </td>
+                                                    <td>
+                                                        <div class="table-actions">
+                                                            <a href="{% url 'reservations:reservation_detail' r_item.reservation.pk %}" class="button button-small button-secondary">
+                                                                View
+                                                            </a>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        {% else %}
+                            <p class="text-muted p-3 mb-0">No reservations found for this week.</p>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
         <div class="detail-card">
             <div class="section-heading">
                 <div>
@@ -209,9 +559,8 @@ Weekly office dashboard for guest assignments, reservation cleanup, and reports.
             <h2>Weekly Reports</h2>
 
             <div class="quick-action-list">
-                <a href="{% url 'ranch:weekly_dining_guest_list_report' %}?week={{ week_start|date:'Y-m-d' }}"
-    class="quick-action">Dining Hall Guest List</a>
-                <a href="#" class="quick-action">Special Needs Report</a>
+                <a href="{% url 'ranch:weekly_dining_guest_list_report' %}?week={{ week_start|date:'Y-m-d' }}" class="quick-action">Dining Hall Guest List</a>
+                <a href="{% url 'ranch:weekly_special_requests_report' %}?week={{ week_start|date:'Y-m-d' }}" class="quick-action">Special Needs Report</a>
                 <a href="{% url 'ranch:weekly_horse_assignment_report' %}?week={{ week_start|date:'Y-m-d' }}" class="quick-action">Horse Assignment Report</a>
             </div>
 
@@ -225,21 +574,116 @@ Weekly office dashboard for guest assignments, reservation cleanup, and reports.
 
             <div class="attention-list">
                 <div class="attention-item">
-                    <span class="badge badge-info">Step 1</span>
-                    <p>Review reservations for the selected week.</p>
+                    <span class="badge badge-warning">Step 1</span>
+                    <p>Review booking alerts &amp; organize shared travel groups.</p>
                 </div>
 
                 <div class="attention-item">
-                    <span class="badge badge-warning">Step 2</span>
-                    <p>Assign any unassigned guests to cabins.</p>
+                    <span class="badge badge-info">Step 2</span>
+                    <p>Assign all unassigned guests to cabins.</p>
                 </div>
 
                 <div class="attention-item">
-                    <span class="badge badge-success">Step 3</span>
-                    <p>Run and print weekly reports.</p>
+                    <span class="badge badge-warning">Step 3</span>
+                    <p>Collect rider physical info &amp; assign horses and saddles.</p>
+                </div>
+
+                <div class="attention-item">
+                    <span class="badge badge-warning">Step 4</span>
+                    <p>Verify deposit payments &amp; signed liability releases.</p>
+                </div>
+
+                <div class="attention-item">
+                    <span class="badge badge-success">Step 5</span>
+                    <p>Generate &amp; print weekly operational reports.</p>
                 </div>
             </div>
         </div>
     </aside>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const carousels = document.querySelectorAll(".task-card-carousel");
+
+    carousels.forEach(function (carousel) {
+        const panes = carousel.querySelectorAll(".card-week-pane");
+        const pills = carousel.querySelectorAll(".card-week-pill");
+        const prevBtn = carousel.querySelector(".card-week-prev");
+        const nextBtn = carousel.querySelector(".card-week-next");
+        const labelEl = carousel.querySelector(".card-week-label");
+        const datesEl = carousel.querySelector(".card-week-dates");
+        let currentIndex = 0;
+
+        function updateCarousel(index) {
+            if (index < 0) index = 0;
+            if (index >= panes.length) index = panes.length - 1;
+            currentIndex = index;
+
+            panes.forEach(function (pane, idx) {
+                if (idx === currentIndex) {
+                    pane.classList.add("is-active");
+                    if (labelEl && pane.dataset.weekTitle) {
+                        labelEl.textContent = pane.dataset.weekTitle;
+                    }
+                    if (datesEl && pane.dataset.weekDates) {
+                        datesEl.textContent = pane.dataset.weekDates;
+                    }
+                } else {
+                    pane.classList.remove("is-active");
+                }
+            });
+
+            pills.forEach(function (pill, idx) {
+                if (idx === currentIndex) {
+                    pill.classList.add("is-active");
+                } else {
+                    pill.classList.remove("is-active");
+                }
+            });
+
+            if (prevBtn) {
+                prevBtn.disabled = (currentIndex === 0);
+                prevBtn.style.opacity = (currentIndex === 0) ? "0.5" : "1";
+                prevBtn.style.cursor = (currentIndex === 0) ? "not-allowed" : "pointer";
+            }
+
+            if (nextBtn) {
+                nextBtn.disabled = (currentIndex === panes.length - 1);
+                nextBtn.style.opacity = (currentIndex === panes.length - 1) ? "0.5" : "1";
+                nextBtn.style.cursor = (currentIndex === panes.length - 1) ? "not-allowed" : "pointer";
+            }
+        }
+
+        if (prevBtn) {
+            prevBtn.addEventListener("click", function (e) {
+                e.preventDefault();
+                updateCarousel(currentIndex - 1);
+            });
+        }
+
+        if (nextBtn) {
+            nextBtn.addEventListener("click", function (e) {
+                e.preventDefault();
+                updateCarousel(currentIndex + 1);
+            });
+        }
+
+        pills.forEach(function (pill) {
+            pill.addEventListener("click", function (e) {
+                e.preventDefault();
+                const targetIndex = parseInt(pill.dataset.weekIndex, 10);
+                if (!isNaN(targetIndex)) {
+                    updateCarousel(targetIndex);
+                }
+            });
+        });
+
+        // Initialize state
+        updateCarousel(0);
+    });
+});
+</script>
 {% endblock %}

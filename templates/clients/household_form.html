@@ -11,6 +11,8 @@
 {% endblock %}
 
 {% block page_actions %}
+<a href="{% url 'clients:group_builder' %}?mode=household" class="button button-primary">⚡ Open Drag &amp; Drop Builder</a>
+<a href="{% url 'clients:group_builder' %}?mode=both" class="button button-secondary">Create Both (Group Builder)</a>
 {% if household %}
     <a href="{% url 'clients:household_detail' household.pk %}" class="button button-secondary">Cancel</a>
 {% elif travel_group %}
@@ -51,6 +53,14 @@
             <label for="{{ form.billing_contact.id_for_label }}">Billing Contact</label>
             {{ form.billing_contact }}
             {% for error in form.billing_contact.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.years_return.id_for_label }}">Years Return (Default for Household)</label>
+            {{ form.years_return }}
+            {% for error in form.years_return.errors %}
                 <span class="form-error">{{ error }}</span>
             {% endfor %}
         </div>

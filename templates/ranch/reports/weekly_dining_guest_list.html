@@ -11,12 +11,20 @@
 {% endblock %}
 
 {% block page_actions %}
-    <a href="{% url 'ranch:office_dashboard' %}?week={{ week_start|date:'Y-m-d' }}" class="button button-secondary no-print">
-        Back to Office
-    </a>
-    <button type="button" class="button button-primary no-print" onclick="window.print()">
-        Print Report
-    </button>
+    <div class="report-week-nav no-print">
+        <a href="?week={{ previous_week|date:'Y-m-d' }}" class="button button-secondary" title="Previous Week">
+            &larr; Prev Week
+        </a>
+        <a href="?week={{ next_week|date:'Y-m-d' }}" class="button button-secondary" title="Next Week">
+            Next Week &rarr;
+        </a>
+        <a href="{% url 'ranch:office_dashboard' %}?week={{ week_start|date:'Y-m-d' }}" class="button button-secondary">
+            Back to Office
+        </a>
+        <button type="button" class="button button-primary" onclick="window.print()">
+            Print Report
+        </button>
+    </div>
 {% endblock %}
 
 {% block content %}
@@ -42,39 +50,52 @@
                         {% endif %}
                     </h3>
 
-                    {% if section.adults %}
-                        <div class="guest-report-group">
+                    {% for party in section.parties %}
+                        <div class="dining-party-group">
+                            {% if party.adults %}
+                                <div class="guest-report-group">
+                                    <ol>
+                                        {% for guest in party.adults %}
+                                            <li>
+                                                <span class="guest-name">{{ guest.client.full_name }}</span>
+                                                {% if guest.inline_years %}
+                                                    <span class="guest-years">{{ guest.inline_years }}</span>
+                                                {% endif %}
+                                            </li>
+                                        {% endfor %}
+                                    </ol>
+                                </div>
+                            {% endif %}
 
+                            {% if party.kids %}
+                                <div class="guest-report-group">
+                                    <ol>
+                                        {% for guest in party.kids %}
+                                            <li>
+                                                <span class="guest-name">{{ guest.client.full_name }}</span>
+                                                {% if guest.inline_years %}
+                                                    <span class="guest-years">{{ guest.inline_years }}</span>
+                                                {% endif %}
+                                            </li>
+                                        {% endfor %}
+                                    </ol>
+                                </div>
+                            {% endif %}
 
-                            <ol>
-                                {% for guest in section.adults %}
-                                    <li>
-                                        <span>{{ guest.client.full_name }}</span>
-
-                                    </li>
-                                {% endfor %}
-                            </ol>
+                            {% if party.primary_years or party.location %}
+                                <div class="dining-party-meta">
+                                    {% if party.primary_years %}
+                                        <div class="party-years">{{ party.primary_years }}</div>
+                                    {% endif %}
+                                    {% if party.location %}
+                                        <div class="party-location">{{ party.location }}</div>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
                         </div>
-                    {% endif %}
-
-                    {% if section.kids %}
-                        <div class="guest-report-group">
-
-
-                            <ol>
-                                {% for guest in section.kids %}
-                                    <li>
-                                        <span>{{ guest.client.full_name }}</span>
-
-                                    </li>
-                                {% endfor %}
-                            </ol>
-                        </div>
-                    {% endif %}
-
-                    {% if not section.guests %}
+                    {% empty %}
                         <p class="text-muted">No guests assigned to this cabin.</p>
-                    {% endif %}
+                    {% endfor %}
                 </section>
             {% empty %}
                 <div class="empty-state">

@@ -12,6 +12,8 @@
 {% endblock %}
 
 {% block page_actions %}
+<a href="{% url 'clients:group_builder' %}?mode=travel_group" class="button button-primary">⚡ Open Drag &amp; Drop Builder</a>
+<a href="{% url 'clients:group_builder' %}?mode=both" class="button button-secondary">Create Both (Group Builder)</a>
 {% if travel_group and travel_group.pk %}
     <a href="{% url 'clients:travel_group_detail' travel_group.pk %}" class="button button-secondary">Cancel</a>
 {% else %}
@@ -50,6 +52,14 @@
             <label for="{{ form.primary_contact.id_for_label }}">Primary Contact</label>
             {{ form.primary_contact }}
             {% for error in form.primary_contact.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.years_return.id_for_label }}">Years Return (Default for Travel Group)</label>
+            {{ form.years_return }}
+            {% for error in form.years_return.errors %}
                 <span class="form-error">{{ error }}</span>
             {% endfor %}
         </div>

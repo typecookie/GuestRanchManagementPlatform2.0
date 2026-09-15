@@ -11,7 +11,10 @@ Manage individual guests, households, family units, and multi-family travel grou
 {% endblock %}
 
 {% block page_actions %}
-<a href="{% url 'clients:client_create' %}" class="button button-primary">Add Client</a>
+<a href="{% url 'clients:group_builder' %}" class="button button-primary">+ Create Both (Group Builder)</a>
+<a href="{% url 'clients:household_create' %}" class="button button-secondary">+ Add Household</a>
+<a href="{% url 'clients:travel_group_create' %}" class="button button-secondary">+ Add Travel Group</a>
+<a href="{% url 'clients:client_create' %}" class="button button-secondary">+ Add Client</a>
 {% endblock %}
 
 {% block content %}
@@ -48,6 +51,13 @@ Manage individual guests, households, family units, and multi-family travel grou
 
         <div class="dashboard-grid">
             <div class="dashboard-card">
+                <div class="dashboard-card-icon">⚡</div>
+                <h3>Group &amp; Household Builder</h3>
+                <p>Drag &amp; drop guests into households, travel groups, and multi-family units in one place.</p>
+                <a href="{% url 'clients:group_builder' %}" class="card-link">Open Group Builder</a>
+            </div>
+
+            <div class="dashboard-card">
                 <div class="dashboard-card-icon">👤</div>
                 <h3>People</h3>
                 <p>Manage individual guests, contact details, riding levels, notes, and preferences.</p>
@@ -80,9 +90,10 @@ Manage individual guests, households, family units, and multi-family travel grou
             </div>
 
             <div class="quick-action-list">
-                <a href="{% url 'clients:client_create' %}" class="quick-action">Add individual client</a>
+                <a href="{% url 'clients:group_builder' %}" class="quick-action"><strong>Create Both (Group Builder)</strong></a>
                 <a href="{% url 'clients:household_create' %}" class="quick-action">Add household</a>
                 <a href="{% url 'clients:travel_group_create' %}" class="quick-action">Add travel group</a>
+                <a href="{% url 'clients:client_create' %}" class="quick-action">Add individual client</a>
             </div>
         </section>
 

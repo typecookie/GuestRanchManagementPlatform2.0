@@ -113,6 +113,14 @@
             {% endfor %}
         </div>
 
+        <div class="form-field">
+            <label for="{{ form.years_return.id_for_label }}">Years Return (Years at Paradise)</label>
+            {{ form.years_return }}
+            {% for error in form.years_return.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
         <div class="form-field form-grid-full">
             <label for="{{ form.dietary_notes.id_for_label }}">Dietary Notes</label>
             {{ form.dietary_notes }}

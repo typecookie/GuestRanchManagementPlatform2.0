@@ -7,6 +7,11 @@ app_name = "clients"
 urlpatterns = [
     path("", views.contact_dashboard, name="contact_dashboard"),
 
+    # Group & Household Builder
+    path("builder/", views.group_builder, name="group_builder"),
+    path("group-builder/", views.group_builder, name="group_builder_alias"),
+    path("create-both/", views.group_builder, name="create_both"),
+
     path("people/", views.client_list, name="client_list"),
     path("people/new/", views.client_create, name="client_create"),
     path("people/<int:pk>/", views.client_detail, name="client_detail"),

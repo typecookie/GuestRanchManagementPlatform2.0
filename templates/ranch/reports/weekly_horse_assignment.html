@@ -11,23 +11,31 @@
 {% endblock %}
 
 {% block page_actions %}
-    <div class="no-print" style="display: flex; gap: 12px; align-items: center; margin-right: 12px; background: rgba(255,255,255,0.5); padding: 8px 12px; border-radius: 12px; border: 1px solid var(--color-border);">
-        <label style="display: flex; align-items: center; gap: 6px; font-weight: 800; cursor: pointer; font-size: 0.9rem;">
-            <input type="checkbox" id="toggle-past-horses" checked> Past Horses
-        </label>
-        <label style="display: flex; align-items: center; gap: 6px; font-weight: 800; cursor: pointer; font-size: 0.9rem;">
-            <input type="checkbox" id="toggle-past-saddles" checked> Past Saddles
-        </label>
+    <div class="report-week-nav no-print">
+        <a href="?week={{ previous_week|date:'Y-m-d' }}" class="button button-secondary" title="Previous Week">
+            &larr; Prev Week
+        </a>
+        <a href="?week={{ next_week|date:'Y-m-d' }}" class="button button-secondary" title="Next Week">
+            Next Week &rarr;
+        </a>
+        <div style="display: flex; gap: 12px; align-items: center; background: rgba(255,255,255,0.5); padding: 8px 12px; border-radius: 12px; border: 1px solid var(--color-border);">
+            <label style="display: flex; align-items: center; gap: 6px; font-weight: 800; cursor: pointer; font-size: 0.9rem;">
+                <input type="checkbox" id="toggle-past-horses" checked> Past Horses
+            </label>
+            <label style="display: flex; align-items: center; gap: 6px; font-weight: 800; cursor: pointer; font-size: 0.9rem;">
+                <input type="checkbox" id="toggle-past-saddles" checked> Past Saddles
+            </label>
+        </div>
+        <button type="submit" form="bulk-assignment-form" class="button button-success">
+            Save All Assignments
+        </button>
+        <a href="{% url 'ranch:office_dashboard' %}?week={{ week_start|date:'Y-m-d' }}" class="button button-secondary">
+            Back to Office
+        </a>
+        <button type="button" class="button button-primary" onclick="window.print()">
+            Print Report
+        </button>
     </div>
-    <button type="submit" form="bulk-assignment-form" class="button button-success no-print">
-        Save All Assignments
-    </button>
-    <a href="{% url 'ranch:office_dashboard' %}?week={{ week_start|date:'Y-m-d' }}" class="button button-secondary no-print">
-        Back to Office
-    </a>
-    <button type="button" class="button button-primary no-print" onclick="window.print()">
-        Print Report
-    </button>
 {% endblock %}
 
 {% block content %}

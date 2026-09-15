@@ -265,3 +265,62 @@ class ReservationGuest(models.Model):
 
     def __str__(self):
         return f"{self.client} - {self.reservation}"
+
+    @property
+    def years_count(self):
+        # 1. Direct Client explicit years_return
+        if self.client_id and self.client.years_return is not None:
+            return self.client.years_return
+
+        # 2. Check Household (reservation.household or client membership)
+        household = None
+        if self.reservation_id and self.reservation.household_id:
+            household = self.reservation.household
+        elif self.client_id:
+            membership = self.client.household_memberships.select_related("household").first()
+            if membership:
+                household = membership.household
+
+        if household and household.years_return is not None:
+            return household.years_return
+
+        # 3. Check Travel Group (reservation.travel_group, client tg membership, or household tg membership)
+        travel_group = None
+        if self.reservation_id and self.reservation.travel_group_id:
+            travel_group = self.reservation.travel_group
+        elif self.client_id:
+            tg_member = self.client.travel_group_memberships.select_related("travel_group").first()
+            if tg_member:
+                travel_group = tg_member.travel_group
+            elif household:
+                hh_tg_member = household.travel_group_memberships.select_related("travel_group").first()
+                if hh_tg_member:
+                    travel_group = hh_tg_member.travel_group
+
+        if travel_group and travel_group.years_return is not None:
+            return travel_group.years_return
+
+        # 4. Fallback: Parse notes regex
+        import re
+        notes_text = f"{self.notes}\n{self.client.general_notes if self.client_id else ''}"
+        match = re.search(r"(\d+)(?:st|nd|rd|th)?\s+year", notes_text, re.IGNORECASE)
+        if match:
+            return int(match.group(1))
+
+        # 5. Fallback: Database prior reservation arrival count
+        if self.client_id and self.reservation_id and self.reservation.arrival_date:
+            count = ReservationGuest.objects.filter(
+                client_id=self.client_id,
+                reservation__arrival_date__year__lte=self.reservation.arrival_date.year,
+            ).exclude(
+                reservation__status=Reservation.ReservationStatus.CANCELLED,
+            ).values("reservation__arrival_date__year").distinct().count()
+            if count > 0:
+                return count
+
+        return 1
+
+    @property
+    def years_display(self):
+        from apps.clients.models import format_years_ordinal
+        return format_years_ordinal(self.years_count)

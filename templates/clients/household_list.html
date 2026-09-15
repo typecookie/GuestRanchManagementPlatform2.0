@@ -13,6 +13,7 @@ View and manage family units, household contacts, billing contacts, and related 
 {% block page_actions %}
 <a href="{% url 'clients:client_list' %}" class="button button-secondary">Clients</a>
 <a href="{% url 'clients:travel_group_list' %}" class="button button-secondary">Travel Groups</a>
+<a href="{% url 'clients:group_builder' %}" class="button button-secondary">Create Both (Group Builder)</a>
 <a href="{% url 'clients:household_create' %}" class="button button-primary">Add Household</a>
 {% endblock %}
 
@@ -65,6 +66,7 @@ View and manage family units, household contacts, billing contacts, and related 
     </div>
 
     <div class="page-toolbar-actions">
+        <a href="{% url 'clients:group_builder' %}" class="button button-secondary">Create Both (Group Builder)</a>
         <a href="{% url 'clients:household_create' %}" class="button button-primary">Add Household</a>
     </div>
 </div>
@@ -79,6 +81,7 @@ View and manage family units, household contacts, billing contacts, and related 
                         <th>Primary Contact</th>
                         <th>Billing Contact</th>
                         <th>Location</th>
+                        <th>Years</th>
                         <th>Status</th>
                         <th class="text-right">Actions</th>
                     </tr>
@@ -114,6 +117,14 @@ View and manage family units, household contacts, billing contacts, and related 
                                     {{ household.city }}{% if household.city and household.state %}, {% endif %}{{ household.state }}
                                 {% else %}
                                     <span class="table-muted">—</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if household.effective_years_count %}
+                                    <span class="badge badge-neutral">{{ household.years_display }}</span>
+                                {% else %}
+                                    <span class="table-muted">1st year</span>
                                 {% endif %}
                             </td>
 

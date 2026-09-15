@@ -48,6 +48,19 @@ Manage connected households and guests for this multi-family trip, reunion, or r
                 </div>
 
                 <div class="detail-row">
+                    <div class="detail-label">Years Return</div>
+                    <div class="detail-value">
+                        {% if travel_group.years_return %}
+                            <strong>{{ travel_group.years_display }}</strong> (Configured: {{ travel_group.years_return }})
+                        {% elif travel_group.effective_years_count %}
+                            <strong>{{ travel_group.years_display }}</strong> <span class="text-muted">(Inherited from Primary Contact)</span>
+                        {% else %}
+                            <span class="text-muted">1st year (Default)</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="detail-row">
                     <div class="detail-label">Status</div>
                     <div class="detail-value">
                         {% if travel_group.is_active %}

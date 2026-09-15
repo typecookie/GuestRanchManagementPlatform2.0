@@ -1,0 +1,1325 @@
+{% extends "base.html" %}
+
+{% block title %}
+    {% if mode == 'both' %}
+        Create Travel Group &amp; Households | Group Builder
+    {% elif mode == 'household' %}
+        Create Household | Group Builder
+    {% else %}
+        Create Travel Group | Group Builder
+    {% endif %}
+{% endblock %}
+
+{% block eyebrow %}Client &amp; Group Management{% endblock %}
+
+{% block page_title %}
+    {% if mode == 'both' %}
+        Create Travel Group &amp; Households
+    {% elif mode == 'household' %}
+        Create Household
+    {% else %}
+        Create Travel Group
+    {% endif %}
+{% endblock %}
+
+{% block page_subtitle %}
+    {% if mode == 'both' %}
+        Organize multiple households and individual guests into a unified travel group with interactive drag-and-drop assignment.
+    {% elif mode == 'household' %}
+        Create a new family unit or household and drag guests directly into family membership.
+    {% else %}
+        Create a travel group for reunions, retreats, or parties and drag clients and households into the group.
+    {% endif %}
+{% endblock %}
+
+{% block page_actions %}
+    <a href="{% url 'clients:client_list' %}" class="button button-secondary">Cancel</a>
+    <a href="{% url 'clients:household_create' %}" class="button button-secondary">Standard Household Form</a>
+    <a href="{% url 'clients:travel_group_create' %}" class="button button-secondary">Standard Group Form</a>
+{% endblock %}
+
+{% block content %}
+<div class="group-builder-container" id="group-builder-app">
+    <!-- Builder Mode Switcher Tabs -->
+    <div class="builder-mode-tabs">
+        <a href="{% url 'clients:group_builder' %}?mode=both{% if reservation %}&reservation_id={{ reservation.pk }}{% endif %}{% if cabin %}&cabin_id={{ cabin.pk }}{% endif %}{% if preselected_client_ids %}&clients={{ preselected_client_ids|join:',' }}{% endif %}{% if name_param %}&name={{ name_param|urlencode }}{% endif %}" class="builder-tab {% if mode == 'both' %}is-active{% endif %}">
+            <span class="builder-tab-icon">👥🏡</span>
+            <div>
+                <strong>Create Both (Travel Group + Households)</strong>
+                <small>Create travel group with multiple households &amp; guests</small>
+            </div>
+        </a>
+        <a href="{% url 'clients:group_builder' %}?mode=household{% if reservation %}&reservation_id={{ reservation.pk }}{% endif %}{% if cabin %}&cabin_id={{ cabin.pk }}{% endif %}{% if preselected_client_ids %}&clients={{ preselected_client_ids|join:',' }}{% endif %}{% if name_param %}&name={{ name_param|urlencode }}{% endif %}" class="builder-tab {% if mode == 'household' %}is-active{% endif %}">
+            <span class="builder-tab-icon">🏡</span>
+            <div>
+                <strong>Create Household</strong>
+                <small>Create a single family unit with members</small>
+            </div>
+        </a>
+        <a href="{% url 'clients:group_builder' %}?mode=travel_group{% if reservation %}&reservation_id={{ reservation.pk }}{% endif %}{% if cabin %}&cabin_id={{ cabin.pk }}{% endif %}{% if preselected_client_ids %}&clients={{ preselected_client_ids|join:',' }}{% endif %}{% if name_param %}&name={{ name_param|urlencode }}{% endif %}" class="builder-tab {% if mode == 'travel_group' %}is-active{% endif %}">
+            <span class="builder-tab-icon">👥</span>
+            <div>
+                <strong>Create Travel Group</strong>
+                <small>Create group and assign existing households or guests</small>
+            </div>
+        </a>
+    </div>
+
+    <!-- Context Banner if linked from Reservation, Cabin, or Alert -->
+    {% if reservation or cabin or preselected_client_ids %}
+        <div class="builder-context-banner">
+            <div class="builder-context-info">
+                <span class="badge badge-warning">Context Linked</span>
+                {% if reservation %}
+                    <span>Reservation: <strong>{{ reservation.reservation_name }}</strong> ({{ reservation.arrival_date|date:"M d" }} – {{ reservation.departure_date|date:"M d, Y" }})</span>
+                {% endif %}
+                {% if cabin %}
+                    <span>Cabin: <strong>{{ cabin.name }}</strong> (Cap: {{ cabin.capacity }})</span>
+                {% endif %}
+                {% if preselected_client_ids %}
+                    <span class="badge badge-primary">{{ preselected_client_ids|length }} Offending/Party Guest{{ preselected_client_ids|length|pluralize }} Auto-Populated</span>
+                {% endif %}
+            </div>
+            <span class="builder-context-hint">Offending reservation clients have been auto-populated into cards below. Drag and drop clients freely between cards, households, or back to the pool.</span>
+        </div>
+    {% endif %}
+
+    <!-- Main Builder Form / Workspace -->
+    <form id="group-builder-form" method="post" action="{% url 'clients:group_builder' %}">
+        {% csrf_token %}
+        <input type="hidden" name="mode" id="input-mode" value="{{ mode }}">
+        {% if reservation %}
+            <input type="hidden" name="reservation_id" value="{{ reservation.pk }}">
+        {% endif %}
+        {% if cabin %}
+            <input type="hidden" name="cabin_id" value="{{ cabin.pk }}">
+        {% endif %}
+        <input type="hidden" name="households" id="input-households-json" value="[]">
+        <input type="hidden" name="direct_clients" id="input-direct-clients-json" value="[]">
+        <input type="hidden" name="clients" id="input-clients-json" value="[]">
+
+        <div class="builder-grid">
+            <!-- LEFT COLUMN: Available Clients Pool -->
+            <aside class="builder-sidebar">
+                <div class="builder-card builder-pool-card js-drop-zone builder-drop-zone" id="client-pool-card" data-zone-type="pool">
+                    <div class="builder-card-header">
+                        <div>
+                            <h3>Available Clients Pool</h3>
+                            <p class="builder-card-subtitle">Drag cards onto a household or click <strong>+</strong></p>
+                        </div>
+                        <span class="badge badge-info" id="pool-count-badge">{{ total_clients_count }}</span>
+                    </div>
+
+                    <div class="builder-search-box">
+                        <input type="text" id="client-search-input" class="form-control" placeholder="Search guests by name, phone, notes..." autocomplete="off">
+                        <button type="button" id="clear-search-btn" class="builder-clear-search" style="display:none;">✕</button>
+                    </div>
+
+                    <div class="builder-pool-filter-chips">
+                        <button type="button" class="filter-chip is-active" data-filter="all">All ({{ total_clients_count }})</button>
+                        {% if preselected_client_ids %}
+                            <button type="button" class="filter-chip chip-highlight" data-filter="preselected">This Party ({{ preselected_client_ids|length }})</button>
+                        {% endif %}
+                        <button type="button" class="filter-chip" data-filter="adult">Adults</button>
+                        <button type="button" class="filter-chip" data-filter="child">Children/Teens</button>
+                    </div>
+
+                    <div class="builder-client-pool" id="client-pool-list">
+                        <!-- Populated by JavaScript -->
+                    </div>
+
+                    <div class="builder-pool-footer">
+                        <small class="text-muted">Tip: Drop guests back here to unassign them from any card.</small>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- RIGHT COLUMN: Builder Canvas -->
+            <main class="builder-main">
+                {% if mode == 'both' %}
+                    <!-- MODE BOTH: Travel Group + Multiple Households -->
+                    <div class="builder-card mb-4">
+                        <div class="builder-card-header">
+                            <div>
+                                <h3>1. Travel Group Details</h3>
+                                <p class="builder-card-subtitle">The overarching group (e.g. reunion, retreat, or multi-family vacation)</p>
+                            </div>
+                        </div>
+
+                        <div class="form-grid">
+                            <div class="form-field form-grid-full">
+                                <label for="tg-name-input">Travel Group Name <span class="text-danger">*</span></label>
+                                <input type="text" id="tg-name-input" name="travel_group_name" class="form-control" placeholder="e.g. Wheeler &amp; Valek Vacation 2026" required value="{% if name_param %}{{ name_param }}{% elif reservation %}{{ reservation.reservation_name }} Group{% endif %}">
+                            </div>
+
+                            <div class="form-field">
+                                <label for="tg-type-select">Group Type</label>
+                                <select id="tg-type-select" name="group_type" class="form-control">
+                                    {% for choice in group_type_choices %}
+                                        <option value="{{ choice.value }}" {% if choice.value == 'multi_family_trip' %}selected{% endif %}>{{ choice.label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="form-field">
+                                <label for="tg-primary-contact-select">Primary Group Organizer</label>
+                                <select id="tg-primary-contact-select" name="travel_group_primary_contact_id" class="form-control">
+                                    <option value="">Auto (First Household Primary)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-field">
+                                <label for="tg-years-input">Default Years Return</label>
+                                <input type="number" id="tg-years-input" name="travel_group_years_return" class="form-control" min="1" placeholder="e.g. 5">
+                            </div>
+
+                            <div class="form-field form-grid-full">
+                                <label for="tg-notes-input">Travel Group Notes</label>
+                                <textarea id="tg-notes-input" name="travel_group_notes" class="form-control" rows="2" placeholder="Notes on party coordination, arrival plans, or shared activities..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="builder-card mb-4">
+                        <div class="builder-card-header flex-between">
+                            <div>
+                                <h3>2. Households in this Travel Group</h3>
+                                <p class="builder-card-subtitle">Organize your guests into family units or individual households</p>
+                            </div>
+                            <button type="button" id="add-household-btn" class="button button-secondary button-small">
+                                + Add Another Household
+                            </button>
+                        </div>
+
+                        <div id="households-canvas" class="households-canvas">
+                            <!-- Dynamic Household Cards inserted by JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- Direct Group Members Drop Zone -->
+                    <div class="builder-card">
+                        <div class="builder-card-header">
+                            <div>
+                                <h3>3. Individual / Direct Group Guests (Optional)</h3>
+                                <p class="builder-card-subtitle">For guests attached directly to the Travel Group without a specific household unit</p>
+                            </div>
+                            <span class="badge badge-neutral" id="direct-guests-count">0 Guests</span>
+                        </div>
+
+                        <div class="builder-drop-zone" id="direct-guests-drop-zone" data-zone-type="direct">
+                            <div class="empty-drop-prompt">
+                                <div class="empty-drop-icon">👤</div>
+                                <strong>Drop individual guests here</strong>
+                                <small>Or click "+ Direct" on any client card in the pool</small>
+                            </div>
+                            <div class="dropped-client-list" id="direct-guests-list"></div>
+                        </div>
+                    </div>
+
+                {% elif mode == 'household' %}
+                    <!-- MODE HOUSEHOLD: Single Household -->
+                    <div class="builder-card mb-4">
+                        <div class="builder-card-header">
+                            <div>
+                                <h3>Household Details</h3>
+                                <p class="builder-card-subtitle">Create a family unit and drag household members into it</p>
+                            </div>
+                        </div>
+
+                        <div class="form-grid">
+                            <div class="form-field form-grid-full">
+                                <label for="hh-name-input">Household Name <span class="text-danger">*</span></label>
+                                <input type="text" id="hh-name-input" name="household_name" class="form-control" placeholder="e.g. Miller Household" required value="{% if name_param %}{{ name_param }}{% endif %}">
+                            </div>
+
+                            <div class="form-field form-grid-full">
+                                <label for="hh-addr1-input">Address Line 1</label>
+                                <input type="text" id="hh-addr1-input" name="address_line_1" class="form-control" placeholder="Street address...">
+                            </div>
+
+                            <div class="form-field">
+                                <label for="hh-city-input">City</label>
+                                <input type="text" id="hh-city-input" name="city" class="form-control" placeholder="City">
+                            </div>
+
+                            <div class="form-field">
+                                <label for="hh-state-input">State / Province</label>
+                                <input type="text" id="hh-state-input" name="state" class="form-control" placeholder="State">
+                            </div>
+
+                            <div class="form-field">
+                                <label for="hh-zip-input">Postal / ZIP Code</label>
+                                <input type="text" id="hh-zip-input" name="postal_code" class="form-control" placeholder="ZIP Code">
+                            </div>
+
+                            <div class="form-field">
+                                <label for="hh-country-input">Country</label>
+                                <input type="text" id="hh-country-input" name="country" class="form-control" value="United States">
+                            </div>
+
+                            <div class="form-field">
+                                <label for="hh-years-input">Years Return</label>
+                                <input type="number" id="hh-years-input" name="household_years_return" class="form-control" min="1" placeholder="e.g. 3">
+                            </div>
+
+                            <div class="form-field form-grid-full">
+                                <label for="hh-notes-input">Notes</label>
+                                <textarea id="hh-notes-input" name="notes" class="form-control" rows="2" placeholder="Household preferences, dietary summary, or family notes..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="builder-card">
+                        <div class="builder-card-header flex-between">
+                            <div>
+                                <h3>Household Members</h3>
+                                <p class="builder-card-subtitle">Drag guests into this household and designate contacts &amp; relationships</p>
+                            </div>
+                            <span class="badge badge-primary" id="hh-single-count">0 Members</span>
+                        </div>
+
+                        <div class="builder-drop-zone" id="single-hh-drop-zone" data-zone-type="single_household" data-hh-index="0">
+                            <div class="empty-drop-prompt">
+                                <div class="empty-drop-icon">🏡</div>
+                                <strong>Drag clients from the left pool and drop here</strong>
+                                <small>Or click "+" on any client card to add them immediately</small>
+                            </div>
+                            <div class="dropped-client-list" id="single-hh-list"></div>
+                        </div>
+                    </div>
+
+                {% else %}
+                    <!-- MODE TRAVEL_GROUP: Travel Group with clients & existing households -->
+                    <div class="builder-card mb-4">
+                        <div class="builder-card-header">
+                            <div>
+                                <h3>Travel Group Details</h3>
+                                <p class="builder-card-subtitle">Create a travel group and drag in clients or existing households</p>
+                            </div>
+                        </div>
+
+                        <div class="form-grid">
+                            <div class="form-field form-grid-full">
+                                <label for="tg-only-name">Travel Group Name <span class="text-danger">*</span></label>
+                                <input type="text" id="tg-only-name" name="travel_group_name" class="form-control" placeholder="e.g. Bear Paw Summer Party" required value="{% if name_param %}{{ name_param }}{% endif %}">
+                            </div>
+
+                            <div class="form-field">
+                                <label for="tg-only-type">Group Type</label>
+                                <select id="tg-only-type" name="group_type" class="form-control">
+                                    {% for choice in group_type_choices %}
+                                        <option value="{{ choice.value }}" {% if choice.value == 'multi_family_trip' %}selected{% endif %}>{{ choice.label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="form-field">
+                                <label for="tg-only-years-input">Years Return</label>
+                                <input type="number" id="tg-only-years-input" name="travel_group_years_return" class="form-control" min="1" placeholder="e.g. 5">
+                            </div>
+
+                            <div class="form-field form-grid-full">
+                                <label for="tg-only-notes">Notes</label>
+                                <textarea id="tg-only-notes" name="notes" class="form-control" rows="2" placeholder="Notes..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="builder-card">
+                        <div class="builder-card-header flex-between">
+                            <div>
+                                <h3>Travel Group Members (Guests)</h3>
+                                <p class="builder-card-subtitle">Drag guests from the pool to add them to this group</p>
+                            </div>
+                            <span class="badge badge-primary" id="tg-only-count">0 Members</span>
+                        </div>
+
+                        <div class="builder-drop-zone" id="tg-only-drop-zone" data-zone-type="travel_group_only">
+                            <div class="empty-drop-prompt">
+                                <div class="empty-drop-icon">👥</div>
+                                <strong>Drag clients from the pool and drop here</strong>
+                                <small>Or click "+" on client cards to add them</small>
+                            </div>
+                            <div class="dropped-client-list" id="tg-only-list"></div>
+                        </div>
+                    </div>
+                {% endif %}
+
+                <!-- Bottom Summary & Action Bar -->
+                <div class="builder-submit-bar">
+                    <div class="builder-summary-stats" id="builder-summary-stats">
+                        <!-- Populated by JS -->
+                    </div>
+                    <div class="builder-submit-actions">
+                        <a href="{% url 'clients:client_list' %}" class="button button-secondary">Cancel</a>
+                        <button type="submit" id="builder-submit-btn" class="button button-primary button-large">
+                            {% if mode == 'both' %}
+                                ✓ Create Travel Group &amp; Households
+                            {% elif mode == 'household' %}
+                                ✓ Create Household
+                            {% else %}
+                                ✓ Create Travel Group
+                            {% endif %}
+                        </button>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </form>
+</div>
+
+<!-- Raw Data & Configuration from Backend -->
+<script type="application/json" id="clients-raw-data">{{ clients_json|safe }}</script>
+<script type="application/json" id="households-raw-data">{{ households_json|safe }}</script>
+<script type="application/json" id="preselected-ids-data">{{ preselected_client_ids_json|safe }}</script>
+<script type="application/json" id="relationship-choices-data">{{ relationship_choices_json|safe }}</script>
+<script type="application/json" id="role-choices-data">{{ role_choices_json|safe }}</script>
+
+<script>
+(function() {
+    'use strict';
+
+    // 1. Parse initial state
+    const clientsData = JSON.parse(document.getElementById('clients-raw-data').textContent || '[]');
+    const preselectedIds = new Set(JSON.parse(document.getElementById('preselected-ids-data').textContent || '[]'));
+    const relationshipChoices = JSON.parse(document.getElementById('relationship-choices-data').textContent || '[]');
+    const roleChoices = JSON.parse(document.getElementById('role-choices-data').textContent || '[]');
+    const currentMode = document.getElementById('input-mode').value;
+
+    // Client lookup map
+    const clientsMap = new Map();
+    clientsData.forEach(c => clientsMap.set(c.id, c));
+
+    // State
+    // For mode 'both': array of household objects
+    // Each household: { id: temp_id, name: '', address_line_1: '', city: '', state: '', postal_code: '', notes: '', clients: [ { id: client_id, is_primary: bool, is_billing: bool, relationship: 'unknown' } ] }
+    let householdsState = [];
+    let directGuestsState = []; // array of { id: client_id, role: 'guest' }
+    let singleHouseholdState = []; // array of { id: client_id, is_primary: bool, is_billing: bool, relationship: 'unknown' }
+    let travelGroupOnlyState = []; // array of { id: client_id, role: 'guest' }
+
+    let nextHouseholdTempId = 1;
+
+    // DOM Elements
+    const clientPoolList = document.getElementById('client-pool-list');
+    const searchInput = document.getElementById('client-search-input');
+    const clearSearchBtn = document.getElementById('clear-search-btn');
+    const filterChips = document.querySelectorAll('.filter-chip');
+    const poolCountBadge = document.getElementById('pool-count-badge');
+    const summaryStatsEl = document.getElementById('builder-summary-stats');
+    const builderForm = document.getElementById('group-builder-form');
+
+    // Initialize builder based on mode
+    function initBuilder() {
+        if (currentMode === 'both') {
+            if (preselectedIds.size > 0) {
+                const preselectedClients = clientsData.filter(c => preselectedIds.has(c.id));
+                const groupMap = new Map();
+
+                preselectedClients.forEach(c => {
+                    const groupKey = (c.household_name && c.household_name.trim()) || (c.last_name && c.last_name.trim()) || 'Family';
+                    if (!groupMap.has(groupKey)) {
+                        groupMap.set(groupKey, {
+                            name: c.household_name || `${c.last_name || 'Family'} Household`,
+                            address_line_1: c.address_line_1 || '',
+                            address_line_2: c.address_line_2 || '',
+                            city: c.city || '',
+                            state: c.state || '',
+                            postal_code: c.postal_code || '',
+                            country: c.country || 'United States',
+                            notes: '',
+                            clients: []
+                        });
+                    }
+                    const grp = groupMap.get(groupKey);
+                    if (!grp.address_line_1 && c.address_line_1) grp.address_line_1 = c.address_line_1;
+                    if (!grp.city && c.city) grp.city = c.city;
+                    if (!grp.state && c.state) grp.state = c.state;
+                    if (!grp.postal_code && c.postal_code) grp.postal_code = c.postal_code;
+
+                    const isFirst = grp.clients.length === 0;
+                    grp.clients.push({
+                        id: c.id,
+                        is_primary: isFirst,
+                        is_billing: isFirst,
+                        relationship: isFirst ? 'self' : 'unknown'
+                    });
+                });
+
+                if (groupMap.size > 1) {
+                    groupMap.forEach(grp => {
+                        householdsState.push({
+                            id: nextHouseholdTempId++,
+                            name: grp.name,
+                            address_line_1: grp.address_line_1,
+                            address_line_2: grp.address_line_2,
+                            city: grp.city,
+                            state: grp.state,
+                            postal_code: grp.postal_code,
+                            country: grp.country,
+                            notes: grp.notes,
+                            clients: grp.clients
+                        });
+                    });
+                } else if (groupMap.size === 1) {
+                    const grp = Array.from(groupMap.values())[0];
+                    householdsState.push({
+                        id: nextHouseholdTempId++,
+                        name: grp.name,
+                        address_line_1: grp.address_line_1,
+                        address_line_2: grp.address_line_2,
+                        city: grp.city,
+                        state: grp.state,
+                        postal_code: grp.postal_code,
+                        country: grp.country,
+                        notes: grp.notes,
+                        clients: grp.clients
+                    });
+
+                    // Add an empty second household so the user can easily drag someone over
+                    householdsState.push({
+                        id: nextHouseholdTempId++,
+                        name: 'Second Household',
+                        address_line_1: '',
+                        address_line_2: '',
+                        city: '',
+                        state: '',
+                        postal_code: '',
+                        country: 'United States',
+                        notes: '',
+                        clients: []
+                    });
+                }
+
+                const tgNameInput = document.getElementById('tg-name-input');
+                if (tgNameInput && !tgNameInput.value) {
+                    const names = Array.from(groupMap.values()).map(g => g.name.replace(' Household', ''));
+                    if (names.length > 1) {
+                        tgNameInput.value = `${names.slice(0, 2).join(' & ')} Group`;
+                    } else if (names.length === 1) {
+                        tgNameInput.value = `${names[0]} Vacation Group`;
+                    }
+                }
+            } else {
+                // Standard default: 2 initial household cards
+                householdsState.push({
+                    id: nextHouseholdTempId++,
+                    name: 'Household 1',
+                    address_line_1: '',
+                    city: '',
+                    state: '',
+                    postal_code: '',
+                    country: 'United States',
+                    notes: '',
+                    clients: []
+                });
+                householdsState.push({
+                    id: nextHouseholdTempId++,
+                    name: 'Household 2',
+                    address_line_1: '',
+                    city: '',
+                    state: '',
+                    postal_code: '',
+                    country: 'United States',
+                    notes: '',
+                    clients: []
+                });
+            }
+            renderHouseholdsCanvas();
+            renderDirectGuestsList();
+        } else if (currentMode === 'household') {
+            if (preselectedIds.size > 0) {
+                const preselectedClients = clientsData.filter(c => preselectedIds.has(c.id));
+                singleHouseholdState = preselectedClients.map((c, idx) => ({
+                    id: c.id,
+                    is_primary: idx === 0,
+                    is_billing: idx === 0,
+                    relationship: idx === 0 ? 'self' : 'unknown'
+                }));
+                const nameInput = document.getElementById('hh-name-input');
+                if (nameInput && !nameInput.value && preselectedClients.length > 0) {
+                    nameInput.value = preselectedClients[0].household_name || `${preselectedClients[0].last_name} Household`;
+                }
+                const firstWithAddr = preselectedClients.find(c => c.address_line_1 || c.city || c.state);
+                if (firstWithAddr) {
+                    const addr1 = document.getElementById('hh-addr1-input');
+                    const city = document.getElementById('hh-city-input');
+                    const state = document.getElementById('hh-state-input');
+                    const zip = document.getElementById('hh-zip-input');
+                    const country = document.getElementById('hh-country-input');
+                    if (addr1 && !addr1.value) addr1.value = firstWithAddr.address_line_1 || '';
+                    if (city && !city.value) city.value = firstWithAddr.city || '';
+                    if (state && !state.value) state.value = firstWithAddr.state || '';
+                    if (zip && !zip.value) zip.value = firstWithAddr.postal_code || '';
+                    if (country && !country.value) country.value = firstWithAddr.country || 'United States';
+                }
+            }
+            renderSingleHouseholdList();
+        } else if (currentMode === 'travel_group') {
+            if (preselectedIds.size > 0) {
+                const preselectedClients = clientsData.filter(c => preselectedIds.has(c.id));
+                travelGroupOnlyState = preselectedClients.map((c, idx) => ({
+                    id: c.id,
+                    role: idx === 0 ? 'group_leader' : 'guest'
+                }));
+                const tgNameInput = document.getElementById('tg-only-name');
+                if (tgNameInput && !tgNameInput.value && preselectedClients.length > 0) {
+                    tgNameInput.value = `${preselectedClients[0].last_name} Travel Group`;
+                }
+            }
+            renderTravelGroupOnlyList();
+        }
+
+        renderClientPool();
+        updateSummaryStats();
+        setupEventListeners();
+    }
+
+    // Helper: get all assigned client IDs across all zones
+    function getAllAssignedClientIds() {
+        const assigned = new Set();
+        if (currentMode === 'both') {
+            householdsState.forEach(hh => {
+                hh.clients.forEach(c => assigned.add(c.id));
+            });
+            directGuestsState.forEach(c => assigned.add(c.id));
+        } else if (currentMode === 'household') {
+            singleHouseholdState.forEach(c => assigned.add(c.id));
+        } else if (currentMode === 'travel_group') {
+            travelGroupOnlyState.forEach(c => assigned.add(c.id));
+        }
+        return assigned;
+    }
+
+    // Render Client Pool
+    let currentFilter = 'all';
+    let currentSearchTerm = '';
+
+    function renderClientPool() {
+        const assignedIds = getAllAssignedClientIds();
+        clientPoolList.innerHTML = '';
+
+        let visibleCount = 0;
+
+        clientsData.forEach(client => {
+            const isAssigned = assignedIds.has(client.id);
+
+            // Filter check
+            if (currentFilter === 'preselected' && !preselectedIds.has(client.id)) return;
+            if (currentFilter === 'adult' && client.client_type_raw !== 'adult' && client.client_type_raw !== 'senior') return;
+            if (currentFilter === 'child' && client.client_type_raw !== 'child' && client.client_type_raw !== 'teen') return;
+
+            // Search query check
+            if (currentSearchTerm) {
+                const term = currentSearchTerm.toLowerCase();
+                const matchName = (client.full_name || '').toLowerCase().includes(term);
+                const matchFirst = (client.first_name || '').toLowerCase().includes(term);
+                const matchLast = (client.last_name || '').toLowerCase().includes(term);
+                const matchPhone = (client.phone || '').toLowerCase().includes(term);
+                const matchEmail = (client.email || '').toLowerCase().includes(term);
+                const matchNotes = (client.general_notes || '').toLowerCase().includes(term);
+                const matchDietary = (client.dietary_notes || '').toLowerCase().includes(term);
+                const matchMedical = (client.medical_notes || '').toLowerCase().includes(term);
+                const matchHH = (client.household_display || '').toLowerCase().includes(term);
+                const matchCity = (client.city || '').toLowerCase().includes(term);
+                const matchState = (client.state || '').toLowerCase().includes(term);
+                const matchZip = (client.postal_code || '').toLowerCase().includes(term);
+                if (!matchName && !matchFirst && !matchLast && !matchPhone && !matchEmail && !matchNotes && !matchDietary && !matchMedical && !matchHH && !matchCity && !matchState && !matchZip) return;
+            }
+
+            visibleCount++;
+
+            const card = document.createElement('div');
+            card.className = `builder-client-card ${isAssigned ? 'is-assigned' : ''} ${preselectedIds.has(client.id) ? 'is-party-member' : ''}`;
+            card.draggable = !isAssigned;
+            card.dataset.clientId = client.id;
+
+            card.innerHTML = `
+                <div class="card-drag-handle" title="Drag to assign">⋮⋮</div>
+                <div class="card-client-info">
+                    <div class="card-client-header">
+                        <strong class="card-client-name">${escapeHtml(client.full_name)}</strong>
+                        <span class="badge badge-subtle">${escapeHtml(client.client_type)}</span>
+                    </div>
+                    <div class="card-client-meta">
+                        ${preselectedIds.has(client.id) ? `<span class="badge-mini badge-warning">★ Context Party Guest</span>` : ''}
+                        ${client.years_display ? `<span class="badge-mini badge-neutral">${escapeHtml(client.years_display)}</span>` : ''}
+                        ${client.riding_level ? `<span class="badge-mini badge-riding">${escapeHtml(client.riding_level)}</span>` : ''}
+                        ${client.household_display ? `<span class="badge-mini badge-hh">Current: ${escapeHtml(client.household_display)}</span>` : ''}
+                        ${client.city || client.state ? `<span class="card-location">${escapeHtml([client.city, client.state].filter(Boolean).join(', '))}</span>` : ''}
+                    </div>
+                </div>
+                <div class="card-client-actions">
+                    ${isAssigned 
+                        ? `<span class="badge badge-success badge-mini">✓ Added</span>`
+                        : `<button type="button" class="btn-quick-add" data-client-id="${client.id}" title="Add to active household">+</button>`
+                    }
+                </div>
+            `;
+
+            if (!isAssigned) {
+                card.addEventListener('dragstart', handleDragStart);
+                card.addEventListener('dragend', handleDragEnd);
+            }
+
+            clientPoolList.appendChild(card);
+        });
+
+        if (visibleCount === 0) {
+            const emptyEl = document.createElement('div');
+            emptyEl.className = 'builder-pool-empty-state text-center p-4 text-muted';
+            emptyEl.innerHTML = currentSearchTerm 
+                ? `<p>No guests matching "<strong>${escapeHtml(currentSearchTerm)}</strong>".</p><button type="button" class="button button-small button-secondary" id="btn-reset-pool-search">Clear Search</button>`
+                : `<p>No guests found in this filter category.</p>`;
+            clientPoolList.appendChild(emptyEl);
+
+            const resetBtn = emptyEl.querySelector('#btn-reset-pool-search');
+            if (resetBtn) {
+                resetBtn.addEventListener('click', () => {
+                    if (searchInput) searchInput.value = '';
+                    currentSearchTerm = '';
+                    if (clearSearchBtn) clearSearchBtn.style.display = 'none';
+                    renderClientPool();
+                });
+            }
+        }
+
+        poolCountBadge.textContent = `${visibleCount} available`;
+    }
+
+    // Render Multiple Households Canvas (Mode: both)
+    function renderHouseholdsCanvas() {
+        const canvas = document.getElementById('households-canvas');
+        if (!canvas) return;
+        canvas.innerHTML = '';
+
+        householdsState.forEach((hh, index) => {
+            const card = document.createElement('div');
+            card.className = 'builder-household-card';
+            card.dataset.hhId = hh.id;
+            card.dataset.hhIndex = index;
+
+            card.innerHTML = `
+                <div class="builder-hh-header">
+                    <div class="builder-hh-title-row">
+                        <span class="builder-hh-badge">Household ${index + 1}</span>
+                        <input type="text" class="form-control hh-name-input" value="${escapeHtml(hh.name)}" placeholder="Household Name (e.g. Wheeler Family)" data-hh-id="${hh.id}">
+                        ${householdsState.length > 1 ? `
+                            <button type="button" class="button-icon-danger btn-remove-hh" data-hh-id="${hh.id}" title="Remove this household">✕ Remove</button>
+                        ` : ''}
+                    </div>
+                    <div class="builder-hh-controls">
+                        <button type="button" class="btn-toggle-address" data-hh-id="${hh.id}">
+                            📍 Address Details ▾
+                        </button>
+                        <span class="badge badge-neutral hh-member-count">${hh.clients.length} Member${hh.clients.length === 1 ? '' : 's'}</span>
+                    </div>
+                </div>
+
+                <div class="builder-hh-address-box" id="address-box-${hh.id}" style="display:none;">
+                    <div class="form-grid">
+                        <div class="form-field form-grid-full">
+                            <label>Street Address</label>
+                            <input type="text" class="form-control hh-addr-input" data-field="address_line_1" data-hh-id="${hh.id}" value="${escapeHtml(hh.address_line_1 || '')}" placeholder="123 Mountain Way...">
+                        </div>
+                        <div class="form-field">
+                            <label>City</label>
+                            <input type="text" class="form-control hh-addr-input" data-field="city" data-hh-id="${hh.id}" value="${escapeHtml(hh.city || '')}" placeholder="City">
+                        </div>
+                        <div class="form-field">
+                            <label>State</label>
+                            <input type="text" class="form-control hh-addr-input" data-field="state" data-hh-id="${hh.id}" value="${escapeHtml(hh.state || '')}" placeholder="State">
+                        </div>
+                        <div class="form-field">
+                            <label>ZIP / Postal</label>
+                            <input type="text" class="form-control hh-addr-input" data-field="postal_code" data-hh-id="${hh.id}" value="${escapeHtml(hh.postal_code || '')}" placeholder="ZIP">
+                        </div>
+                        <div class="form-field">
+                            <label>Years Return</label>
+                            <input type="number" class="form-control hh-addr-input" data-field="years_return" data-hh-id="${hh.id}" value="${escapeHtml(hh.years_return || '')}" min="1" placeholder="e.g. 3">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="builder-drop-zone js-drop-zone" data-zone-type="household" data-hh-id="${hh.id}">
+                    ${hh.clients.length === 0 ? `
+                        <div class="empty-drop-prompt">
+                            <div class="empty-drop-icon">🏡</div>
+                            <strong>Drag guests here for Household ${index + 1}</strong>
+                            <small>Or click "+" on any guest in the pool</small>
+                        </div>
+                    ` : ''}
+                    <div class="dropped-client-list">
+                        ${hh.clients.map((cObj, cIdx) => renderDroppedClientItem(cObj, 'household', hh.id)).join('')}
+                    </div>
+                </div>
+            `;
+
+            canvas.appendChild(card);
+        });
+
+        setupDropZones();
+        updatePrimaryOrganizerSelect();
+    }
+
+    // Render Dropped Client Item inside a Drop Zone
+    function renderDroppedClientItem(cObj, zoneType, hhId) {
+        const client = clientsMap.get(cObj.id);
+        if (!client) return '';
+
+        if (zoneType === 'household' || zoneType === 'single_household') {
+            return `
+                <div class="dropped-item" draggable="true" data-client-id="${client.id}" data-hh-id="${hhId || ''}">
+                    <div class="dropped-item-handle" title="Drag to move">⋮⋮</div>
+                    <div class="dropped-item-info">
+                        <strong>${escapeHtml(client.full_name)}</strong>
+                        <span class="badge badge-mini">${escapeHtml(client.client_type)}</span>
+                        ${client.years_display ? `<span class="badge-mini badge-neutral">${escapeHtml(client.years_display)}</span>` : ''}
+                        ${client.dietary_notes ? `<span class="badge-mini badge-warning" title="${escapeHtml(client.dietary_notes)}">Dietary</span>` : ''}
+                        ${client.medical_notes ? `<span class="badge-mini badge-danger" title="${escapeHtml(client.medical_notes)}">Medical</span>` : ''}
+                    </div>
+                    <div class="dropped-item-options">
+                        <label class="radio-label" title="Mark as Primary Contact">
+                            <input type="radio" name="prim_${hhId || 'single'}" class="opt-primary-contact" data-hh-id="${hhId || ''}" data-client-id="${client.id}" ${cObj.is_primary ? 'checked' : ''}>
+                            <span>Primary</span>
+                        </label>
+                        <select class="form-control form-control-sm opt-relationship" data-hh-id="${hhId || ''}" data-client-id="${client.id}">
+                            ${relationshipChoices.map(rc => `
+                                <option value="${rc.value}" ${cObj.relationship === rc.value ? 'selected' : ''}>${rc.label}</option>
+                            `).join('')}
+                        </select>
+                        <button type="button" class="btn-remove-client" data-client-id="${client.id}" data-hh-id="${hhId || ''}" data-zone-type="${zoneType}" title="Remove from household">✕</button>
+                    </div>
+                </div>
+            `;
+        } else {
+            // Direct / Travel group item
+            return `
+                <div class="dropped-item" draggable="true" data-client-id="${client.id}">
+                    <div class="dropped-item-handle" title="Drag to move">⋮⋮</div>
+                    <div class="dropped-item-info">
+                        <strong>${escapeHtml(client.full_name)}</strong>
+                        <span class="badge badge-mini">${escapeHtml(client.client_type)}</span>
+                        ${client.years_display ? `<span class="badge-mini badge-neutral">${escapeHtml(client.years_display)}</span>` : ''}
+                    </div>
+                    <div class="dropped-item-options">
+                        <select class="form-control form-control-sm opt-role" data-client-id="${client.id}">
+                            ${roleChoices.map(rc => `
+                                <option value="${rc.value}" ${cObj.role === rc.value ? 'selected' : ''}>${rc.label}</option>
+                            `).join('')}
+                        </select>
+                        <button type="button" class="btn-remove-client" data-client-id="${client.id}" data-zone-type="${zoneType}" title="Remove from group">✕</button>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    // Render Direct Guests List (Mode: both)
+    function renderDirectGuestsList() {
+        const dropZone = document.getElementById('direct-guests-drop-zone');
+        const countBadge = document.getElementById('direct-guests-count');
+        if (!dropZone || !countBadge) return;
+
+        countBadge.textContent = `${directGuestsState.length} Guest${directGuestsState.length === 1 ? '' : 's'}`;
+        const listContainer = document.getElementById('direct-guests-list');
+        listContainer.innerHTML = directGuestsState.map(cObj => renderDroppedClientItem(cObj, 'direct')).join('');
+
+        const prompt = dropZone.querySelector('.empty-drop-prompt');
+        if (prompt) {
+            prompt.style.display = directGuestsState.length === 0 ? 'block' : 'none';
+        }
+
+        setupDropZones();
+        updatePrimaryOrganizerSelect();
+    }
+
+    // Render Single Household List (Mode: household)
+    function renderSingleHouseholdList() {
+        const dropZone = document.getElementById('single-hh-drop-zone');
+        const countBadge = document.getElementById('hh-single-count');
+        if (!dropZone) return;
+
+        if (countBadge) {
+            countBadge.textContent = `${singleHouseholdState.length} Member${singleHouseholdState.length === 1 ? '' : 's'}`;
+        }
+
+        const listContainer = document.getElementById('single-hh-list');
+        listContainer.innerHTML = singleHouseholdState.map(cObj => renderDroppedClientItem(cObj, 'single_household', 0)).join('');
+
+        const prompt = dropZone.querySelector('.empty-drop-prompt');
+        if (prompt) {
+            prompt.style.display = singleHouseholdState.length === 0 ? 'block' : 'none';
+        }
+
+        setupDropZones();
+    }
+
+    // Render Travel Group Only List (Mode: travel_group)
+    function renderTravelGroupOnlyList() {
+        const dropZone = document.getElementById('tg-only-drop-zone');
+        const countBadge = document.getElementById('tg-only-count');
+        if (!dropZone) return;
+
+        if (countBadge) {
+            countBadge.textContent = `${travelGroupOnlyState.length} Member${travelGroupOnlyState.length === 1 ? '' : 's'}`;
+        }
+
+        const listContainer = document.getElementById('tg-only-list');
+        listContainer.innerHTML = travelGroupOnlyState.map(cObj => renderDroppedClientItem(cObj, 'travel_group_only')).join('');
+
+        const prompt = dropZone.querySelector('.empty-drop-prompt');
+        if (prompt) {
+            prompt.style.display = travelGroupOnlyState.length === 0 ? 'block' : 'none';
+        }
+
+        setupDropZones();
+    }
+
+    // Drag and Drop handlers
+    let draggedClientId = null;
+
+    function handleDragStart(e) {
+        const card = e.target.closest('[data-client-id]');
+        if (!card) return;
+        draggedClientId = parseInt(card.dataset.clientId, 10);
+        e.dataTransfer.setData('text/plain', draggedClientId);
+        e.dataTransfer.effectAllowed = 'move';
+        card.classList.add('is-dragging');
+    }
+
+    function handleDragEnd(e) {
+        const card = e.target.closest('[data-client-id]');
+        if (card) card.classList.remove('is-dragging');
+        document.querySelectorAll('.builder-drop-zone').forEach(z => z.classList.remove('is-drag-over'));
+    }
+
+    function setupDropZones() {
+        const dropZones = document.querySelectorAll('.builder-drop-zone');
+
+        dropZones.forEach(zone => {
+            zone.removeEventListener('dragover', handleDragOver);
+            zone.removeEventListener('dragleave', handleDragLeave);
+            zone.removeEventListener('drop', handleDrop);
+
+            zone.addEventListener('dragover', handleDragOver);
+            zone.addEventListener('dragleave', handleDragLeave);
+            zone.addEventListener('drop', handleDrop);
+        });
+
+        // Make dropped items draggable too (to move between zones)
+        document.querySelectorAll('.dropped-item').forEach(item => {
+            item.removeEventListener('dragstart', handleDragStart);
+            item.removeEventListener('dragend', handleDragEnd);
+            item.addEventListener('dragstart', handleDragStart);
+            item.addEventListener('dragend', handleDragEnd);
+        });
+    }
+
+    function handleDragOver(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        e.currentTarget.classList.add('is-drag-over');
+    }
+
+    function handleDragLeave(e) {
+        e.currentTarget.classList.remove('is-drag-over');
+    }
+
+    function handleDrop(e) {
+        e.preventDefault();
+        const zone = e.currentTarget;
+        zone.classList.remove('is-drag-over');
+
+        const clientIdStr = e.dataTransfer.getData('text/plain') || draggedClientId;
+        if (!clientIdStr) return;
+        const clientId = parseInt(clientIdStr, 10);
+        const client = clientsMap.get(clientId);
+        if (!client) return;
+
+        const zoneType = zone.dataset.zoneType;
+        const hhId = zone.dataset.hhId ? parseInt(zone.dataset.hhId, 10) : null;
+
+        // Remove client from any existing placement
+        removeClientFromAllPlacements(clientId);
+
+        // If dropped onto pool, simply unassign and re-render
+        if (zoneType === 'pool') {
+            if (currentMode === 'both') {
+                renderHouseholdsCanvas();
+                renderDirectGuestsList();
+            } else if (currentMode === 'household') {
+                renderSingleHouseholdList();
+            } else if (currentMode === 'travel_group') {
+                renderTravelGroupOnlyList();
+            }
+            renderClientPool();
+            updateSummaryStats();
+            return;
+        }
+
+        // Add to new placement
+        if (zoneType === 'household') {
+            const hh = householdsState.find(h => h.id === hhId);
+            if (hh) {
+                // If household name is default, suggest client's last name
+                if (hh.name.startsWith('Household') || hh.name === 'Second Household') {
+                    hh.name = `${client.last_name} Household`;
+                }
+                const isFirst = hh.clients.length === 0;
+                hh.clients.push({
+                    id: clientId,
+                    is_primary: isFirst,
+                    is_billing: isFirst,
+                    relationship: isFirst ? 'self' : 'unknown'
+                });
+            }
+            renderHouseholdsCanvas();
+        } else if (zoneType === 'direct') {
+            directGuestsState.push({
+                id: clientId,
+                role: 'guest'
+            });
+            renderDirectGuestsList();
+        } else if (zoneType === 'single_household') {
+            const isFirst = singleHouseholdState.length === 0;
+            singleHouseholdState.push({
+                id: clientId,
+                is_primary: isFirst,
+                is_billing: isFirst,
+                relationship: isFirst ? 'self' : 'unknown'
+            });
+            const nameInput = document.getElementById('hh-name-input');
+            if (nameInput && (!nameInput.value || nameInput.value === 'New Household')) {
+                nameInput.value = `${client.last_name} Household`;
+            }
+            renderSingleHouseholdList();
+        } else if (zoneType === 'travel_group_only') {
+            travelGroupOnlyState.push({
+                id: clientId,
+                role: 'guest'
+            });
+            renderTravelGroupOnlyList();
+        }
+
+        renderClientPool();
+        updateSummaryStats();
+    }
+
+    function removeClientFromAllPlacements(clientId) {
+        if (currentMode === 'both') {
+            householdsState.forEach(hh => {
+                hh.clients = hh.clients.filter(c => c.id !== clientId);
+            });
+            directGuestsState = directGuestsState.filter(c => c.id !== clientId);
+        } else if (currentMode === 'household') {
+            singleHouseholdState = singleHouseholdState.filter(c => c.id !== clientId);
+        } else if (currentMode === 'travel_group') {
+            travelGroupOnlyState = travelGroupOnlyState.filter(c => c.id !== clientId);
+        }
+    }
+
+    // Update Summary Stats & Primary Organizer Selector
+    function updateSummaryStats() {
+        if (!summaryStatsEl) return;
+
+        if (currentMode === 'both') {
+            let totalMembers = 0;
+            householdsState.forEach(hh => totalMembers += hh.clients.length);
+            totalMembers += directGuestsState.length;
+            summaryStatsEl.innerHTML = `
+                <span class="stat-pill"><strong>1</strong> Travel Group</span>
+                <span class="stat-pill"><strong>${householdsState.length}</strong> Household${householdsState.length === 1 ? '' : 's'}</span>
+                <span class="stat-pill"><strong>${totalMembers}</strong> Guest${totalMembers === 1 ? '' : 's'} Assigned</span>
+            `;
+        } else if (currentMode === 'household') {
+            summaryStatsEl.innerHTML = `
+                <span class="stat-pill"><strong>1</strong> Household</span>
+                <span class="stat-pill"><strong>${singleHouseholdState.length}</strong> Member${singleHouseholdState.length === 1 ? '' : 's'}</span>
+            `;
+        } else {
+            summaryStatsEl.innerHTML = `
+                <span class="stat-pill"><strong>1</strong> Travel Group</span>
+                <span class="stat-pill"><strong>${travelGroupOnlyState.length}</strong> Member${travelGroupOnlyState.length === 1 ? '' : 's'}</span>
+            `;
+        }
+    }
+
+    function updatePrimaryOrganizerSelect() {
+        const select = document.getElementById('tg-primary-contact-select');
+        if (!select) return;
+
+        const currentVal = select.value;
+        select.innerHTML = '<option value="">Auto (First Household Primary)</option>';
+
+        const allAssigned = [];
+        householdsState.forEach(hh => {
+            hh.clients.forEach(c => {
+                const client = clientsMap.get(c.id);
+                if (client) allAssigned.push(client);
+            });
+        });
+        directGuestsState.forEach(c => {
+            const client = clientsMap.get(c.id);
+            if (client) allAssigned.push(client);
+        });
+
+        allAssigned.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.id;
+            opt.textContent = `${c.full_name} (${c.client_type})`;
+            if (String(c.id) === String(currentVal)) opt.selected = true;
+            select.appendChild(opt);
+        });
+    }
+
+    // Setup Event Listeners
+    function setupEventListeners() {
+        // Search Filter
+        if (searchInput) {
+            searchInput.addEventListener('input', function(e) {
+                currentSearchTerm = e.target.value.trim();
+                clearSearchBtn.style.display = currentSearchTerm ? 'inline-block' : 'none';
+                renderClientPool();
+            });
+        }
+
+        if (clearSearchBtn) {
+            clearSearchBtn.addEventListener('click', function() {
+                searchInput.value = '';
+                currentSearchTerm = '';
+                clearSearchBtn.style.display = 'none';
+                renderClientPool();
+            });
+        }
+
+        // Filter Chips
+        filterChips.forEach(chip => {
+            chip.addEventListener('click', function() {
+                filterChips.forEach(c => c.classList.remove('is-active'));
+                chip.classList.add('is-active');
+                currentFilter = chip.dataset.filter;
+                renderClientPool();
+            });
+        });
+
+        // Add Household Button
+        const addHhBtn = document.getElementById('add-household-btn');
+        if (addHhBtn) {
+            addHhBtn.addEventListener('click', function() {
+                const newId = nextHouseholdTempId++;
+                householdsState.push({
+                    id: newId,
+                    name: `Household ${householdsState.length + 1}`,
+                    address_line_1: '',
+                    city: '',
+                    state: '',
+                    postal_code: '',
+                    country: 'United States',
+                    notes: '',
+                    clients: []
+                });
+                renderHouseholdsCanvas();
+                updateSummaryStats();
+            });
+        }
+
+        // Delegate Dynamic Clicks on Canvas
+        document.addEventListener('click', function(e) {
+            // Quick Add button from pool
+            if (e.target.matches('.btn-quick-add')) {
+                const clientId = parseInt(e.target.dataset.clientId, 10);
+                if (!clientId) return;
+
+                if (currentMode === 'both') {
+                    // Add to first household that exists, or create one
+                    if (householdsState.length === 0) {
+                        householdsState.push({
+                            id: nextHouseholdTempId++,
+                            name: 'Household 1',
+                            clients: []
+                        });
+                    }
+                    const targetHh = householdsState[0];
+                    const client = clientsMap.get(clientId);
+                    if (targetHh.name.startsWith('Household')) {
+                        targetHh.name = `${client.last_name} Household`;
+                    }
+                    targetHh.clients.push({
+                        id: clientId,
+                        is_primary: targetHh.clients.length === 0,
+                        is_billing: targetHh.clients.length === 0,
+                        relationship: targetHh.clients.length === 0 ? 'self' : 'unknown'
+                    });
+                    renderHouseholdsCanvas();
+                } else if (currentMode === 'household') {
+                    singleHouseholdState.push({
+                        id: clientId,
+                        is_primary: singleHouseholdState.length === 0,
+                        is_billing: singleHouseholdState.length === 0,
+                        relationship: singleHouseholdState.length === 0 ? 'self' : 'unknown'
+                    });
+                    renderSingleHouseholdList();
+                } else if (currentMode === 'travel_group') {
+                    travelGroupOnlyState.push({
+                        id: clientId,
+                        role: 'guest'
+                    });
+                    renderTravelGroupOnlyList();
+                }
+
+                renderClientPool();
+                updateSummaryStats();
+            }
+
+            // Remove Client from dropped list
+            if (e.target.matches('.btn-remove-client')) {
+                const clientId = parseInt(e.target.dataset.clientId, 10);
+                removeClientFromAllPlacements(clientId);
+                if (currentMode === 'both') {
+                    renderHouseholdsCanvas();
+                    renderDirectGuestsList();
+                } else if (currentMode === 'household') {
+                    renderSingleHouseholdList();
+                } else {
+                    renderTravelGroupOnlyList();
+                }
+                renderClientPool();
+                updateSummaryStats();
+            }
+
+            // Remove Household
+            if (e.target.matches('.btn-remove-hh')) {
+                const hhId = parseInt(e.target.dataset.hhId, 10);
+                householdsState = householdsState.filter(h => h.id !== hhId);
+                renderHouseholdsCanvas();
+                renderClientPool();
+                updateSummaryStats();
+            }
+
+            // Toggle Address Box
+            if (e.target.matches('.btn-toggle-address')) {
+                const hhId = e.target.dataset.hhId;
+                const box = document.getElementById(`address-box-${hhId}`);
+                if (box) {
+                    box.style.display = box.style.display === 'none' ? 'block' : 'none';
+                }
+            }
+        });
+
+        // Delegate input changes for Household Name and Address
+        document.addEventListener('input', function(e) {
+            if (e.target.matches('.hh-name-input')) {
+                const hhId = parseInt(e.target.dataset.hhId, 10);
+                const hh = householdsState.find(h => h.id === hhId);
+                if (hh) hh.name = e.target.value;
+            }
+
+            if (e.target.matches('.hh-addr-input')) {
+                const hhId = parseInt(e.target.dataset.hhId, 10);
+                const field = e.target.dataset.field;
+                const hh = householdsState.find(h => h.id === hhId);
+                if (hh && field) hh[field] = e.target.value;
+            }
+        });
+
+        // Delegate Primary Contact radio changes
+        document.addEventListener('change', function(e) {
+            if (e.target.matches('.opt-primary-contact')) {
+                const hhId = e.target.dataset.hhId ? parseInt(e.target.dataset.hhId, 10) : null;
+                const clientId = parseInt(e.target.dataset.clientId, 10);
+
+                if (currentMode === 'both' && hhId) {
+                    const hh = householdsState.find(h => h.id === hhId);
+                    if (hh) {
+                        hh.clients.forEach(c => c.is_primary = (c.id === clientId));
+                    }
+                } else if (currentMode === 'household') {
+                    singleHouseholdState.forEach(c => c.is_primary = (c.id === clientId));
+                }
+            }
+
+            if (e.target.matches('.opt-relationship')) {
+                const hhId = e.target.dataset.hhId ? parseInt(e.target.dataset.hhId, 10) : null;
+                const clientId = parseInt(e.target.dataset.clientId, 10);
+                const relVal = e.target.value;
+
+                if (currentMode === 'both' && hhId) {
+                    const hh = householdsState.find(h => h.id === hhId);
+                    if (hh) {
+                        const c = hh.clients.find(item => item.id === clientId);
+                        if (c) c.relationship = relVal;
+                    }
+                } else if (currentMode === 'household') {
+                    const c = singleHouseholdState.find(item => item.id === clientId);
+                    if (c) c.relationship = relVal;
+                }
+            }
+
+            if (e.target.matches('.opt-role')) {
+                const clientId = parseInt(e.target.dataset.clientId, 10);
+                const roleVal = e.target.value;
+
+                if (currentMode === 'both') {
+                    const c = directGuestsState.find(item => item.id === clientId);
+                    if (c) c.role = roleVal;
+                } else if (currentMode === 'travel_group') {
+                    const c = travelGroupOnlyState.find(item => item.id === clientId);
+                    if (c) c.role = roleVal;
+                }
+            }
+        });
+
+        // Form Submit Handler
+        if (builderForm) {
+            builderForm.addEventListener('submit', function(e) {
+                // Prepare hidden JSON inputs
+                if (currentMode === 'both') {
+                    const householdsPayload = householdsState.map(hh => ({
+                        name: hh.name.trim() || 'Household',
+                        address_line_1: hh.address_line_1 || '',
+                        city: hh.city || '',
+                        state: hh.state || '',
+                        postal_code: hh.postal_code || '',
+                        country: hh.country || 'United States',
+                        notes: hh.notes || '',
+                        years_return: hh.years_return || '',
+                        primary_contact_id: hh.clients.find(c => c.is_primary)?.id || (hh.clients[0]?.id || null),
+                        billing_contact_id: hh.clients.find(c => c.is_billing)?.id || (hh.clients[0]?.id || null),
+                        clients: hh.clients.map(c => ({
+                            id: c.id,
+                            relationship: c.relationship || 'unknown'
+                        }))
+                    }));
+
+                    document.getElementById('input-households-json').value = JSON.stringify(householdsPayload);
+                    document.getElementById('input-direct-clients-json').value = JSON.stringify(directGuestsState);
+                } else if (currentMode === 'household') {
+                    const clientsPayload = singleHouseholdState.map(c => ({
+                        id: c.id,
+                        relationship: c.relationship || 'unknown'
+                    }));
+                    document.getElementById('input-clients-json').value = JSON.stringify(clientsPayload);
+                } else if (currentMode === 'travel_group') {
+                    document.getElementById('input-clients-json').value = JSON.stringify(travelGroupOnlyState);
+                }
+            });
+        }
+    }
+
+    // Helper: escape HTML
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    // Initialize on DOM load
+    document.addEventListener('DOMContentLoaded', initBuilder);
+})();
+</script>
+{% endblock %}

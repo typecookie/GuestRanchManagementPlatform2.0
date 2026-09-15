@@ -25,6 +25,7 @@ class ClientForm(forms.ModelForm):
             "date_of_birth",
             "client_type",
             "riding_level",
+            "years_return",
             "dietary_notes",
             "medical_notes",
             "general_notes",
@@ -32,6 +33,7 @@ class ClientForm(forms.ModelForm):
         ]
         widgets = {
             "date_of_birth": forms.DateInput(attrs={"type": "date"}),
+            "years_return": forms.NumberInput(attrs={"class": "form-control", "min": 1, "placeholder": "e.g. 5"}),
             "dietary_notes": forms.Textarea(attrs={"rows": 4}),
             "medical_notes": forms.Textarea(attrs={"rows": 4}),
             "general_notes": forms.Textarea(attrs={"rows": 4}),
@@ -45,6 +47,7 @@ class HouseholdForm(forms.ModelForm):
             "name",
             "primary_contact",
             "billing_contact",
+            "years_return",
             "address_line_1",
             "address_line_2",
             "city",
@@ -71,6 +74,7 @@ class HouseholdForm(forms.ModelForm):
                     "data-quick-add-url": reverse_lazy("clients:quick_add_client"),
                 }
             ),
+            "years_return": forms.NumberInput(attrs={"class": "form-control", "min": 1, "placeholder": "e.g. 5"}),
             "notes": forms.Textarea(attrs={"rows": 4}),
         }
 
@@ -82,6 +86,7 @@ class TravelGroupForm(forms.ModelForm):
             "name",
             "group_type",
             "primary_contact",
+            "years_return",
             "notes",
             "is_active",
         ]
@@ -94,6 +99,7 @@ class TravelGroupForm(forms.ModelForm):
                     "data-quick-add-url": reverse_lazy("clients:quick_add_client"),
                 }
             ),
+            "years_return": forms.NumberInput(attrs={"class": "form-control", "min": 1, "placeholder": "e.g. 5"}),
             "notes": forms.Textarea(attrs={"rows": 4}),
         }
 

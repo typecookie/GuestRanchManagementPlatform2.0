@@ -55,6 +55,19 @@ View family members, contact information, travel group connections, and househol
                 </div>
 
                 <div class="detail-row">
+                    <div class="detail-label">Years Return</div>
+                    <div class="detail-value">
+                        {% if household.years_return %}
+                            <strong>{{ household.years_display }}</strong> (Configured: {{ household.years_return }})
+                        {% elif household.effective_years_count %}
+                            <strong>{{ household.years_display }}</strong> <span class="text-muted">(Inherited from Travel Group / Primary)</span>
+                        {% else %}
+                            <span class="text-muted">1st year (Default)</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="detail-row">
                     <div class="detail-label">Status</div>
                     <div class="detail-value">
                         {% if household.is_active %}
