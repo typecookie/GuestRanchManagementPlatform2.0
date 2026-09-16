@@ -46,13 +46,14 @@ class BarInventoryAndReportsTests(TestCase):
             postal_code="83001"
         )
 
-        # Item 1: Well stocked Bourbon with tags (Top shelf with custom sale price)
+        # Item 1: Well stocked Bourbon (Top shelf with custom sale price)
         self.item_bourbon = BarInventoryItem.objects.create(
             stock_number="LIQ-1001",
             description="Maker's Mark Kentucky Bourbon 750ml",
             category=BarInventoryItem.Category.LIQUOR,
             pricing_method=BarInventoryItem.PricingMethod.BY_CLASS,
             beverage_class=BarInventoryItem.BeverageClass.TOP,
+            tag=self.tag_bourbon,
             on_hand=Decimal('18.00'),
             minimum_on_hand=Decimal('6.00'),
             single_price=Decimal('28.50'),
@@ -63,7 +64,25 @@ class BarInventoryAndReportsTests(TestCase):
             location="Main Bar",
             unit_type="Bottle"
         )
-        self.item_bourbon.tags.add(self.tag_whisky, self.tag_bourbon)
+
+        # Item 1b: Second Bourbon to test tag subtotal aggregation
+        self.item_bourbon2 = BarInventoryItem.objects.create(
+            stock_number="LIQ-1005",
+            description="Buffalo Trace Bourbon 750ml",
+            category=BarInventoryItem.Category.LIQUOR,
+            pricing_method=BarInventoryItem.PricingMethod.BY_CLASS,
+            beverage_class=BarInventoryItem.BeverageClass.CALL,
+            tag=self.tag_bourbon,
+            on_hand=Decimal('10.00'),
+            minimum_on_hand=Decimal('4.00'),
+            single_price=Decimal('25.00'),
+            case_price=Decimal('270.00'),
+            sale_price=Decimal('0.00'),
+            singles_per_case=12,
+            distributor=self.distributor1,
+            location="Main Bar",
+            unit_type="Bottle"
+        )
 
         # Item 2: Low stock Gin (Call class)
         self.item_gin = BarInventoryItem.objects.create(
@@ -72,6 +91,7 @@ class BarInventoryAndReportsTests(TestCase):
             category=BarInventoryItem.Category.LIQUOR,
             pricing_method=BarInventoryItem.PricingMethod.BY_CLASS,
             beverage_class=BarInventoryItem.BeverageClass.CALL,
+            tag=self.tag_gin,
             on_hand=Decimal('2.00'),
             minimum_on_hand=Decimal('8.00'),
             single_price=Decimal('32.00'),
@@ -82,7 +102,6 @@ class BarInventoryAndReportsTests(TestCase):
             location="Main Bar",
             unit_type="Bottle"
         )
-        self.item_gin.tags.add(self.tag_gin)
 
         # Item 3: Low stock Beer (Domestic class)
         self.item_beer = BarInventoryItem.objects.create(
@@ -91,6 +110,7 @@ class BarInventoryAndReportsTests(TestCase):
             category=BarInventoryItem.Category.BEER,
             pricing_method=BarInventoryItem.PricingMethod.BY_CLASS,
             beverage_class=BarInventoryItem.BeverageClass.DOMESTIC,
+            tag=self.tag_ipa,
             on_hand=Decimal('10.00'),
             minimum_on_hand=Decimal('48.00'),
             single_price=Decimal('1.85'),
@@ -101,7 +121,6 @@ class BarInventoryAndReportsTests(TestCase):
             location="Cooler",
             unit_type="Can"
         )
-        self.item_beer.tags.add(self.tag_ipa)
 
         # Item 4: Rum with Dark Rum tag (Well class)
         self.item_rum = BarInventoryItem.objects.create(
@@ -110,6 +129,7 @@ class BarInventoryAndReportsTests(TestCase):
             category=BarInventoryItem.Category.LIQUOR,
             pricing_method=BarInventoryItem.PricingMethod.BY_CLASS,
             beverage_class=BarInventoryItem.BeverageClass.WELL,
+            tag=self.tag_dark_rum,
             on_hand=Decimal('12.00'),
             minimum_on_hand=Decimal('4.00'),
             single_price=Decimal('22.00'),
@@ -120,7 +140,6 @@ class BarInventoryAndReportsTests(TestCase):
             location="Main Bar",
             unit_type="Bottle"
         )
-        self.item_rum.tags.add(self.tag_rum, self.tag_dark_rum)
 
     def test_bar_item_calculations(self):
         # Bourbon: 18 * 28.50 = 513.00
@@ -164,10 +183,11 @@ class BarInventoryAndReportsTests(TestCase):
         self.assertNotContains(response, "Hendrick&#x27;s Gin")
 
     def test_bar_inventory_search_by_tag_name(self):
-        # Search query matching tag 'whisky'
-        response = self.client.get(reverse('bar:inventory_list') + '?q=whisky')
+        # Search query matching tag 'bourbon'
+        response = self.client.get(reverse('bar:inventory_list') + '?q=bourbon')
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Maker&#x27;s Mark")
+        self.assertContains(response, "Buffalo Trace")
         self.assertNotContains(response, "Hendrick&#x27;s Gin")
         self.assertNotContains(response, "Snake River Pako&#x27;s IPA")
 
@@ -189,15 +209,15 @@ class BarInventoryAndReportsTests(TestCase):
         self.assertIn('Whisky', names)
         self.assertIn('Rum', names)
 
-    def test_bar_item_create_with_tags_and_custom_tags(self):
+    def test_bar_item_create_with_single_tag_and_custom_tag(self):
+        # 1. Create with selected existing tag
         response = self.client.post(reverse('bar:item_create'), {
             'stock_number': 'LIQ-1004',
             'description': 'Patron Silver Tequila 750ml',
             'category': 'liquor',
             'pricing_method': 'by_class',
             'beverage_class': 'top',
-            'tags': [self.tag_whisky.pk], # Can pick existing tag
-            'custom_tags': 'Tequila, Blanco', # And quick add new tags
+            'tag': self.tag_bourbon.pk,
             'on_hand': '8',
             'minimum_on_hand': '3',
             'single_price': '45.00',
@@ -211,10 +231,29 @@ class BarInventoryAndReportsTests(TestCase):
         })
         self.assertEqual(response.status_code, 302)
         created_item = BarInventoryItem.objects.get(stock_number='LIQ-1004')
-        item_tag_names = list(created_item.tags.values_list('name', flat=True))
-        self.assertIn('Tequila', item_tag_names)
-        self.assertIn('Blanco', item_tag_names)
-        self.assertIn('Whisky', item_tag_names)
+        self.assertEqual(created_item.tag, self.tag_bourbon)
+
+        # 2. Create with custom tag string
+        response2 = self.client.post(reverse('bar:item_create'), {
+            'stock_number': 'LIQ-1006',
+            'description': 'Casamigos Reposado Tequila',
+            'category': 'liquor',
+            'pricing_method': 'by_class',
+            'beverage_class': 'top',
+            'custom_tag': 'Reposado',
+            'on_hand': '6',
+            'minimum_on_hand': '2',
+            'single_price': '52.00',
+            'case_price': '580.00',
+            'sale_price': '18.00',
+            'singles_per_case': 12,
+            'location': 'Main Bar',
+            'is_active': True,
+        })
+        self.assertEqual(response2.status_code, 302)
+        created_item2 = BarInventoryItem.objects.get(stock_number='LIQ-1006')
+        self.assertIsNotNone(created_item2.tag)
+        self.assertEqual(created_item2.tag.name, 'Reposado')
 
     def test_bar_inventory_filter_low_stock(self):
         response = self.client.get(reverse('bar:inventory_list') + '?stock_status=low')
@@ -230,6 +269,7 @@ class BarInventoryAndReportsTests(TestCase):
         self.assertContains(response, "$513.00")
         self.assertContains(response, "$28.50")
         self.assertContains(response, "$310.00")
+        self.assertContains(response, "Bourbon")
         self.assertContains(response, "Wyoming Wine &amp; Spirits Distributing")
         self.assertContains(response, "307-555-4400")
 
@@ -260,6 +300,7 @@ class BarInventoryAndReportsTests(TestCase):
             'category': 'liquor',
             'pricing_method': 'by_class',
             'beverage_class': 'top',
+            'tag': self.tag_bourbon.pk,
             'on_hand': '20',
             'minimum_on_hand': '6',
             'single_price': '29.00',
@@ -277,13 +318,54 @@ class BarInventoryAndReportsTests(TestCase):
         self.assertEqual(self.item_bourbon.total_value, Decimal('580.00'))
 
     def test_report_valuation(self):
+        # Add an untagged item to verify untagged group handling
+        BarInventoryItem.objects.create(
+            stock_number="LIQ-1099",
+            description="House Well Vodka 750ml",
+            category=BarInventoryItem.Category.LIQUOR,
+            pricing_method=BarInventoryItem.PricingMethod.BY_CLASS,
+            beverage_class=BarInventoryItem.BeverageClass.WELL,
+            tag=None, # Untagged
+            on_hand=Decimal('5.00'),
+            minimum_on_hand=Decimal('2.00'),
+            single_price=Decimal('15.00'),
+            case_price=Decimal('150.00'),
+            singles_per_case=12,
+            location="Main Bar",
+            unit_type="Bottle"
+        )
+
         response = self.client.get(reverse('bar:report_valuation'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Inventory Valuation Report")
         self.assertContains(response, "Spirits &amp; Liquor")
         self.assertContains(response, "Beer &amp; Cider")
-        # Grand total valuation: 513.00 + 64.00 + 18.50 + 264.00 = 859.50
-        self.assertContains(response, "$859.50")
+
+        # Verify tag groups and subtotals appear in response
+        # Bourbon tag group: Maker's Mark (513.00) + Buffalo Trace (250.00) = 763.00
+        self.assertContains(response, "Bourbon")
+        self.assertContains(response, "$763.00")
+        self.assertContains(response, "Subtotal for Bourbon")
+
+        # Dark Rum tag group: Kraken (264.00)
+        self.assertContains(response, "Dark Rum")
+        self.assertContains(response, "$264.00")
+        self.assertContains(response, "Subtotal for Dark Rum")
+
+        # Gin tag group: Hendrick's (64.00)
+        self.assertContains(response, "Gin")
+        self.assertContains(response, "$64.00")
+        self.assertContains(response, "Subtotal for Gin")
+
+        # Untagged group: House Well Vodka (75.00)
+        self.assertContains(response, "Untagged / Other")
+        self.assertContains(response, "$75.00")
+
+        # Category total Spirits & Liquor: 763.00 + 264.00 + 64.00 + 75.00 = 1166.00
+        self.assertContains(response, "$1166.00")
+
+        # Grand total valuation: 1166.00 + 18.50 = 1184.50
+        self.assertContains(response, "$1184.50")
 
     def test_report_low_stock(self):
         response = self.client.get(reverse('bar:report_low_stock'))

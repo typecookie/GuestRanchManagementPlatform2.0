@@ -234,13 +234,13 @@ Stock # {{ item.stock_number }} &bull; {{ item.get_category_display }} &bull; {{
             </div>
 
             <div style="margin-bottom: 0.75rem;">
-                <span style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; font-weight: 700; display: block; margin-bottom: 4px;">Types / Tags</span>
-                <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-                    {% for tag in item.tags.all %}
-                        <a href="{% url 'bar:inventory_list' %}?tag={{ tag.pk }}" class="badge badge-accent" style="text-decoration: none;" title="Filter inventory by {{ tag.name }}">🏷️ {{ tag.name }}</a>
-                    {% empty %}
-                        <span class="table-muted">No tags</span>
-                    {% endfor %}
+                <span style="font-size: 0.8rem; color: var(--color-muted); text-transform: uppercase; font-weight: 700; display: block; margin-bottom: 4px;">Type / Tag</span>
+                <div>
+                    {% if item.tag %}
+                        <a href="{% url 'bar:inventory_list' %}?tag={{ item.tag.pk }}" class="badge badge-accent" style="text-decoration: none;" title="Filter inventory by {{ item.tag.name }}">🏷️ {{ item.tag.name }}</a>
+                    {% else %}
+                        <span class="table-muted">No tag (Untagged)</span>
+                    {% endif %}
                 </div>
             </div>
 

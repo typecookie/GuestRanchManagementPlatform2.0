@@ -14,10 +14,10 @@ class BarItemTagForm(forms.ModelForm):
 
 
 class BarInventoryItemForm(forms.ModelForm):
-    custom_tags = forms.CharField(
+    custom_tag = forms.CharField(
         required=False,
-        widget=forms.HiddenInput(attrs={'id': 'id_custom_tags'}),
-        help_text="Comma-separated tag names to create or associate"
+        widget=forms.HiddenInput(attrs={'id': 'id_custom_tag'}),
+        help_text="Tag name to create or associate"
     )
 
     def __init__(self, *args, **kwargs):
@@ -25,8 +25,9 @@ class BarInventoryItemForm(forms.ModelForm):
         # Show all active distributors / contractors
         self.fields['distributor'].queryset = Contractor.objects.filter(is_active=True).order_by('name')
         self.fields['distributor'].required = False
-        self.fields['tags'].queryset = BarItemTag.objects.all().order_by('name')
-        self.fields['tags'].required = False
+        self.fields['tag'].queryset = BarItemTag.objects.all().order_by('name')
+        self.fields['tag'].required = False
+        self.fields['tag'].empty_label = "— No Tag / Untagged —"
         self.fields['beverage_class'].required = False
         self.fields['sale_price'].required = False
 
@@ -34,7 +35,7 @@ class BarInventoryItemForm(forms.ModelForm):
         model = BarInventoryItem
         fields = [
             'stock_number', 'description', 'category', 'pricing_method', 'beverage_class',
-            'tags', 'on_hand', 'minimum_on_hand',
+            'tag', 'on_hand', 'minimum_on_hand',
             'single_price', 'case_price', 'sale_price', 'singles_per_case',
             'distributor', 'location', 'unit_type', 'notes', 'is_active'
         ]
@@ -44,7 +45,7 @@ class BarInventoryItemForm(forms.ModelForm):
             'category': forms.Select(attrs={'class': 'form-select'}),
             'pricing_method': forms.Select(attrs={'class': 'form-select', 'id': 'id_pricing_method'}),
             'beverage_class': forms.Select(attrs={'class': 'form-select', 'id': 'id_beverage_class'}),
-            'tags': forms.SelectMultiple(attrs={'class': 'form-select js-tags-select', 'style': 'display: none;'}),
+            'tag': forms.Select(attrs={'class': 'form-select js-tag-select', 'id': 'id_tag'}),
             'on_hand': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
             'minimum_on_hand': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
             'single_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0', 'placeholder': '0.00'}),
@@ -76,23 +77,14 @@ class BarInventoryItemForm(forms.ModelForm):
         return cleaned_data
 
     def save(self, commit=True):
-        instance = super().save(commit=commit)
-        custom_tags_str = self.cleaned_data.get('custom_tags', '')
-        if custom_tags_str:
-            tag_names = [t.strip() for t in custom_tags_str.split(',') if t.strip()]
-            new_tag_objs = []
-            for name in tag_names:
-                tag_obj, _ = BarItemTag.objects.get_or_create(name=name)
-                new_tag_objs.append(tag_obj)
-            
-            if commit:
-                instance.tags.add(*new_tag_objs)
-            else:
-                old_save_m2m = getattr(self, 'save_m2m', None)
-                def new_save_m2m():
-                    if old_save_m2m:
-                        old_save_m2m()
-                    instance.tags.add(*new_tag_objs)
-                self.save_m2m = new_save_m2m
+        instance = super().save(commit=False)
+        custom_tag_name = self.cleaned_data.get('custom_tag', '').strip()
+        if custom_tag_name:
+            tag_obj, _ = BarItemTag.objects.get_or_create(name=custom_tag_name)
+            instance.tag = tag_obj
+
+        if commit:
+            instance.save()
+            self.save_m2m()
 
         return instance

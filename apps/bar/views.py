@@ -13,7 +13,7 @@ from apps.contractors.models import Contractor
 @login_required
 @module_permission_required('Bar', 'read')
 def inventory_list(request):
-    items = BarInventoryItem.objects.select_related('distributor').prefetch_related('tags').all()
+    items = BarInventoryItem.objects.select_related('distributor', 'tag').all()
 
     # Search query
     query = request.GET.get('q', '').strip()
@@ -23,7 +23,7 @@ def inventory_list(request):
             Q(description__icontains=query) |
             Q(distributor__name__icontains=query) |
             Q(location__icontains=query) |
-            Q(tags__name__icontains=query) |
+            Q(tag__name__icontains=query) |
             Q(beverage_class__icontains=query)
         ).distinct()
 
@@ -45,7 +45,7 @@ def inventory_list(request):
     # Filter by tag / type
     selected_tag = request.GET.get('tag', '')
     if selected_tag:
-        items = items.filter(tags__id=selected_tag)
+        items = items.filter(Q(tag__id=selected_tag) | Q(tag__name=selected_tag))
 
     # Filter by distributor
     distributor_id = request.GET.get('distributor', '')
@@ -71,16 +71,18 @@ def inventory_list(request):
     # Sorting
     sort_by = request.GET.get('sort', 'category')
     valid_sorts = {
-        'category': ('category', 'description'),
+        'category': ('category', 'tag__name', 'description'),
         'description': ('description',),
         'stock_number': ('stock_number',),
+        'tag': ('tag__name', 'description'),
+        '-tag': ('-tag__name', 'description'),
         'on_hand': ('on_hand',),
         '-on_hand': ('-on_hand',),
         'single_price': ('single_price',),
         '-single_price': ('-single_price',),
         'pricing_method': ('pricing_method', 'beverage_class', 'description'),
     }
-    order_fields = valid_sorts.get(sort_by, ('category', 'description'))
+    order_fields = valid_sorts.get(sort_by, ('category', 'tag__name', 'description'))
     items = items.order_by(*order_fields)
 
     # Overall metrics across all active bar inventory
@@ -122,7 +124,7 @@ def inventory_list(request):
 @module_permission_required('Bar', 'read')
 def item_detail(request, pk):
     item = get_object_or_404(
-        BarInventoryItem.objects.select_related('distributor').prefetch_related('tags'),
+        BarInventoryItem.objects.select_related('distributor', 'tag'),
         pk=pk
     )
     context = {
@@ -163,7 +165,7 @@ def item_create(request):
 @login_required
 @module_permission_required('Bar', 'write')
 def item_edit(request, pk):
-    item = get_object_or_404(BarInventoryItem.objects.prefetch_related('tags'), pk=pk)
+    item = get_object_or_404(BarInventoryItem.objects.select_related('tag'), pk=pk)
     if request.method == 'POST':
         form = BarInventoryItemForm(request.POST, instance=item)
         if form.is_valid():
@@ -254,9 +256,9 @@ def reports_dashboard(request):
 @module_permission_required('Bar', 'read')
 def report_valuation(request):
     """
-    Inventory Valuation Report with category breakdowns, unit values, and total valuation.
+    Inventory Valuation Report with category breakdowns, sub-sorting by tag, tag subtotals, and overall totals.
     """
-    items = BarInventoryItem.objects.filter(is_active=True).select_related('distributor').order_by('category', 'description')
+    items = BarInventoryItem.objects.filter(is_active=True).select_related('distributor', 'tag').order_by('category', 'tag__name', 'description')
     
     # Filter by category if selected
     selected_cat = request.GET.get('category', '')
@@ -274,11 +276,41 @@ def report_valuation(request):
         if cat_items or not selected_cat:
             cat_units = sum((i.on_hand or Decimal('0.00')) for i in cat_items)
             cat_val = sum(i.total_value for i in cat_items)
-            
+
+            # Sub-sort and group items by tag within this category
+            tag_dict = {}
+            for item in cat_items:
+                tag_key = item.tag.name if item.tag else ""
+                tag_obj = item.tag
+                if tag_key not in tag_dict:
+                    tag_dict[tag_key] = {
+                        'tag': tag_obj,
+                        'tag_name': tag_key if tag_key else "Untagged / Other",
+                        'items': [],
+                        'total_units': Decimal('0.00'),
+                        'total_value': Decimal('0.00'),
+                        'item_count': 0,
+                    }
+                tag_dict[tag_key]['items'].append(item)
+                tag_dict[tag_key]['total_units'] += (item.on_hand or Decimal('0.00'))
+                tag_dict[tag_key]['total_value'] += item.total_value
+                tag_dict[tag_key]['item_count'] += 1
+
+            # Sort tag groups: tagged groups alphabetically by tag name, untagged at the end
+            sorted_tag_groups = sorted(
+                tag_dict.values(),
+                key=lambda g: (1 if g['tag'] is None else 0, g['tag_name'].lower())
+            )
+
+            # Sort items within each tag group by description
+            for g in sorted_tag_groups:
+                g['items'].sort(key=lambda x: (x.description or '').lower())
+
             categories_data.append({
                 'category_key': cat_key,
                 'category_label': cat_label,
                 'items': cat_items,
+                'tag_groups': sorted_tag_groups,
                 'total_units': cat_units,
                 'total_value': cat_val,
                 'item_count': len(cat_items),

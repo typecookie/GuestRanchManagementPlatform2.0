@@ -153,11 +153,9 @@ Manage bar stock, track single/case/sale pricing, total inventory valuation, and
                                 {% if not item.is_active %}
                                     <span class="badge badge-neutral" style="font-size: 0.7rem;">Inactive</span>
                                 {% endif %}
-                                {% if item.tags.all %}
-                                    <div style="display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px;">
-                                        {% for t in item.tags.all %}
-                                            <a href="{% url 'bar:inventory_list' %}?tag={{ t.pk }}" class="badge badge-accent" style="font-size: 0.7rem; padding: 2px 6px; text-decoration: none;" title="Filter by {{ t.name }}">🏷️ {{ t.name }}</a>
-                                        {% endfor %}
+                                {% if item.tag %}
+                                    <div style="margin-top: 4px;">
+                                        <a href="{% url 'bar:inventory_list' %}?tag={{ item.tag.pk }}" class="badge badge-accent" style="font-size: 0.7rem; padding: 2px 6px; text-decoration: none;" title="Filter by {{ item.tag.name }}">🏷️ {{ item.tag.name }}</a>
                                     </div>
                                 {% endif %}
                             </td>

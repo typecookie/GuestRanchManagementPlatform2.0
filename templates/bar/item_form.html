@@ -76,29 +76,35 @@ Enter stock number, description, stock quantities, single & case cost pricing, s
                 </div>
             </div>
 
-            <!-- Tags / Types Section -->
+            <!-- Tags / Type Section (Single Tag) -->
             <div class="form-group" style="margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--color-border);">
-                <label style="font-weight: 700; display: block; margin-bottom: 6px;">
-                    Item Types / Tags (e.g. Whisky, Rum, Dark Rum, Bourbon, IPA)
+                <label for="{{ form.tag.id_for_label }}" style="font-weight: 700; display: block; margin-bottom: 6px;">
+                    Item Type / Tag (Single Tag)
                 </label>
-                {{ form.tags }}
-                {{ form.custom_tags }}
-
-                <!-- Selected tags container -->
-                <div id="selected-tags-container" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; min-height: 32px; align-items: center;">
-                    <span id="no-tags-placeholder" style="font-size: 0.85rem; color: var(--color-muted); font-style: italic;">No tags selected yet. Type below or click a suggestion.</span>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: start; margin-bottom: 12px;">
+                    <div>
+                        {{ form.tag }}
+                        <div style="font-size: 0.75rem; color: var(--color-muted); margin-top: 4px;">Choose the primary tag / beverage type for this item.</div>
+                    </div>
+                    <div>
+                        <!-- Tag input & Quick Add row -->
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <input type="text" id="tag-input-field" class="form-control" placeholder="New tag name (e.g. Dark Rum)..." autocomplete="off">
+                            <button type="button" id="btn-add-tag" class="button button-secondary" data-quick-add-url="{% url 'bar:quick_add_tag' %}" style="white-space: nowrap;">+ Quick Add Tag</button>
+                        </div>
+                    </div>
                 </div>
+                {{ form.custom_tag }}
 
-                <!-- Tag input & Quick Add row -->
-                <div style="display: flex; gap: 8px; align-items: center; max-width: 520px; margin-bottom: 12px;">
-                    <input type="text" id="tag-input-field" class="form-control" placeholder="Type tag name (e.g. Dark Rum) and press Enter..." autocomplete="off">
-                    <button type="button" id="btn-add-tag" class="button button-secondary" data-quick-add-url="{% url 'bar:quick_add_tag' %}" style="white-space: nowrap;">+ Quick Add Tag</button>
+                <!-- Selected tag badge preview -->
+                <div id="selected-tag-container" style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; min-height: 32px;">
+                    <span id="no-tag-placeholder" style="font-size: 0.85rem; color: var(--color-muted); font-style: italic;">No tag assigned yet (Untagged). Select from dropdown or click a suggestion below.</span>
                 </div>
 
                 <!-- Suggestions / Existing tags pills -->
                 <div style="margin-top: 6px;">
                     <span style="font-size: 0.75rem; color: var(--color-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 8px;">
-                        Quick Tag Suggestions (Click to toggle):
+                        Quick Tag Presets & Suggestions (Click to set):
                     </span>
                     <div id="quick-tag-suggestions" style="display: flex; flex-wrap: wrap; gap: 6px;">
                         {% for tag in all_tags %}
@@ -108,7 +114,7 @@ Enter stock number, description, stock quantities, single & case cost pricing, s
                         {% endfor %}
                     </div>
                 </div>
-                {% if form.tags.errors %}<div class="form-error">{{ form.tags.errors }}</div>{% endif %}
+                {% if form.tag.errors %}<div class="form-error">{{ form.tag.errors }}</div>{% endif %}
             </div>
         </div>
 
@@ -370,10 +376,9 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
-    // Interactive Tag Manager for Bar Item Types
-    const tagsSelect = document.getElementById("id_tags");
-    const selectedTagsContainer = document.getElementById("selected-tags-container");
-    const noTagsPlaceholder = document.getElementById("no-tags-placeholder");
+    // Single Tag Manager for Bar Item Type
+    const tagSelect = document.getElementById("id_tag");
+    const selectedTagContainer = document.getElementById("selected-tag-container");
     const tagInputField = document.getElementById("tag-input-field");
     const btnAddTag = document.getElementById("btn-add-tag");
     const quickTagSuggestions = document.getElementById("quick-tag-suggestions");
@@ -404,48 +409,40 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
-    function getSelectedTags() {
-        if (!tagsSelect) return [];
-        const result = [];
-        Array.from(tagsSelect.options).forEach(opt => {
-            if (opt.selected) {
-                result.push({ id: opt.value, name: opt.textContent.trim() });
-            }
-        });
-        return result;
-    }
+    function renderTagDisplay() {
+        if (!selectedTagContainer || !tagSelect) return;
+        selectedTagContainer.innerHTML = "";
 
-    function renderTagBadges() {
-        if (!selectedTagsContainer || !tagsSelect) return;
-        const selectedTags = getSelectedTags();
-        selectedTagsContainer.innerHTML = "";
+        const selectedIndex = tagSelect.selectedIndex;
+        const selectedValue = tagSelect.value;
+        const selectedText = (selectedIndex >= 0 && selectedValue) ? tagSelect.options[selectedIndex].text.trim() : "";
 
-        if (selectedTags.length === 0) {
-            if (noTagsPlaceholder) {
-                selectedTagsContainer.appendChild(noTagsPlaceholder);
-            }
+        if (!selectedValue || !selectedText) {
+            const placeholder = document.createElement("span");
+            placeholder.id = "no-tag-placeholder";
+            placeholder.style.cssText = "font-size: 0.85rem; color: var(--color-muted); font-style: italic;";
+            placeholder.textContent = "No tag assigned yet (Untagged). Select above or click a suggestion below.";
+            selectedTagContainer.appendChild(placeholder);
         } else {
-            selectedTags.forEach(tag => {
-                const badge = document.createElement("span");
-                badge.className = "badge badge-accent";
-                badge.style.cssText = "font-size: 0.85rem; padding: 5px 10px; display: inline-flex; align-items: center; gap: 6px; border-radius: 16px; font-weight: 600;";
-                badge.innerHTML = `<span>🏷️ ${tag.name}</span> <button type="button" data-tag-id="${tag.id}" style="background: none; border: none; color: inherit; cursor: pointer; font-size: 0.9rem; line-height: 1; padding: 0; margin-left: 4px;" title="Remove tag">&times;</button>`;
-                
-                const removeBtn = badge.querySelector("button");
-                removeBtn.addEventListener("click", function() {
-                    removeTagById(tag.id);
-                });
-
-                selectedTagsContainer.appendChild(badge);
+            const badge = document.createElement("span");
+            badge.className = "badge badge-accent";
+            badge.style.cssText = "font-size: 0.9rem; padding: 6px 12px; display: inline-flex; align-items: center; gap: 8px; border-radius: 16px; font-weight: 600;";
+            badge.innerHTML = `<span>🏷️ Selected Tag: <strong>${selectedText}</strong></span> <button type="button" style="background: none; border: none; color: inherit; cursor: pointer; font-size: 1rem; line-height: 1; padding: 0; margin-left: 4px;" title="Clear Tag / Untag">&times;</button>`;
+            
+            const clearBtn = badge.querySelector("button");
+            clearBtn.addEventListener("click", function() {
+                tagSelect.value = "";
+                renderTagDisplay();
             });
+
+            selectedTagContainer.appendChild(badge);
         }
 
-        // Highlight suggestions if currently active
-        const selectedNames = new Set(selectedTags.map(t => t.name.toLowerCase()));
+        // Highlight matching suggestion button
         if (quickTagSuggestions) {
             quickTagSuggestions.querySelectorAll('.tag-suggestion-btn').forEach(btn => {
                 const btnName = (btn.dataset.tagName || '').toLowerCase();
-                if (selectedNames.has(btnName)) {
+                if (selectedText && btnName === selectedText.toLowerCase()) {
                     btn.classList.remove('button-secondary');
                     btn.classList.add('button-primary');
                     btn.textContent = '✓ ' + btn.dataset.tagName;
@@ -458,37 +455,31 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }
 
-    function removeTagById(tagId) {
-        if (!tagsSelect) return;
-        Array.from(tagsSelect.options).forEach(opt => {
-            if (opt.value === String(tagId)) {
-                opt.selected = false;
-            }
-        });
-        renderTagBadges();
+    if (tagSelect) {
+        tagSelect.addEventListener("change", renderTagDisplay);
     }
 
-    function addOrSelectTag(tagName, tagId = null) {
-        if (!tagName) return;
+    function setSingleTag(tagName, tagId = null) {
+        if (!tagName) return Promise.resolve();
         tagName = tagName.trim();
-        if (!tagName) return;
+        if (!tagName) return Promise.resolve();
 
-        // Check if tag option already exists in select
+        // Check if option already exists in dropdown
         let option = null;
         if (tagId) {
-            option = Array.from(tagsSelect.options).find(o => o.value === String(tagId));
+            option = Array.from(tagSelect.options).find(o => o.value === String(tagId));
         }
         if (!option) {
-            option = Array.from(tagsSelect.options).find(o => o.textContent.trim().toLowerCase() === tagName.toLowerCase());
+            option = Array.from(tagSelect.options).find(o => o.textContent.trim().toLowerCase() === tagName.toLowerCase());
         }
 
         if (option) {
-            option.selected = true;
-            renderTagBadges();
+            tagSelect.value = option.value;
+            renderTagDisplay();
             return Promise.resolve();
         }
 
-        // If tag needs to be created on server
+        // If tag needs to be created on server via quick-add endpoint
         const quickAddUrl = btnAddTag ? btnAddTag.dataset.quickAddUrl : '/bar/tags/quick-add/';
         const formData = new FormData();
         formData.append("name", tagName);
@@ -505,18 +496,21 @@ document.addEventListener("DOMContentLoaded", function() {
         .then(data => {
             if (data.id) {
                 const newOpt = new Option(data.name, data.id, true, true);
-                tagsSelect.add(newOpt);
-                renderTagBadges();
+                tagSelect.add(newOpt);
+                tagSelect.value = data.id;
+                renderTagDisplay();
             } else if (data.error) {
                 alert(data.error);
             }
         })
         .catch(err => {
             console.error("Error adding tag:", err);
-            // Fallback: add to select as custom tag
+            const customTagInput = document.getElementById("id_custom_tag");
+            if (customTagInput) customTagInput.value = tagName;
             const newOpt = new Option(tagName, tagName, true, true);
-            tagsSelect.add(newOpt);
-            renderTagBadges();
+            tagSelect.add(newOpt);
+            tagSelect.value = tagName;
+            renderTagDisplay();
         });
     }
 
@@ -527,14 +521,15 @@ document.addEventListener("DOMContentLoaded", function() {
             const tagName = btn.dataset.tagName;
             const tagId = btn.dataset.tagId;
 
-            const selectedTags = getSelectedTags();
-            const isSelected = selectedTags.some(t => t.name.toLowerCase() === tagName.toLowerCase());
+            const selectedIndex = tagSelect ? tagSelect.selectedIndex : -1;
+            const selectedText = (selectedIndex >= 0 && tagSelect.value) ? tagSelect.options[selectedIndex].text.trim() : "";
 
-            if (isSelected) {
-                const found = selectedTags.find(t => t.name.toLowerCase() === tagName.toLowerCase());
-                if (found) removeTagById(found.id);
+            if (selectedText.toLowerCase() === tagName.toLowerCase()) {
+                // Toggle off
+                tagSelect.value = "";
+                renderTagDisplay();
             } else {
-                addOrSelectTag(tagName, tagId);
+                setSingleTag(tagName, tagId);
             }
         });
     }
@@ -544,10 +539,9 @@ document.addEventListener("DOMContentLoaded", function() {
             const val = tagInputField.value.trim();
             if (!val) return;
             btnAddTag.disabled = true;
-            addOrSelectTag(val).finally(() => {
+            setSingleTag(val).finally(() => {
                 tagInputField.value = "";
                 btnAddTag.disabled = false;
-                tagInputField.focus();
             });
         });
 
@@ -559,8 +553,8 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
-    // Initial render of existing tags on form load
-    renderTagBadges();
+    // Initial render of tag on form load
+    renderTagDisplay();
 });
 </script>
 {% endblock %}

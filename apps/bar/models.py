@@ -87,12 +87,14 @@ class BarInventoryItem(models.Model):
         verbose_name="Beverage Class / Tier",
         help_text="Class tier if sold by class: Call, Well, Top, Domestic, or Import"
     )
-    tags = models.ManyToManyField(
+    tag = models.ForeignKey(
         'BarItemTag',
+        on_delete=models.SET_NULL,
         blank=True,
+        null=True,
         related_name='bar_items',
-        verbose_name="Types / Tags",
-        help_text="Tag-style types (e.g. Whisky, Rum, Dark Rum, Bourbon, Tequila, Vodka, IPA)"
+        verbose_name="Type / Tag",
+        help_text="Single tag-style type (e.g. Whisky, Rum, Dark Rum, Bourbon, Tequila, Vodka, IPA)"
     )
     on_hand = models.DecimalField(
         max_digits=10,
