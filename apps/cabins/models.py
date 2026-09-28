@@ -46,15 +46,16 @@ class Cabin(models.Model):
 
     sort_order = models.PositiveIntegerField(
         default=0,
-        help_text="Controls display order in cabin lists and reservation grids.",
+        help_text="Secondary display order in cabin lists and reservation grids after capacity.",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["sort_order", "name"]
+        ordering = ["capacity", "sort_order", "name"]
         indexes = [
+            models.Index(fields=["capacity"]),
             models.Index(fields=["name"]),
             models.Index(fields=["cabin_number"]),
             models.Index(fields=["status"]),

@@ -35,16 +35,19 @@ class ClientAdmin(admin.ModelAdmin):
     list_display = [
         "full_name",
         "preferred_name",
-        "middle_name",
         "client_type",
+        "is_rider",
         "riding_level",
+        "height",
+        "weight",
         "email",
         "phone",
         "is_active",
     ]
     list_filter = [
-        "client_type",
+        "is_rider",
         "riding_level",
+        "client_type",
         "is_active",
     ]
     search_fields = [
@@ -55,6 +58,55 @@ class ClientAdmin(admin.ModelAdmin):
         "email",
         "phone",
         "alternate_phone",
+        "height",
+        "weight",
+        "rider_notes",
+    ]
+    fieldsets = [
+        (
+            "Personal Information",
+            {
+                "fields": [
+                    ("first_name", "middle_name", "last_name"),
+                    "preferred_name",
+                    "date_of_birth",
+                    "client_type",
+                    "years_return",
+                    "is_active",
+                ]
+            },
+        ),
+        (
+            "Rider & Physical Information",
+            {
+                "fields": [
+                    ("is_rider", "riding_level"),
+                    ("height", "weight"),
+                    "saddle_preference",
+                    "rider_notes",
+                ],
+                "description": "Required physical and riding details for horse and saddle assignments.",
+            },
+        ),
+        (
+            "Contact Information",
+            {
+                "fields": [
+                    "email",
+                    ("phone", "alternate_phone"),
+                ]
+            },
+        ),
+        (
+            "Notes & Preferences",
+            {
+                "fields": [
+                    "dietary_notes",
+                    "medical_notes",
+                    "general_notes",
+                ]
+            },
+        ),
     ]
     ordering = ["last_name", "first_name"]
     inlines = [ClientNoteInline]

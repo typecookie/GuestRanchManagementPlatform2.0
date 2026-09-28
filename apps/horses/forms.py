@@ -1,12 +1,22 @@
 from django import forms
-from .models import Horse, Saddle, SaddleMaintenanceLog, MedicalRecord, MedicalCareStep
+from .models import Horse, Pasture, Saddle, SaddleMaintenanceLog, MedicalRecord, MedicalCareStep
+
+class PastureForm(forms.ModelForm):
+    class Meta:
+        model = Pasture
+        fields = ['name', 'description', 'display_order']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. North Pasture'}),
+            'description': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3, 'placeholder': 'Acreage, water access, terrain notes...'}),
+            'display_order': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': '0'}),
+        }
 
 class HorseForm(forms.ModelForm):
     class Meta:
         model = Horse
         fields = [
             'name', 'breed', 'color', 'birth_year', 
-            'gender', 'status', 'notes', 'medical_notes'
+            'gender', 'status', 'pasture', 'notes', 'medical_notes'
         ]
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. Spirit'}),
@@ -15,9 +25,14 @@ class HorseForm(forms.ModelForm):
             'birth_year': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'YYYY'}),
             'gender': forms.Select(attrs={'class': 'form-select'}),
             'status': forms.Select(attrs={'class': 'form-select'}),
+            'pasture': forms.Select(attrs={'class': 'form-select'}),
             'notes': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3}),
             'medical_notes': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3}),
         }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['pasture'].empty_label = "Unassigned / Barn"
 
 class SaddleForm(forms.ModelForm):
     class Meta:

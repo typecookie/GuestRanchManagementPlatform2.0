@@ -11,39 +11,132 @@ Weekly office dashboard for guest assignments, reservation cleanup, and reports.
 {% endblock %}
 
 {% block page_actions %}
+<a href="{% url 'reservations:operating_dates_list' %}" class="button button-secondary">⚙ Operating Dates</a>
 <a href="{% url 'clients:group_builder' %}" class="button button-primary">+ Create Both (Group Builder)</a>
 <a href="{% url 'clients:group_builder' %}?mode=household" class="button button-secondary">+ Create Household</a>
 <a href="{% url 'clients:group_builder' %}?mode=travel_group" class="button button-secondary">+ Create Travel Group</a>
 <a href="{% url 'ranch:ranch_operations' %}" class="button button-secondary">Ranch Operations</a>
-<a href="{% url 'reservations:reservation_grid' %}?year={{ week_start.year }}&month={{ week_start.month }}" class="button button-secondary">Reservation Grid</a>
+<a href="{% url 'reservations:reservation_grid' %}?year={{ week_start.year }}&month={{ week_start.month }}{% if current_season %}&season={{ current_season.pk }}{% endif %}" class="button button-secondary">Reservation Grid</a>
 {% endblock %}
 
 {% block content %}
+<div class="season-grid-banner">
+    <div class="season-banner-info" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <label for="office-season-select" style="font-weight: 800; color: var(--color-text); font-size: 0.85rem; margin: 0; white-space: nowrap;">Operating Season:</label>
+        <select
+            id="office-season-select"
+            class="form-select"
+            style="font-weight: 600; font-size: 0.85rem; padding: 4px 10px; height: 34px; min-width: 230px;"
+            onchange="if(this.value) window.location.href=this.value;"
+        >
+            {% if categorized_seasons.current_and_upcoming %}
+                <optgroup label="Current &amp; Upcoming Seasons">
+                    {% for s in categorized_seasons.current_and_upcoming %}
+                        <option
+                            value="{% url 'ranch:office_dashboard' %}?season={{ s.pk }}{% if view_mode == 'month' %}&view=month&year={{ target_year }}&month={{ target_month }}{% endif %}{% if request.GET.dept %}&dept={{ request.GET.dept }}{% endif %}"
+                            {% if current_season and current_season.pk == s.pk %}selected{% endif %}
+                        >
+                            {{ s.name }} ({{ s.status_label }}) · {{ s.start_date|date:"M j" }} – {{ s.end_date|date:"M j, Y" }}
+                        </option>
+                    {% endfor %}
+                </optgroup>
+            {% endif %}
+            {% if categorized_seasons.prior_seasons %}
+                <optgroup label="Prior Seasons">
+                    {% for s in categorized_seasons.prior_seasons %}
+                        <option
+                            value="{% url 'ranch:office_dashboard' %}?season={{ s.pk }}{% if view_mode == 'month' %}&view=month&year={{ target_year }}&month={{ target_month }}{% endif %}{% if request.GET.dept %}&dept={{ request.GET.dept }}{% endif %}"
+                            {% if current_season and current_season.pk == s.pk %}selected{% endif %}
+                        >
+                            {{ s.name }} (Prior Season) · {{ s.start_date|date:"M j" }} – {{ s.end_date|date:"M j, Y" }}
+                        </option>
+                    {% endfor %}
+                </optgroup>
+            {% endif %}
+            {% if not categorized_seasons.current_and_upcoming and not categorized_seasons.prior_seasons %}
+                <option value="{% url 'ranch:office_dashboard' %}{% if view_mode == 'month' %}?view=month&year={{ target_year }}&month={{ target_month }}{% endif %}{% if request.GET.dept %}{% if view_mode == 'month' %}&{% else %}?{% endif %}dept={{ request.GET.dept }}{% endif %}">Summer Season {{ today.year }} (Default)</option>
+            {% endif %}
+        </select>
+
+        {% if view_mode == 'month' %}
+            {% if is_month_open %}
+                <span class="badge badge-success" style="font-size: 0.75rem;">Open Month</span>
+            {% else %}
+                <span class="badge badge-warning" style="font-size: 0.75rem;">Off-Season Month</span>
+            {% endif %}
+        {% else %}
+            {% if is_week_open %}
+                <span class="badge badge-success" style="font-size: 0.75rem;">Open Week</span>
+            {% else %}
+                <span class="badge badge-warning" style="font-size: 0.75rem;">Off-Season Week</span>
+            {% endif %}
+        {% endif %}
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+        <a href="{% url 'reservations:reservation_grid' %}{% if current_season %}?season={{ current_season.pk }}{% endif %}" class="button button-small button-secondary">
+            📅 Reservation Grid
+        </a>
+        <a href="{% url 'reservations:operating_dates_list' %}" class="button button-small button-secondary">
+            ⚙ Operating Dates
+        </a>
+    </div>
+</div>
+
 <div class="page-toolbar">
     <div class="page-toolbar-main">
-        <a
-            href="{% url 'ranch:office_dashboard' %}?week={{ previous_week|date:'Y-m-d' }}"
-            class="button button-secondary"
-        >
-            ← Previous Week
-        </a>
+        {% if view_mode == 'month' %}
+            <a
+                href="{% url 'ranch:office_dashboard' %}?view=month&year={{ previous_month_year }}&month={{ previous_month_month }}{% if current_season %}&season={{ current_season.pk }}{% endif %}{% if request.GET.dept %}&dept={{ request.GET.dept }}{% endif %}"
+                class="button button-secondary"
+            >
+                ← Previous Month
+            </a>
 
-        <div class="week-heading">
-            <strong>Week of {{ week_start|date:"M j, Y" }}</strong>
-            <span>{{ week_start|date:"M j" }} to {{ week_end|date:"M j, Y" }}</span>
-        </div>
+            <div class="week-heading">
+                <strong>Month of {{ month_start|date:"F Y" }}</strong>
+                <span>{{ month_start|date:"M 1" }} to {{ month_end_display|date:"M j, Y" }}</span>
+            </div>
 
-        <a
-            href="{% url 'ranch:office_dashboard' %}?week={{ next_week|date:'Y-m-d' }}"
-            class="button button-secondary"
-        >
-            Next Week →
-        </a>
+            <a
+                href="{% url 'ranch:office_dashboard' %}?view=month&year={{ next_month_year }}&month={{ next_month_month }}{% if current_season %}&season={{ current_season.pk }}{% endif %}{% if request.GET.dept %}&dept={{ request.GET.dept }}{% endif %}"
+                class="button button-secondary"
+            >
+                Next Month →
+            </a>
+        {% else %}
+            <a
+                href="{% url 'ranch:office_dashboard' %}?week={{ previous_week|date:'Y-m-d' }}{% if current_season %}&season={{ current_season.pk }}{% endif %}{% if request.GET.dept %}&dept={{ request.GET.dept }}{% endif %}"
+                class="button button-secondary"
+            >
+                ← Previous Week
+            </a>
+
+            <div class="week-heading">
+                <strong>Week of {{ week_start|date:"M j, Y" }}</strong>
+                <span>{{ week_start|date:"M j" }} to {{ week_end|date:"M j, Y" }}</span>
+            </div>
+
+            <a
+                href="{% url 'ranch:office_dashboard' %}?week={{ next_week|date:'Y-m-d' }}{% if current_season %}&season={{ current_season.pk }}{% endif %}{% if request.GET.dept %}&dept={{ request.GET.dept }}{% endif %}"
+                class="button button-secondary"
+            >
+                Next Week →
+            </a>
+        {% endif %}
     </div>
 
     <div class="page-toolbar-actions">
-        <a href="{% url 'clients:group_builder' %}" class="button button-secondary">Group &amp; Household Builder</a>
-        <a href="{% url 'ranch:office_dashboard' %}" class="button button-primary">Current Week</a>
+        <div style="display: inline-flex; border: 1px solid var(--color-border); border-radius: 8px; overflow: hidden; background: #ffffff;">
+            <a href="{% url 'ranch:office_dashboard' %}?view=week{% if current_season %}&season={{ current_season.pk }}{% endif %}{% if request.GET.dept %}&dept={{ request.GET.dept }}{% endif %}" class="button button-small {% if view_mode != 'month' %}button-primary{% else %}button-secondary{% endif %}" style="border: none; border-radius: 0;">By Week</a>
+            <a href="{% url 'ranch:office_dashboard' %}?view=month{% if current_season %}&season={{ current_season.pk }}{% endif %}{% if request.GET.dept %}&dept={{ request.GET.dept }}{% endif %}" class="button button-small {% if view_mode == 'month' %}button-primary{% else %}button-secondary{% endif %}" style="border: none; border-radius: 0;">By Month</a>
+        </div>
+        <a href="{% url 'clients:group_builder' %}{% if request.GET.dept %}?dept={{ request.GET.dept }}{% endif %}" class="button button-secondary">Group &amp; Household Builder</a>
+        {% if view_mode == 'month' %}
+            <a href="{% url 'ranch:office_dashboard' %}?view=month{% if current_season %}&season={{ current_season.pk }}{% endif %}{% if request.GET.dept %}&dept={{ request.GET.dept }}{% endif %}" class="button button-primary">Current Month</a>
+        {% else %}
+            <a href="{% url 'ranch:office_dashboard' %}{% if current_season %}&season={{ current_season.pk }}{% endif %}{% if request.GET.dept %}&dept={{ request.GET.dept }}{% endif %}" class="button button-primary">Current Week</a>
+        {% endif %}
     </div>
 </div>
 
@@ -201,305 +294,663 @@ Weekly office dashboard for guest assignments, reservation cleanup, and reports.
             {% endif %}
         </div>
 
-        <div class="detail-card task-card-carousel" id="horse-saddle-task-card">
-            <div class="section-heading">
+        <div class="detail-card task-card-carousel {% if view_mode == 'month' %}mode-months{% endif %}" id="horse-saddle-task-card">
+            <div class="section-heading" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
                 <div>
                     <h2>Horse &amp; Saddle Assignments &amp; Rider Readiness</h2>
-                    <p>Track rider readiness, missing physical info (height, weight, experience), and horse/saddle assignments week by week.</p>
+                    <p>Track rider readiness, missing physical info (height, weight, experience), and horse/saddle assignments week by week or by month.</p>
                 </div>
-                <div>
-                    <a href="{% url 'ranch:weekly_horse_assignment_report' %}?week={{ week_start|date:'Y-m-d' }}" class="button button-small button-secondary">
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <div class="card-mode-toggle" style="display: flex; gap: 2px; background: #f0ede8; padding: 2px; border-radius: 8px; border: 1px solid var(--color-border);">
+                        <button type="button" class="card-mode-btn {% if view_mode != 'month' %}is-active{% endif %}" data-target-mode="weeks">Weeks</button>
+                        <button type="button" class="card-mode-btn {% if view_mode == 'month' %}is-active{% endif %}" data-target-mode="months">Months</button>
+                    </div>
+                    <label for="horse-card-season-select" style="font-weight: 700; font-size: 0.85rem; margin: 0; color: var(--color-text); white-space: nowrap;">Season:</label>
+                    <select
+                        id="horse-card-season-select"
+                        class="form-select"
+                        style="font-weight: 600; font-size: 0.85rem; padding: 4px 10px; height: 34px; min-width: 190px;"
+                        onchange="if(this.value) window.location.href=this.value;"
+                    >
+                        {% if categorized_seasons.current_and_upcoming %}
+                            <optgroup label="Current &amp; Upcoming Seasons">
+                                {% for s in categorized_seasons.current_and_upcoming %}
+                                    <option
+                                        value="{% url 'ranch:office_dashboard' %}?season={{ s.pk }}{% if view_mode == 'month' %}&view=month&year={{ target_year }}&month={{ target_month }}{% endif %}{% if request.GET.dept %}&dept={{ request.GET.dept }}{% endif %}#horse-saddle-task-card"
+                                        {% if current_season and current_season.pk == s.pk %}selected{% endif %}
+                                    >
+                                        {{ s.name }} ({{ s.status_label }})
+                                    </option>
+                                {% endfor %}
+                            </optgroup>
+                        {% endif %}
+                        {% if categorized_seasons.prior_seasons %}
+                            <optgroup label="Prior Seasons">
+                                {% for s in categorized_seasons.prior_seasons %}
+                                    <option
+                                        value="{% url 'ranch:office_dashboard' %}?season={{ s.pk }}{% if view_mode == 'month' %}&view=month&year={{ target_year }}&month={{ target_month }}{% endif %}{% if request.GET.dept %}&dept={{ request.GET.dept }}{% endif %}#horse-saddle-task-card"
+                                        {% if current_season and current_season.pk == s.pk %}selected{% endif %}
+                                    >
+                                        {{ s.name }} (Prior Season)
+                                    </option>
+                                {% endfor %}
+                            </optgroup>
+                        {% endif %}
+                        {% if not categorized_seasons.current_and_upcoming and not categorized_seasons.prior_seasons %}
+                            <option value="{% url 'ranch:office_dashboard' %}{% if view_mode == 'month' %}?view=month&year={{ target_year }}&month={{ target_month }}{% endif %}{% if request.GET.dept %}{% if view_mode == 'month' %}&{% else %}?{% endif %}dept={{ request.GET.dept }}{% endif %}#horse-saddle-task-card">Summer Season {{ today.year }} (Default)</option>
+                        {% endif %}
+                    </select>
+                    <a href="{% url 'ranch:weekly_horse_assignment_report' %}?{% if view_mode == 'month' %}view=month&year={{ target_year }}&month={{ target_month }}{% else %}week={{ week_start|date:'Y-m-d' }}{% endif %}{% if current_season %}&season={{ current_season.pk }}{% endif %}{% if request.GET.dept %}&dept={{ request.GET.dept }}{% endif %}" class="button button-small button-secondary">
                         Horse Assignment Report
                     </a>
                 </div>
             </div>
 
-            <div class="card-week-toolbar">
-                <div class="card-week-nav-group">
-                    <button type="button" class="button button-small button-secondary card-week-prev">
-                        ← Prev Week
-                    </button>
-                    <div class="card-week-indicator">
-                        <span class="card-week-label">Week of {{ horse_saddle_weeks.0.week_start|date:"M j, Y" }}</span>
-                        <span class="card-week-dates">{{ horse_saddle_weeks.0.week_start|date:"M j" }} to {{ horse_saddle_weeks.0.week_end|date:"M j, Y" }}</span>
+            <!-- Weeks Carousel Section -->
+            <div class="carousel-section-weeks">
+                <div class="card-week-toolbar">
+                    <div class="card-week-nav-group">
+                        <button type="button" class="button button-small button-secondary card-week-prev">
+                            ← Prev Week
+                        </button>
+                        <div class="card-week-indicator">
+                            <span class="card-week-label">Week of {{ horse_saddle_weeks.0.week_start|date:"M j, Y" }}</span>
+                            <span class="card-week-dates">{{ horse_saddle_weeks.0.week_start|date:"M j" }} to {{ horse_saddle_weeks.0.week_end|date:"M j, Y" }}</span>
+                        </div>
+                        <button type="button" class="button button-small button-secondary card-week-next">
+                            Next Week →
+                        </button>
                     </div>
-                    <button type="button" class="button button-small button-secondary card-week-next">
-                        Next Week →
-                    </button>
+
+                    <div class="card-week-pills">
+                        {% for week_item in horse_saddle_weeks %}
+                            <button type="button" class="card-week-pill {% if forloop.first %}is-active{% endif %}" data-week-index="{{ forloop.counter0 }}">
+                                Week {{ forloop.counter }}
+                            </button>
+                        {% endfor %}
+                    </div>
                 </div>
 
-                <div class="card-week-pills">
+                <div class="card-week-panes">
                     {% for week_item in horse_saddle_weeks %}
-                        <button type="button" class="card-week-pill {% if forloop.first %}is-active{% endif %}" data-week-index="{{ forloop.counter0 }}">
-                            Week {{ forloop.counter }}
-                        </button>
+                        <div class="card-week-pane {% if forloop.first %}is-active{% endif %}"
+                             data-week-index="{{ forloop.counter0 }}"
+                             data-week-title="Week of {{ week_item.week_start|date:'M j, Y' }}"
+                             data-week-dates="{{ week_item.week_start|date:'M j' }} to {{ week_item.week_end|date:'M j, Y' }}">
+                            <div class="card-week-badges mb-3">
+                                <span class="badge badge-info">{{ week_item.total_riders }} Rider{{ week_item.total_riders|pluralize }}</span>
+                                {% if week_item.missing_horses > 0 %}
+                                    <span class="badge badge-danger">{{ week_item.missing_horses }} Unassigned Horse{{ week_item.missing_horses|pluralize }}</span>
+                                {% else %}
+                                    <span class="badge badge-success">{{ week_item.horses_assigned }}/{{ week_item.total_riders }} Horses Assigned</span>
+                                {% endif %}
+                                {% if week_item.missing_saddles > 0 %}
+                                    <span class="badge badge-danger">{{ week_item.missing_saddles }} Unassigned Saddle{{ week_item.missing_saddles|pluralize }}</span>
+                                {% else %}
+                                    <span class="badge badge-success">{{ week_item.saddles_assigned }}/{{ week_item.total_riders }} Saddles Assigned</span>
+                                {% endif %}
+                                {% if week_item.missing_info_count > 0 %}
+                                    <span class="badge badge-warning">{{ week_item.missing_info_count }} Missing Rider Info</span>
+                                {% else %}
+                                    <span class="badge badge-success">Rider Info Complete</span>
+                                {% endif %}
+                            </div>
+
+                            {% if week_item.has_records %}
+                                <div class="table-card">
+                                    <div class="table-responsive">
+                                        <table class="data-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Reservation / Cabin</th>
+                                                    <th>Guest</th>
+                                                    <th>Rider Status</th>
+                                                    <th>Horse</th>
+                                                    <th>Saddle</th>
+                                                    <th>Missing Info</th>
+                                                    <th class="text-right">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for r_item in week_item.reservations %}
+                                                    {% for guest in r_item.guests %}
+                                                        <tr>
+                                                            <td>
+                                                                <strong>{{ r_item.reservation.reservation_name }}</strong>
+                                                                {% if guest.cabin %}
+                                                                    <div class="text-muted small">Cabin: {{ guest.cabin.name }}</div>
+                                                                {% else %}
+                                                                    <div class="text-danger small font-weight-bold">Cabin: Unassigned</div>
+                                                                {% endif %}
+                                                            </td>
+                                                            <td>
+                                                                <strong>{{ guest.client.full_name }}</strong>
+                                                                {% if guest.age_at_stay %}
+                                                                    <span class="text-muted small">(Age {{ guest.age_at_stay }})</span>
+                                                                {% endif %}
+                                                            </td>
+                                                            <td>
+                                                                {% if guest.is_rider %}
+                                                                    <span class="badge badge-info">Rider ({{ guest.get_riding_experience_display }})</span>
+                                                                {% else %}
+                                                                    <span class="badge badge-light">Non-Rider</span>
+                                                                {% endif %}
+                                                            </td>
+                                                            <td>
+                                                                {% if guest.is_rider %}
+                                                                    {% if guest.horse %}
+                                                                        <span class="badge badge-success">{{ guest.horse.name }}</span>
+                                                                    {% else %}
+                                                                        <span class="badge badge-danger">Unassigned</span>
+                                                                    {% endif %}
+                                                                {% else %}
+                                                                    <span class="text-muted">—</span>
+                                                                {% endif %}
+                                                            </td>
+                                                            <td>
+                                                                {% if guest.is_rider %}
+                                                                    {% if guest.saddle %}
+                                                                        <span class="badge badge-success">#{{ guest.saddle.saddle_number }}{% if guest.saddle.rack_number %} ({{ guest.saddle.rack_number }}){% endif %}</span>
+                                                                    {% else %}
+                                                                        <span class="badge badge-danger">Unassigned</span>
+                                                                    {% endif %}
+                                                                {% else %}
+                                                                    <span class="text-muted">—</span>
+                                                                {% endif %}
+                                                            </td>
+                                                            <td>
+                                                                {% if guest.is_rider %}
+                                                                    {% if guest.missing_rider_fields %}
+                                                                        {% for field in guest.missing_rider_fields %}
+                                                                            <span class="badge badge-warning">Missing {{ field }}</span>
+                                                                        {% endfor %}
+                                                                    {% else %}
+                                                                        <span class="badge badge-success">Complete</span>
+                                                                    {% endif %}
+                                                                {% else %}
+                                                                    <span class="text-muted">N/A</span>
+                                                                {% endif %}
+                                                            </td>
+                                                            <td>
+                                                                <div class="table-actions">
+                                                                    <a href="{% url 'ranch:weekly_horse_assignment_report' %}?week={{ week_item.week_start|date:'Y-m-d' }}{% if current_season %}&season={{ current_season.pk }}{% endif %}{% if request.GET.dept %}&dept={{ request.GET.dept }}{% endif %}" class="button button-small button-secondary">
+                                                                        Assign
+                                                                    </a>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    {% endfor %}
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            {% else %}
+                                <p class="text-muted p-3 mb-0">No reservations or guests found for this week.</p>
+                            {% endif %}
+                        </div>
                     {% endfor %}
                 </div>
             </div>
 
-            <div class="card-week-panes">
-                {% for week_item in horse_saddle_weeks %}
-                    <div class="card-week-pane {% if forloop.first %}is-active{% endif %}"
-                         data-week-index="{{ forloop.counter0 }}"
-                         data-week-title="Week of {{ week_item.week_start|date:'M j, Y' }}"
-                         data-week-dates="{{ week_item.week_start|date:'M j' }} to {{ week_item.week_end|date:'M j, Y' }}">
-                        <div class="card-week-badges mb-3">
-                            <span class="badge badge-info">{{ week_item.total_riders }} Rider{{ week_item.total_riders|pluralize }}</span>
-                            {% if week_item.missing_horses > 0 %}
-                                <span class="badge badge-danger">{{ week_item.missing_horses }} Unassigned Horse{{ week_item.missing_horses|pluralize }}</span>
+            <!-- Months Carousel Section -->
+            <div class="carousel-section-months">
+                <div class="card-week-toolbar">
+                    <div class="card-week-nav-group">
+                        <button type="button" class="button button-small button-secondary card-week-prev">
+                            ← Prev Month
+                        </button>
+                        <div class="card-week-indicator">
+                            <span class="card-week-label">Month of {{ horse_saddle_months.0.month_label }}</span>
+                            <span class="card-week-dates">{{ horse_saddle_months.0.month_start|date:"M 1" }} to {{ horse_saddle_months.0.month_end|date:"M j, Y" }}</span>
+                        </div>
+                        <button type="button" class="button button-small button-secondary card-week-next">
+                            Next Month →
+                        </button>
+                    </div>
+
+                    <div class="card-week-pills">
+                        {% for month_item in horse_saddle_months %}
+                            <button type="button" class="card-week-pill {% if forloop.first %}is-active{% endif %}" data-week-index="{{ forloop.counter0 }}">
+                                {{ month_item.month_short }}
+                            </button>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="card-week-panes">
+                    {% for month_item in horse_saddle_months %}
+                        <div class="card-week-pane {% if forloop.first %}is-active{% endif %}"
+                             data-week-index="{{ forloop.counter0 }}"
+                             data-week-title="Month of {{ month_item.month_label }}"
+                             data-week-dates="{{ month_item.month_start|date:'M 1' }} to {{ month_item.month_end|date:'M j, Y' }}">
+                            <div class="card-week-badges mb-3">
+                                <span class="badge badge-info">{{ month_item.total_riders }} Rider{{ month_item.total_riders|pluralize }} in {{ month_item.month_name }}</span>
+                                {% if month_item.missing_horses > 0 %}
+                                    <span class="badge badge-danger">{{ month_item.missing_horses }} Unassigned Horse{{ month_item.missing_horses|pluralize }}</span>
+                                {% else %}
+                                    <span class="badge badge-success">{{ month_item.horses_assigned }}/{{ month_item.total_riders }} Horses Assigned</span>
+                                {% endif %}
+                                {% if month_item.missing_saddles > 0 %}
+                                    <span class="badge badge-danger">{{ month_item.missing_saddles }} Unassigned Saddle{{ month_item.missing_saddles|pluralize }}</span>
+                                {% else %}
+                                    <span class="badge badge-success">{{ month_item.saddles_assigned }}/{{ month_item.total_riders }} Saddles Assigned</span>
+                                {% endif %}
+                                {% if month_item.missing_info_count > 0 %}
+                                    <span class="badge badge-warning">{{ month_item.missing_info_count }} Missing Rider Info</span>
+                                {% else %}
+                                    <span class="badge badge-success">Rider Info Complete</span>
+                                {% endif %}
+                            </div>
+
+                            {% if month_item.has_records %}
+                                <div class="table-card">
+                                    <div class="table-responsive">
+                                        <table class="data-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Reservation / Cabin</th>
+                                                    <th>Guest</th>
+                                                    <th>Rider Status</th>
+                                                    <th>Horse</th>
+                                                    <th>Saddle</th>
+                                                    <th>Missing Info</th>
+                                                    <th class="text-right">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for r_item in month_item.reservations %}
+                                                    {% for guest in r_item.guests %}
+                                                        <tr>
+                                                            <td>
+                                                                <strong>{{ r_item.reservation.reservation_name }}</strong>
+                                                                <div class="text-muted small">
+                                                                    {{ r_item.reservation.arrival_date|date:"M j" }} – {{ r_item.reservation.departure_date|date:"M j" }} ·
+                                                                    {% if guest.cabin %}{{ guest.cabin.name }}{% else %}<span class="text-danger font-weight-bold">Cabin: Unassigned</span>{% endif %}
+                                                                </div>
+                                                            </td>
+                                                            <td>
+                                                                <strong>{{ guest.client.full_name }}</strong>
+                                                                {% if guest.age_at_stay %}
+                                                                    <span class="text-muted small">(Age {{ guest.age_at_stay }})</span>
+                                                                {% endif %}
+                                                            </td>
+                                                            <td>
+                                                                {% if guest.is_rider %}
+                                                                    <span class="badge badge-info">Rider ({{ guest.get_riding_experience_display }})</span>
+                                                                {% else %}
+                                                                    <span class="badge badge-light">Non-Rider</span>
+                                                                {% endif %}
+                                                            </td>
+                                                            <td>
+                                                                {% if guest.is_rider %}
+                                                                    {% if guest.horse %}
+                                                                        <span class="badge badge-success">{{ guest.horse.name }}</span>
+                                                                    {% else %}
+                                                                        <span class="badge badge-danger">Unassigned</span>
+                                                                    {% endif %}
+                                                                {% else %}
+                                                                    <span class="text-muted">—</span>
+                                                                {% endif %}
+                                                            </td>
+                                                            <td>
+                                                                {% if guest.is_rider %}
+                                                                    {% if guest.saddle %}
+                                                                        <span class="badge badge-success">#{{ guest.saddle.saddle_number }}{% if guest.saddle.rack_number %} ({{ guest.saddle.rack_number }}){% endif %}</span>
+                                                                    {% else %}
+                                                                        <span class="badge badge-danger">Unassigned</span>
+                                                                    {% endif %}
+                                                                {% else %}
+                                                                    <span class="text-muted">—</span>
+                                                                {% endif %}
+                                                            </td>
+                                                            <td>
+                                                                {% if guest.is_rider %}
+                                                                    {% if guest.missing_rider_fields %}
+                                                                        {% for field in guest.missing_rider_fields %}
+                                                                            <span class="badge badge-warning">Missing {{ field }}</span>
+                                                                        {% endfor %}
+                                                                    {% else %}
+                                                                        <span class="badge badge-success">Complete</span>
+                                                                    {% endif %}
+                                                                {% else %}
+                                                                    <span class="text-muted">N/A</span>
+                                                                {% endif %}
+                                                            </td>
+                                                            <td>
+                                                                <div class="table-actions">
+                                                                    <a href="{% url 'ranch:weekly_horse_assignment_report' %}?view=month&year={{ month_item.year }}&month={{ month_item.month }}{% if current_season %}&season={{ current_season.pk }}{% endif %}{% if request.GET.dept %}&dept={{ request.GET.dept }}{% endif %}" class="button button-small button-secondary">
+                                                                        Assign
+                                                                    </a>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    {% endfor %}
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
                             {% else %}
-                                <span class="badge badge-success">{{ week_item.horses_assigned }}/{{ week_item.total_riders }} Horses Assigned</span>
-                            {% endif %}
-                            {% if week_item.missing_saddles > 0 %}
-                                <span class="badge badge-danger">{{ week_item.missing_saddles }} Unassigned Saddle{{ week_item.missing_saddles|pluralize }}</span>
-                            {% else %}
-                                <span class="badge badge-success">{{ week_item.saddles_assigned }}/{{ week_item.total_riders }} Saddles Assigned</span>
-                            {% endif %}
-                            {% if week_item.missing_info_count > 0 %}
-                                <span class="badge badge-warning">{{ week_item.missing_info_count }} Missing Rider Info</span>
-                            {% else %}
-                                <span class="badge badge-success">Rider Info Complete</span>
+                                <p class="text-muted p-3 mb-0">No reservations or guests found for {{ month_item.month_name }}.</p>
                             {% endif %}
                         </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
 
-                        {% if week_item.has_records %}
-                            <div class="table-card">
-                                <div class="table-responsive">
-                                    <table class="data-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Reservation / Cabin</th>
-                                                <th>Guest</th>
-                                                <th>Rider Status</th>
-                                                <th>Horse</th>
-                                                <th>Saddle</th>
-                                                <th>Missing Info</th>
-                                                <th class="text-right">Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for r_item in week_item.reservations %}
-                                                {% for guest in r_item.guests %}
+        <div class="detail-card task-card-carousel {% if view_mode == 'month' %}mode-months{% endif %}" id="intake-task-card">
+            <div class="section-heading" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <div>
+                    <h2>Guest Intake: Release &amp; Deposit Status</h2>
+                    <p>Track liability release forms, deposit collection, and missing guest intake/contact info week by week or by month.</p>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <div class="card-mode-toggle" style="display: flex; gap: 2px; background: #f0ede8; padding: 2px; border-radius: 8px; border: 1px solid var(--color-border);">
+                        <button type="button" class="card-mode-btn {% if view_mode != 'month' %}is-active{% endif %}" data-target-mode="weeks">Weeks</button>
+                        <button type="button" class="card-mode-btn {% if view_mode == 'month' %}is-active{% endif %}" data-target-mode="months">Months</button>
+                    </div>
+                    <label for="intake-card-season-select" style="font-weight: 700; font-size: 0.85rem; margin: 0; color: var(--color-text); white-space: nowrap;">Season:</label>
+                    <select
+                        id="intake-card-season-select"
+                        class="form-select"
+                        style="font-weight: 600; font-size: 0.85rem; padding: 4px 10px; height: 34px; min-width: 190px;"
+                        onchange="if(this.value) window.location.href=this.value;"
+                    >
+                        {% if categorized_seasons.current_and_upcoming %}
+                            <optgroup label="Current &amp; Upcoming Seasons">
+                                {% for s in categorized_seasons.current_and_upcoming %}
+                                    <option
+                                        value="{% url 'ranch:office_dashboard' %}?season={{ s.pk }}{% if view_mode == 'month' %}&view=month&year={{ target_year }}&month={{ target_month }}{% endif %}{% if request.GET.dept %}&dept={{ request.GET.dept }}{% endif %}#intake-task-card"
+                                        {% if current_season and current_season.pk == s.pk %}selected{% endif %}
+                                    >
+                                        {{ s.name }} ({{ s.status_label }})
+                                    </option>
+                                {% endfor %}
+                            </optgroup>
+                        {% endif %}
+                        {% if categorized_seasons.prior_seasons %}
+                            <optgroup label="Prior Seasons">
+                                {% for s in categorized_seasons.prior_seasons %}
+                                    <option
+                                        value="{% url 'ranch:office_dashboard' %}?season={{ s.pk }}{% if view_mode == 'month' %}&view=month&year={{ target_year }}&month={{ target_month }}{% endif %}{% if request.GET.dept %}&dept={{ request.GET.dept }}{% endif %}#intake-task-card"
+                                        {% if current_season and current_season.pk == s.pk %}selected{% endif %}
+                                    >
+                                        {{ s.name }} (Prior Season)
+                                    </option>
+                                {% endfor %}
+                            </optgroup>
+                        {% endif %}
+                        {% if not categorized_seasons.current_and_upcoming and not categorized_seasons.prior_seasons %}
+                            <option value="{% url 'ranch:office_dashboard' %}{% if view_mode == 'month' %}?view=month&year={{ target_year }}&month={{ target_month }}{% endif %}{% if request.GET.dept %}{% if view_mode == 'month' %}&{% else %}?{% endif %}dept={{ request.GET.dept }}{% endif %}#intake-task-card">Summer Season {{ today.year }} (Default)</option>
+                        {% endif %}
+                    </select>
+                </div>
+            </div>
+
+            <!-- Weeks Carousel Section -->
+            <div class="carousel-section-weeks">
+                <div class="card-week-toolbar">
+                    <div class="card-week-nav-group">
+                        <button type="button" class="button button-small button-secondary card-week-prev">
+                            ← Prev Week
+                        </button>
+                        <div class="card-week-indicator">
+                            <span class="card-week-label">Week of {{ intake_weeks.0.week_start|date:"M j, Y" }}</span>
+                            <span class="card-week-dates">{{ intake_weeks.0.week_start|date:"M j" }} to {{ intake_weeks.0.week_end|date:"M j, Y" }}</span>
+                        </div>
+                        <button type="button" class="button button-small button-secondary card-week-next">
+                            Next Week →
+                        </button>
+                    </div>
+
+                    <div class="card-week-pills">
+                        {% for week_item in intake_weeks %}
+                            <button type="button" class="card-week-pill {% if forloop.first %}is-active{% endif %}" data-week-index="{{ forloop.counter0 }}">
+                                Week {{ forloop.counter }}
+                            </button>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="card-week-panes">
+                    {% for week_item in intake_weeks %}
+                        <div class="card-week-pane {% if forloop.first %}is-active{% endif %}"
+                             data-week-index="{{ forloop.counter0 }}"
+                             data-week-title="Week of {{ week_item.week_start|date:'M j, Y' }}"
+                             data-week-dates="{{ week_item.week_start|date:'M j' }} to {{ week_item.week_end|date:'M j, Y' }}">
+                            <div class="card-week-badges mb-3">
+                                <span class="badge badge-info">{{ week_item.total_reservations }} Reservation{{ week_item.total_reservations|pluralize }}</span>
+                                {% if week_item.deposits_needed > 0 %}
+                                    <span class="badge badge-danger">{{ week_item.deposits_needed }} Deposit{{ week_item.deposits_needed|pluralize }} Needed</span>
+                                {% else %}
+                                    <span class="badge badge-success">{{ week_item.deposits_received }}/{{ week_item.total_reservations }} Deposits Received</span>
+                                {% endif %}
+                                {% if week_item.total_unsigned_releases > 0 %}
+                                    <span class="badge badge-danger">{{ week_item.total_unsigned_releases }} Unsigned Release{{ week_item.total_unsigned_releases|pluralize }}</span>
+                                {% else %}
+                                    <span class="badge badge-success">{{ week_item.total_signed_releases }}/{{ week_item.total_guests }} Releases Signed</span>
+                                {% endif %}
+                            </div>
+
+                            {% if week_item.has_records %}
+                                <div class="table-card">
+                                    <div class="table-responsive">
+                                        <table class="data-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Reservation</th>
+                                                    <th>Contact / Household</th>
+                                                    <th>Dates</th>
+                                                    <th>Deposit Status</th>
+                                                    <th>Liability Release</th>
+                                                    <th>Missing Info</th>
+                                                    <th class="text-right">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for r_item in week_item.reservations %}
                                                     <tr>
                                                         <td>
                                                             <strong>{{ r_item.reservation.reservation_name }}</strong>
-                                                            {% if guest.cabin %}
-                                                                <div class="text-muted small">Cabin: {{ guest.cabin.name }}</div>
-                                                            {% else %}
-                                                                <div class="text-danger small font-weight-bold">Cabin: Unassigned</div>
-                                                            {% endif %}
+                                                            <div class="text-muted small">{{ r_item.total_guests }} guest{{ r_item.total_guests|pluralize }}</div>
                                                         </td>
                                                         <td>
-                                                            <strong>{{ guest.client.full_name }}</strong>
-                                                            {% if guest.age_at_stay %}
-                                                                <span class="text-muted small">(Age {{ guest.age_at_stay }})</span>
-                                                            {% endif %}
-                                                        </td>
-                                                        <td>
-                                                            {% if guest.is_rider %}
-                                                                <span class="badge badge-info">Rider ({{ guest.get_riding_experience_display }})</span>
-                                                            {% else %}
-                                                                <span class="badge badge-light">Non-Rider</span>
-                                                            {% endif %}
-                                                        </td>
-                                                        <td>
-                                                            {% if guest.is_rider %}
-                                                                {% if guest.horse %}
-                                                                    <span class="badge badge-success">{{ guest.horse.name }}</span>
-                                                                {% else %}
-                                                                    <span class="badge badge-danger">Unassigned</span>
-                                                                {% endif %}
+                                                            {% if r_item.reservation.primary_contact %}
+                                                                <div>{{ r_item.reservation.primary_contact.full_name }}</div>
+                                                                <div class="text-muted small">
+                                                                    {{ r_item.reservation.primary_contact.phone|default:r_item.reservation.primary_contact.email|default:"No direct contact" }}
+                                                                </div>
+                                                            {% elif r_item.reservation.household %}
+                                                                <div>{{ r_item.reservation.household.name }}</div>
                                                             {% else %}
                                                                 <span class="text-muted">—</span>
                                                             {% endif %}
                                                         </td>
                                                         <td>
-                                                            {% if guest.is_rider %}
-                                                                {% if guest.saddle %}
-                                                                    <span class="badge badge-success">#{{ guest.saddle.saddle_number }}{% if guest.saddle.rack_number %} ({{ guest.saddle.rack_number }}){% endif %}</span>
-                                                                {% else %}
-                                                                    <span class="badge badge-danger">Unassigned</span>
-                                                                {% endif %}
+                                                            {{ r_item.reservation.arrival_date|date:"M j" }} to {{ r_item.reservation.departure_date|date:"M j, Y" }}
+                                                        </td>
+                                                        <td>
+                                                            <span class="badge {{ r_item.deposit_badge }}">{{ r_item.deposit_label }}</span>
+                                                        </td>
+                                                        <td>
+                                                            {% if r_item.unsigned_count == 0 and r_item.total_guests > 0 %}
+                                                                <span class="badge badge-success">All Signed ({{ r_item.signed_count }}/{{ r_item.total_guests }})</span>
+                                                            {% elif r_item.signed_count > 0 %}
+                                                                <span class="badge badge-warning">{{ r_item.signed_count }}/{{ r_item.total_guests }} Signed</span>
+                                                                <div class="text-danger small mt-1">Unsigned: {% for g in r_item.unsigned_guests %}{{ g.client.full_name }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>
                                                             {% else %}
-                                                                <span class="text-muted">—</span>
+                                                                <span class="badge badge-danger">0/{{ r_item.total_guests }} Signed</span>
+                                                                <div class="text-danger small mt-1">Unsigned: {% for g in r_item.unsigned_guests %}{{ g.client.full_name }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>
                                                             {% endif %}
                                                         </td>
                                                         <td>
-                                                            {% if guest.is_rider %}
-                                                                {% if guest.missing_rider_fields %}
-                                                                    {% for field in guest.missing_rider_fields %}
-                                                                        <span class="badge badge-warning">Missing {{ field }}</span>
-                                                                    {% endfor %}
-                                                                {% else %}
-                                                                    <span class="badge badge-success">Complete</span>
-                                                                {% endif %}
+                                                            {% if r_item.missing_items %}
+                                                                {% for item in r_item.missing_items %}
+                                                                    <span class="badge badge-warning">{{ item }}</span>
+                                                                {% endfor %}
                                                             {% else %}
-                                                                <span class="text-muted">N/A</span>
+                                                                <span class="badge badge-success">Intake Complete</span>
                                                             {% endif %}
                                                         </td>
                                                         <td>
                                                             <div class="table-actions">
-                                                                <a href="{% url 'ranch:weekly_horse_assignment_report' %}?week={{ week_item.week_start|date:'Y-m-d' }}" class="button button-small button-secondary">
-                                                                    Assign
+                                                                <a href="{% url 'reservations:reservation_detail' r_item.reservation.pk %}" class="button button-small button-secondary">
+                                                                    View
                                                                 </a>
                                                             </div>
                                                         </td>
                                                     </tr>
                                                 {% endfor %}
-                                            {% endfor %}
-                                        </tbody>
-                                    </table>
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
-                            </div>
-                        {% else %}
-                            <p class="text-muted p-3 mb-0">No reservations or guests found for this week.</p>
-                        {% endif %}
-                    </div>
-                {% endfor %}
-            </div>
-        </div>
-
-        <div class="detail-card task-card-carousel" id="intake-task-card">
-            <div class="section-heading">
-                <div>
-                    <h2>Guest Intake: Release &amp; Deposit Status</h2>
-                    <p>Track liability release forms, deposit collection, and missing guest intake/contact info week by week.</p>
-                </div>
-            </div>
-
-            <div class="card-week-toolbar">
-                <div class="card-week-nav-group">
-                    <button type="button" class="button button-small button-secondary card-week-prev">
-                        ← Prev Week
-                    </button>
-                    <div class="card-week-indicator">
-                        <span class="card-week-label">Week of {{ intake_weeks.0.week_start|date:"M j, Y" }}</span>
-                        <span class="card-week-dates">{{ intake_weeks.0.week_start|date:"M j" }} to {{ intake_weeks.0.week_end|date:"M j, Y" }}</span>
-                    </div>
-                    <button type="button" class="button button-small button-secondary card-week-next">
-                        Next Week →
-                    </button>
-                </div>
-
-                <div class="card-week-pills">
-                    {% for week_item in intake_weeks %}
-                        <button type="button" class="card-week-pill {% if forloop.first %}is-active{% endif %}" data-week-index="{{ forloop.counter0 }}">
-                            Week {{ forloop.counter }}
-                        </button>
+                            {% else %}
+                                <p class="text-muted p-3 mb-0">No reservations found for this week.</p>
+                            {% endif %}
+                        </div>
                     {% endfor %}
                 </div>
             </div>
 
-            <div class="card-week-panes">
-                {% for week_item in intake_weeks %}
-                    <div class="card-week-pane {% if forloop.first %}is-active{% endif %}"
-                         data-week-index="{{ forloop.counter0 }}"
-                         data-week-title="Week of {{ week_item.week_start|date:'M j, Y' }}"
-                         data-week-dates="{{ week_item.week_start|date:'M j' }} to {{ week_item.week_end|date:'M j, Y' }}">
-                        <div class="card-week-badges mb-3">
-                            <span class="badge badge-info">{{ week_item.total_reservations }} Reservation{{ week_item.total_reservations|pluralize }}</span>
-                            {% if week_item.deposits_needed > 0 %}
-                                <span class="badge badge-danger">{{ week_item.deposits_needed }} Deposit{{ week_item.deposits_needed|pluralize }} Needed</span>
+            <!-- Months Carousel Section -->
+            <div class="carousel-section-months">
+                <div class="card-week-toolbar">
+                    <div class="card-week-nav-group">
+                        <button type="button" class="button button-small button-secondary card-week-prev">
+                            ← Prev Month
+                        </button>
+                        <div class="card-week-indicator">
+                            <span class="card-week-label">Month of {{ intake_months.0.month_label }}</span>
+                            <span class="card-week-dates">{{ intake_months.0.month_start|date:"M 1" }} to {{ intake_months.0.month_end|date:"M j, Y" }}</span>
+                        </div>
+                        <button type="button" class="button button-small button-secondary card-week-next">
+                            Next Month →
+                        </button>
+                    </div>
+
+                    <div class="card-week-pills">
+                        {% for month_item in intake_months %}
+                            <button type="button" class="card-week-pill {% if forloop.first %}is-active{% endif %}" data-week-index="{{ forloop.counter0 }}">
+                                {{ month_item.month_short }}
+                            </button>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="card-week-panes">
+                    {% for month_item in intake_months %}
+                        <div class="card-week-pane {% if forloop.first %}is-active{% endif %}"
+                             data-week-index="{{ forloop.counter0 }}"
+                             data-week-title="Month of {{ month_item.month_label }}"
+                             data-week-dates="{{ month_item.month_start|date:'M 1' }} to {{ month_item.month_end|date:'M j, Y' }}">
+                            <div class="card-week-badges mb-3">
+                                <span class="badge badge-info">{{ month_item.total_reservations }} Reservation{{ month_item.total_reservations|pluralize }} in {{ month_item.month_name }}</span>
+                                {% if month_item.deposits_needed > 0 %}
+                                    <span class="badge badge-danger">{{ month_item.deposits_needed }} Deposit{{ month_item.deposits_needed|pluralize }} Needed</span>
+                                {% else %}
+                                    <span class="badge badge-success">{{ month_item.deposits_received }}/{{ month_item.total_reservations }} Deposits Received</span>
+                                {% endif %}
+                                {% if month_item.total_unsigned_releases > 0 %}
+                                    <span class="badge badge-danger">{{ month_item.total_unsigned_releases }} Unsigned Release{{ month_item.total_unsigned_releases|pluralize }}</span>
+                                {% else %}
+                                    <span class="badge badge-success">{{ month_item.total_signed_releases }}/{{ month_item.total_guests }} Releases Signed</span>
+                                {% endif %}
+                            </div>
+
+                            {% if month_item.has_records %}
+                                <div class="table-card">
+                                    <div class="table-responsive">
+                                        <table class="data-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Reservation</th>
+                                                    <th>Contact / Household</th>
+                                                    <th>Dates</th>
+                                                    <th>Deposit Status</th>
+                                                    <th>Liability Release</th>
+                                                    <th>Missing Info</th>
+                                                    <th class="text-right">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for r_item in month_item.reservations %}
+                                                    <tr>
+                                                        <td>
+                                                            <strong>{{ r_item.reservation.reservation_name }}</strong>
+                                                            <div class="text-muted small">{{ r_item.total_guests }} guest{{ r_item.total_guests|pluralize }}</div>
+                                                        </td>
+                                                        <td>
+                                                            {% if r_item.reservation.primary_contact %}
+                                                                <div>{{ r_item.reservation.primary_contact.full_name }}</div>
+                                                                <div class="text-muted small">
+                                                                    {{ r_item.reservation.primary_contact.phone|default:r_item.reservation.primary_contact.email|default:"No direct contact" }}
+                                                                </div>
+                                                            {% elif r_item.reservation.household %}
+                                                                <div>{{ r_item.reservation.household.name }}</div>
+                                                            {% else %}
+                                                                <span class="text-muted">—</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            {{ r_item.reservation.arrival_date|date:"M j" }} to {{ r_item.reservation.departure_date|date:"M j, Y" }}
+                                                        </td>
+                                                        <td>
+                                                            <span class="badge {{ r_item.deposit_badge }}">{{ r_item.deposit_label }}</span>
+                                                        </td>
+                                                        <td>
+                                                            {% if r_item.unsigned_count == 0 and r_item.total_guests > 0 %}
+                                                                <span class="badge badge-success">All Signed ({{ r_item.signed_count }}/{{ r_item.total_guests }})</span>
+                                                            {% elif r_item.signed_count > 0 %}
+                                                                <span class="badge badge-warning">{{ r_item.signed_count }}/{{ r_item.total_guests }} Signed</span>
+                                                                <div class="text-danger small mt-1">Unsigned: {% for g in r_item.unsigned_guests %}{{ g.client.full_name }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>
+                                                            {% else %}
+                                                                <span class="badge badge-danger">0/{{ r_item.total_guests }} Signed</span>
+                                                                <div class="text-danger small mt-1">Unsigned: {% for g in r_item.unsigned_guests %}{{ g.client.full_name }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            {% if r_item.missing_items %}
+                                                                {% for item in r_item.missing_items %}
+                                                                    <span class="badge badge-warning">{{ item }}</span>
+                                                                {% endfor %}
+                                                            {% else %}
+                                                                <span class="badge badge-success">Intake Complete</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            <div class="table-actions">
+                                                                <a href="{% url 'reservations:reservation_detail' r_item.reservation.pk %}" class="button button-small button-secondary">
+                                                                    View
+                                                                </a>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
                             {% else %}
-                                <span class="badge badge-success">{{ week_item.deposits_received }}/{{ week_item.total_reservations }} Deposits Received</span>
-                            {% endif %}
-                            {% if week_item.total_unsigned_releases > 0 %}
-                                <span class="badge badge-danger">{{ week_item.total_unsigned_releases }} Unsigned Release{{ week_item.total_unsigned_releases|pluralize }}</span>
-                            {% else %}
-                                <span class="badge badge-success">{{ week_item.total_signed_releases }}/{{ week_item.total_guests }} Releases Signed</span>
+                                <p class="text-muted p-3 mb-0">No reservations found for {{ month_item.month_name }}.</p>
                             {% endif %}
                         </div>
-
-                        {% if week_item.has_records %}
-                            <div class="table-card">
-                                <div class="table-responsive">
-                                    <table class="data-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Reservation</th>
-                                                <th>Contact / Household</th>
-                                                <th>Dates</th>
-                                                <th>Deposit Status</th>
-                                                <th>Liability Release</th>
-                                                <th>Missing Info</th>
-                                                <th class="text-right">Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for r_item in week_item.reservations %}
-                                                <tr>
-                                                    <td>
-                                                        <strong>{{ r_item.reservation.reservation_name }}</strong>
-                                                        <div class="text-muted small">{{ r_item.total_guests }} guest{{ r_item.total_guests|pluralize }}</div>
-                                                    </td>
-                                                    <td>
-                                                        {% if r_item.reservation.primary_contact %}
-                                                            <div>{{ r_item.reservation.primary_contact.full_name }}</div>
-                                                            <div class="text-muted small">
-                                                                {{ r_item.reservation.primary_contact.phone|default:r_item.reservation.primary_contact.email|default:"No direct contact" }}
-                                                            </div>
-                                                        {% elif r_item.reservation.household %}
-                                                            <div>{{ r_item.reservation.household.name }}</div>
-                                                        {% else %}
-                                                            <span class="text-muted">—</span>
-                                                        {% endif %}
-                                                    </td>
-                                                    <td>
-                                                        {{ r_item.reservation.arrival_date|date:"M j" }} to {{ r_item.reservation.departure_date|date:"M j, Y" }}
-                                                    </td>
-                                                    <td>
-                                                        <span class="badge {{ r_item.deposit_badge }}">{{ r_item.deposit_label }}</span>
-                                                    </td>
-                                                    <td>
-                                                        {% if r_item.unsigned_count == 0 and r_item.total_guests > 0 %}
-                                                            <span class="badge badge-success">All Signed ({{ r_item.signed_count }}/{{ r_item.total_guests }})</span>
-                                                        {% elif r_item.signed_count > 0 %}
-                                                            <span class="badge badge-warning">{{ r_item.signed_count }}/{{ r_item.total_guests }} Signed</span>
-                                                            <div class="text-danger small mt-1">Unsigned: {% for g in r_item.unsigned_guests %}{{ g.client.full_name }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>
-                                                        {% else %}
-                                                            <span class="badge badge-danger">0/{{ r_item.total_guests }} Signed</span>
-                                                            <div class="text-danger small mt-1">Unsigned: {% for g in r_item.unsigned_guests %}{{ g.client.full_name }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>
-                                                        {% endif %}
-                                                    </td>
-                                                    <td>
-                                                        {% if r_item.missing_items %}
-                                                            {% for item in r_item.missing_items %}
-                                                                <span class="badge badge-warning">{{ item }}</span>
-                                                            {% endfor %}
-                                                        {% else %}
-                                                            <span class="badge badge-success">Intake Complete</span>
-                                                        {% endif %}
-                                                    </td>
-                                                    <td>
-                                                        <div class="table-actions">
-                                                            <a href="{% url 'reservations:reservation_detail' r_item.reservation.pk %}" class="button button-small button-secondary">
-                                                                View
-                                                            </a>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            {% endfor %}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        {% else %}
-                            <p class="text-muted p-3 mb-0">No reservations found for this week.</p>
-                        {% endif %}
-                    </div>
-                {% endfor %}
+                    {% endfor %}
+                </div>
             </div>
         </div>
 
         <div class="detail-card">
             <div class="section-heading">
                 <div>
-                    <h2>Reservations This Week</h2>
-                    <p>All active reservations overlapping this Sunday-to-Sunday week.</p>
+                    <h2>{% if view_mode == 'month' %}Reservations for {{ month_start|date:"F Y" }}{% else %}Reservations This Week{% endif %}</h2>
+                    <p>{% if view_mode == 'month' %}All active reservations overlapping {{ month_start|date:"M 1" }} to {{ month_end_display|date:"M j, Y" }}.{% else %}All active reservations overlapping this Sunday-to-Sunday week.{% endif %}</p>
                 </div>
             </div>
 
-            {% if reservations_this_week %}
+            {% if reservations_period %}
                 <div class="table-card">
                     <div class="table-responsive">
                         <table class="data-table">
@@ -515,7 +966,7 @@ Weekly office dashboard for guest assignments, reservation cleanup, and reports.
                             </thead>
 
                             <tbody>
-                                {% for reservation in reservations_this_week %}
+                                {% for reservation in reservations_period %}
                                     <tr>
                                         <td><strong>{{ reservation.reservation_name }}</strong></td>
                                         <td>{{ reservation.get_reservation_type_display }}</td>
@@ -549,23 +1000,23 @@ Weekly office dashboard for guest assignments, reservation cleanup, and reports.
                     </div>
                 </div>
             {% else %}
-                <p class="text-muted mb-0">No reservations found for this week.</p>
+                <p class="text-muted mb-0">No reservations found for this {% if view_mode == 'month' %}month{% else %}week{% endif %}.</p>
             {% endif %}
         </div>
     </section>
 
     <aside class="panel-stack">
         <div class="detail-card">
-            <h2>Weekly Reports</h2>
+            <h2>{% if view_mode == 'month' %}Monthly Reports{% else %}Weekly Reports{% endif %}</h2>
 
             <div class="quick-action-list">
-                <a href="{% url 'ranch:weekly_dining_guest_list_report' %}?week={{ week_start|date:'Y-m-d' }}" class="quick-action">Dining Hall Guest List</a>
-                <a href="{% url 'ranch:weekly_special_requests_report' %}?week={{ week_start|date:'Y-m-d' }}" class="quick-action">Special Needs Report</a>
-                <a href="{% url 'ranch:weekly_horse_assignment_report' %}?week={{ week_start|date:'Y-m-d' }}" class="quick-action">Horse Assignment Report</a>
+                <a href="{% url 'ranch:weekly_dining_guest_list_report' %}?{% if view_mode == 'month' %}view=month&year={{ target_year }}&month={{ target_month }}{% else %}week={{ week_start|date:'Y-m-d' }}{% endif %}{% if current_season %}&season={{ current_season.pk }}{% endif %}{% if request.GET.dept %}&dept={{ request.GET.dept }}{% endif %}" class="quick-action">Dining Hall Guest List</a>
+                <a href="{% url 'ranch:weekly_special_requests_report' %}?{% if view_mode == 'month' %}view=month&year={{ target_year }}&month={{ target_month }}{% else %}week={{ week_start|date:'Y-m-d' }}{% endif %}{% if current_season %}&season={{ current_season.pk }}{% endif %}{% if request.GET.dept %}&dept={{ request.GET.dept }}{% endif %}" class="quick-action">Special Needs Report</a>
+                <a href="{% url 'ranch:weekly_horse_assignment_report' %}?{% if view_mode == 'month' %}view=month&year={{ target_year }}&month={{ target_month }}{% else %}week={{ week_start|date:'Y-m-d' }}{% endif %}{% if current_season %}&season={{ current_season.pk }}{% endif %}{% if request.GET.dept %}&dept={{ request.GET.dept }}{% endif %}" class="quick-action">Horse Assignment Report</a>
             </div>
 
             <p class="text-muted">
-                Weekly report links will run for {{ week_start|date:"M j" }} to {{ week_end|date:"M j, Y" }}.
+                Report links will run for {% if view_mode == 'month' %}{{ month_start|date:"M 1" }} to {{ month_end_display|date:"M j, Y" }}{% else %}{{ week_start|date:"M j" }} to {{ week_end|date:"M j, Y" }}{% endif %}.
             </p>
         </div>
 
@@ -609,80 +1060,99 @@ document.addEventListener("DOMContentLoaded", function () {
     const carousels = document.querySelectorAll(".task-card-carousel");
 
     carousels.forEach(function (carousel) {
-        const panes = carousel.querySelectorAll(".card-week-pane");
-        const pills = carousel.querySelectorAll(".card-week-pill");
-        const prevBtn = carousel.querySelector(".card-week-prev");
-        const nextBtn = carousel.querySelector(".card-week-next");
-        const labelEl = carousel.querySelector(".card-week-label");
-        const datesEl = carousel.querySelector(".card-week-dates");
-        let currentIndex = 0;
-
-        function updateCarousel(index) {
-            if (index < 0) index = 0;
-            if (index >= panes.length) index = panes.length - 1;
-            currentIndex = index;
-
-            panes.forEach(function (pane, idx) {
-                if (idx === currentIndex) {
-                    pane.classList.add("is-active");
-                    if (labelEl && pane.dataset.weekTitle) {
-                        labelEl.textContent = pane.dataset.weekTitle;
-                    }
-                    if (datesEl && pane.dataset.weekDates) {
-                        datesEl.textContent = pane.dataset.weekDates;
-                    }
+        // Mode buttons: weeks vs months
+        const modeButtons = carousel.querySelectorAll(".card-mode-btn");
+        modeButtons.forEach(function (btn) {
+            btn.addEventListener("click", function (e) {
+                e.preventDefault();
+                const targetMode = btn.dataset.targetMode;
+                modeButtons.forEach(b => b.classList.remove("is-active"));
+                btn.classList.add("is-active");
+                if (targetMode === "months") {
+                    carousel.classList.add("mode-months");
                 } else {
-                    pane.classList.remove("is-active");
-                }
-            });
-
-            pills.forEach(function (pill, idx) {
-                if (idx === currentIndex) {
-                    pill.classList.add("is-active");
-                } else {
-                    pill.classList.remove("is-active");
-                }
-            });
-
-            if (prevBtn) {
-                prevBtn.disabled = (currentIndex === 0);
-                prevBtn.style.opacity = (currentIndex === 0) ? "0.5" : "1";
-                prevBtn.style.cursor = (currentIndex === 0) ? "not-allowed" : "pointer";
-            }
-
-            if (nextBtn) {
-                nextBtn.disabled = (currentIndex === panes.length - 1);
-                nextBtn.style.opacity = (currentIndex === panes.length - 1) ? "0.5" : "1";
-                nextBtn.style.cursor = (currentIndex === panes.length - 1) ? "not-allowed" : "pointer";
-            }
-        }
-
-        if (prevBtn) {
-            prevBtn.addEventListener("click", function (e) {
-                e.preventDefault();
-                updateCarousel(currentIndex - 1);
-            });
-        }
-
-        if (nextBtn) {
-            nextBtn.addEventListener("click", function (e) {
-                e.preventDefault();
-                updateCarousel(currentIndex + 1);
-            });
-        }
-
-        pills.forEach(function (pill) {
-            pill.addEventListener("click", function (e) {
-                e.preventDefault();
-                const targetIndex = parseInt(pill.dataset.weekIndex, 10);
-                if (!isNaN(targetIndex)) {
-                    updateCarousel(targetIndex);
+                    carousel.classList.remove("mode-months");
                 }
             });
         });
 
-        // Initialize state
-        updateCarousel(0);
+        // Initialize each carousel section (weeks & months)
+        const sections = carousel.querySelectorAll(".carousel-section-weeks, .carousel-section-months");
+        sections.forEach(function (section) {
+            const panes = section.querySelectorAll(".card-week-pane");
+            const pills = section.querySelectorAll(".card-week-pill");
+            const prevBtn = section.querySelector(".card-week-prev");
+            const nextBtn = section.querySelector(".card-week-next");
+            const labelEl = section.querySelector(".card-week-label");
+            const datesEl = section.querySelector(".card-week-dates");
+            let currentIndex = 0;
+
+            function updateCarousel(index) {
+                if (index < 0) index = 0;
+                if (index >= panes.length) index = panes.length - 1;
+                currentIndex = index;
+
+                panes.forEach(function (pane, idx) {
+                    if (idx === currentIndex) {
+                        pane.classList.add("is-active");
+                        if (labelEl && pane.dataset.weekTitle) {
+                            labelEl.textContent = pane.dataset.weekTitle;
+                        }
+                        if (datesEl && pane.dataset.weekDates) {
+                            datesEl.textContent = pane.dataset.weekDates;
+                        }
+                    } else {
+                        pane.classList.remove("is-active");
+                    }
+                });
+
+                pills.forEach(function (pill, idx) {
+                    if (idx === currentIndex) {
+                        pill.classList.add("is-active");
+                    } else {
+                        pill.classList.remove("is-active");
+                    }
+                });
+
+                if (prevBtn) {
+                    prevBtn.disabled = (currentIndex === 0);
+                    prevBtn.style.opacity = (currentIndex === 0) ? "0.5" : "1";
+                    prevBtn.style.cursor = (currentIndex === 0) ? "not-allowed" : "pointer";
+                }
+
+                if (nextBtn) {
+                    nextBtn.disabled = (currentIndex === panes.length - 1);
+                    nextBtn.style.opacity = (currentIndex === panes.length - 1) ? "0.5" : "1";
+                    nextBtn.style.cursor = (currentIndex === panes.length - 1) ? "not-allowed" : "pointer";
+                }
+            }
+
+            if (prevBtn) {
+                prevBtn.addEventListener("click", function (e) {
+                    e.preventDefault();
+                    updateCarousel(currentIndex - 1);
+                });
+            }
+
+            if (nextBtn) {
+                nextBtn.addEventListener("click", function (e) {
+                    e.preventDefault();
+                    updateCarousel(currentIndex + 1);
+                });
+            }
+
+            pills.forEach(function (pill) {
+                pill.addEventListener("click", function (e) {
+                    e.preventDefault();
+                    const targetIndex = parseInt(pill.dataset.weekIndex, 10);
+                    if (!isNaN(targetIndex)) {
+                        updateCarousel(targetIndex);
+                    }
+                });
+            });
+
+            updateCarousel(0);
+        });
     });
 });
 </script>

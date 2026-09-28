@@ -99,3 +99,28 @@ class CabinInventoryAndMaintenanceTests(TestCase):
         self.assertEqual(proj_resp.status_code, 200)
         self.assertContains(proj_resp, "Pine Ridge Cabin")
         self.assertContains(proj_resp, "LG AC Unit")
+
+
+class CabinOrderingTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(username="admin_order", password="password123", email="admin_order@ranch.local")
+        self.client = Client()
+        self.client.force_login(self.user)
+
+        self.c_large = Cabin.objects.create(name="Grand Lodge", capacity=10, sort_order=1)
+        self.c_small = Cabin.objects.create(name="Bunkhouse Solo", capacity=1, sort_order=3)
+        self.c_medium = Cabin.objects.create(name="Aspen Duet", capacity=4, sort_order=2)
+        self.c_small_b = Cabin.objects.create(name="Creekside Solo", capacity=1, sort_order=1)
+
+    def test_default_cabin_model_ordering_by_capacity(self):
+        cabins = list(Cabin.objects.all())
+        # Smallest capacity (1) should come first, ordered by sort_order / name among same capacity
+        expected = [self.c_small_b, self.c_small, self.c_medium, self.c_large]
+        self.assertEqual(cabins, expected)
+
+    def test_cabin_list_view_orders_by_capacity(self):
+        response = self.client.get(reverse("cabins:cabin_list"))
+        self.assertEqual(response.status_code, 200)
+        cabins_in_context = list(response.context["cabins"])
+        expected = [self.c_small_b, self.c_small, self.c_medium, self.c_large]
+        self.assertEqual(cabins_in_context, expected)

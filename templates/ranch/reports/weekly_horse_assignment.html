@@ -7,17 +7,34 @@
 {% block page_title %}Horse Assignments{% endblock %}
 
 {% block page_subtitle %}
-    Week of {{ week_start|date:"M j, Y" }} to {{ week_end|date:"M j, Y" }}
+    {% if view_mode == 'month' %}
+        Month of {{ month_start|date:"F Y" }} ({{ month_start|date:"M 1" }} to {{ month_end_display|date:"M j, Y" }})
+    {% else %}
+        Week of {{ week_start|date:"M j, Y" }} to {{ week_end|date:"M j, Y" }}
+    {% endif %}
 {% endblock %}
 
 {% block page_actions %}
     <div class="report-week-nav no-print">
-        <a href="?week={{ previous_week|date:'Y-m-d' }}" class="button button-secondary" title="Previous Week">
-            &larr; Prev Week
-        </a>
-        <a href="?week={{ next_week|date:'Y-m-d' }}" class="button button-secondary" title="Next Week">
-            Next Week &rarr;
-        </a>
+        {% if view_mode == 'month' %}
+            <a href="?view=month&year={{ previous_month_year }}&month={{ previous_month_month }}{% if current_season %}&season={{ current_season.pk }}{% endif %}{% if request.GET.dept %}&dept={{ request.GET.dept }}{% endif %}" class="button button-secondary" title="Previous Month">
+                &larr; Prev Month
+            </a>
+            <a href="?view=month&year={{ next_month_year }}&month={{ next_month_month }}{% if current_season %}&season={{ current_season.pk }}{% endif %}{% if request.GET.dept %}&dept={{ request.GET.dept }}{% endif %}" class="button button-secondary" title="Next Month">
+                Next Month &rarr;
+            </a>
+        {% else %}
+            <a href="?week={{ previous_week|date:'Y-m-d' }}{% if current_season %}&season={{ current_season.pk }}{% endif %}{% if request.GET.dept %}&dept={{ request.GET.dept }}{% endif %}" class="button button-secondary" title="Previous Week">
+                &larr; Prev Week
+            </a>
+            <a href="?week={{ next_week|date:'Y-m-d' }}{% if current_season %}&season={{ current_season.pk }}{% endif %}{% if request.GET.dept %}&dept={{ request.GET.dept }}{% endif %}" class="button button-secondary" title="Next Week">
+                Next Week &rarr;
+            </a>
+        {% endif %}
+        <div style="display: inline-flex; border: 1px solid var(--color-border); border-radius: 8px; overflow: hidden; background: #ffffff;">
+            <a href="?view=week{% if current_season %}&season={{ current_season.pk }}{% endif %}{% if request.GET.dept %}&dept={{ request.GET.dept }}{% endif %}" class="button button-small {% if view_mode != 'month' %}button-primary{% else %}button-secondary{% endif %}" style="border: none; border-radius: 0;">By Week</a>
+            <a href="?view=month{% if current_season %}&season={{ current_season.pk }}{% endif %}{% if request.GET.dept %}&dept={{ request.GET.dept }}{% endif %}" class="button button-small {% if view_mode == 'month' %}button-primary{% else %}button-secondary{% endif %}" style="border: none; border-radius: 0;">By Month</a>
+        </div>
         <div style="display: flex; gap: 12px; align-items: center; background: rgba(255,255,255,0.5); padding: 8px 12px; border-radius: 12px; border: 1px solid var(--color-border);">
             <label style="display: flex; align-items: center; gap: 6px; font-weight: 800; cursor: pointer; font-size: 0.9rem;">
                 <input type="checkbox" id="toggle-past-horses" checked> Past Horses
@@ -29,7 +46,7 @@
         <button type="submit" form="bulk-assignment-form" class="button button-success">
             Save All Assignments
         </button>
-        <a href="{% url 'ranch:office_dashboard' %}?week={{ week_start|date:'Y-m-d' }}" class="button button-secondary">
+        <a href="{% url 'ranch:office_dashboard' %}?{% if view_mode == 'month' %}view=month&year={{ target_year }}&month={{ target_month }}{% else %}week={{ week_start|date:'Y-m-d' }}{% endif %}{% if current_season %}&season={{ current_season.pk }}{% endif %}{% if request.GET.dept %}&dept={{ request.GET.dept }}{% endif %}" class="button button-secondary">
             Back to Office
         </a>
         <button type="button" class="button button-primary" onclick="window.print()">
@@ -39,11 +56,78 @@
 {% endblock %}
 
 {% block content %}
+    <div class="season-grid-banner no-print" style="margin-bottom: 20px;">
+        <div class="season-banner-info" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <label for="report-season-select" style="font-weight: 800; color: var(--color-text); font-size: 0.85rem; margin: 0; white-space: nowrap;">Operating Season:</label>
+            <select
+                id="report-season-select"
+                class="form-select"
+                style="font-weight: 600; font-size: 0.85rem; padding: 4px 10px; height: 34px; min-width: 230px;"
+                onchange="if(this.value) window.location.href=this.value;"
+            >
+                {% if categorized_seasons.current_and_upcoming %}
+                    <optgroup label="Current &amp; Upcoming Seasons">
+                        {% for s in categorized_seasons.current_and_upcoming %}
+                            <option
+                                value="{{ request.path }}?season={{ s.pk }}{% if view_mode == 'month' %}&view=month&year={{ target_year }}&month={{ target_month }}{% endif %}{% if request.GET.dept %}&dept={{ request.GET.dept }}{% endif %}"
+                                {% if current_season and current_season.pk == s.pk %}selected{% endif %}
+                            >
+                                {{ s.name }} ({{ s.status_label }}) · {{ s.start_date|date:"M j" }} – {{ s.end_date|date:"M j, Y" }}
+                            </option>
+                        {% endfor %}
+                    </optgroup>
+                {% endif %}
+                {% if categorized_seasons.prior_seasons %}
+                    <optgroup label="Prior Seasons">
+                        {% for s in categorized_seasons.prior_seasons %}
+                            <option
+                                value="{{ request.path }}?season={{ s.pk }}{% if view_mode == 'month' %}&view=month&year={{ target_year }}&month={{ target_month }}{% endif %}{% if request.GET.dept %}&dept={{ request.GET.dept }}{% endif %}"
+                                {% if current_season and current_season.pk == s.pk %}selected{% endif %}
+                            >
+                                {{ s.name }} (Prior Season) · {{ s.start_date|date:"M j" }} – {{ s.end_date|date:"M j, Y" }}
+                            </option>
+                        {% endfor %}
+                    </optgroup>
+                {% endif %}
+                {% if not categorized_seasons.current_and_upcoming and not categorized_seasons.prior_seasons %}
+                    <option value="{{ request.path }}{% if view_mode == 'month' %}?view=month&year={{ target_year }}&month={{ target_month }}{% endif %}{% if request.GET.dept %}{% if view_mode == 'month' %}&{% else %}?{% endif %}dept={{ request.GET.dept }}{% endif %}">Summer Season {{ today.year }} (Default)</option>
+                {% endif %}
+            </select>
+
+            {% if view_mode == 'month' %}
+                {% if is_month_open %}
+                    <span class="badge badge-success" style="font-size: 0.75rem;">Open Month</span>
+                {% else %}
+                    <span class="badge badge-warning" style="font-size: 0.75rem;">Off-Season Month</span>
+                {% endif %}
+            {% else %}
+                {% if is_week_open %}
+                    <span class="badge badge-success" style="font-size: 0.75rem;">Open Week</span>
+                {% else %}
+                    <span class="badge badge-warning" style="font-size: 0.75rem;">Off-Season Week</span>
+                {% endif %}
+            {% endif %}
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <a href="{% url 'ranch:office_dashboard' %}?{% if view_mode == 'month' %}view=month&year={{ target_year }}&month={{ target_month }}{% else %}week={{ week_start|date:'Y-m-d' }}{% endif %}{% if current_season %}&season={{ current_season.pk }}{% endif %}{% if request.GET.dept %}&dept={{ request.GET.dept }}{% endif %}" class="button button-small button-secondary">
+                🏢 Office Dashboard
+            </a>
+            <a href="{% url 'reservations:reservation_grid' %}{% if current_season %}?season={{ current_season.pk }}{% endif %}" class="button button-small button-secondary">
+                📅 Reservation Grid
+            </a>
+        </div>
+    </div>
+
     <div class="print-report horse-report">
         <div class="print-report-header">
             <h2>Horse Assignments</h2>
             <p>
-                Week of {{ week_start|date:"M j, Y" }} to {{ week_end|date:"M j, Y" }}
+                {% if view_mode == 'month' %}
+                    Month of {{ month_start|date:"F Y" }} ({{ month_start|date:"M 1" }} to {{ month_end_display|date:"M j, Y" }})
+                {% else %}
+                    Week of {{ week_start|date:"M j, Y" }} to {{ week_end|date:"M j, Y" }}
+                {% endif %}
             </p>
             <p>
                 {{ reservation_count }} reservation(s) · {{ guest_count }} guest(s)
@@ -89,10 +173,36 @@
                                             <div class="text-muted" style="font-size: 0.8rem;">
                                                 {{ guest.reservation.reservation_name }}
                                             </div>
+                                            {% if guest.client.saddle_preference %}
+                                                <div style="font-size: 0.75rem; color: var(--color-accent); font-weight: 600; margin-top: 2px;">
+                                                    Saddle Pref: {{ guest.client.saddle_preference }}
+                                                </div>
+                                            {% endif %}
+                                            {% if guest.client.rider_notes %}
+                                                <div style="font-size: 0.75rem; color: var(--color-muted); font-style: italic; margin-top: 2px;">
+                                                    Rider Notes: {{ guest.client.rider_notes|truncatewords:10 }}
+                                                </div>
+                                            {% endif %}
                                         </td>
                                         <td>{{ guest.age_at_stay|default:"-" }}</td>
-                                        <td>{{ guest.height|default:"-" }}</td>
-                                        <td>{{ guest.weight|default:"-" }}</td>
+                                        <td>
+                                            {% if guest.height %}
+                                                {{ guest.height }}
+                                            {% elif guest.client.height %}
+                                                {{ guest.client.height }} <span class="text-muted" style="font-size: 0.75rem;" title="From Client Profile">(Profile)</span>
+                                            {% else %}
+                                                <span class="text-danger font-weight-bold">Missing</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if guest.weight %}
+                                                {{ guest.weight }}
+                                            {% elif guest.client.weight %}
+                                                {{ guest.client.weight }} <span class="text-muted" style="font-size: 0.75rem;" title="From Client Profile">(Profile)</span>
+                                            {% else %}
+                                                <span class="text-danger font-weight-bold">Missing</span>
+                                            {% endif %}
+                                        </td>
                                         <td>
                                             <span class="badge badge-info">
                                                 {{ guest.get_riding_experience_display }}

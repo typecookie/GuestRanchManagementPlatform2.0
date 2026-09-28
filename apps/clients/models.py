@@ -51,6 +51,36 @@ class Client(models.Model):
         default=RidingLevel.UNKNOWN,
     )
 
+    # Rider & Physical Profile for Horse & Saddle Assignments
+    height = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name="Height",
+        help_text="e.g. 5'8\" or 68 inches",
+    )
+    weight = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name="Weight",
+        help_text="e.g. 150 lbs",
+    )
+    is_rider = models.BooleanField(
+        default=True,
+        verbose_name="Is Rider",
+        help_text="Whether this client participates in horseback riding activities.",
+    )
+    saddle_preference = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name="Saddle Preference",
+        help_text="e.g. 15\" Western, Youth, 16\" standard",
+    )
+    rider_notes = models.TextField(
+        blank=True,
+        verbose_name="Riding & Horse Notes",
+        help_text="Horse preferences, saddle requirements, riding experience details, or comfort notes.",
+    )
+
     dietary_notes = models.TextField(blank=True)
     medical_notes = models.TextField(blank=True)
     general_notes = models.TextField(blank=True)

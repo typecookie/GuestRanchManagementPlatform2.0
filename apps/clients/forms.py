@@ -24,7 +24,12 @@ class ClientForm(forms.ModelForm):
             "alternate_phone",
             "date_of_birth",
             "client_type",
+            "is_rider",
             "riding_level",
+            "height",
+            "weight",
+            "saddle_preference",
+            "rider_notes",
             "years_return",
             "dietary_notes",
             "medical_notes",
@@ -33,6 +38,10 @@ class ClientForm(forms.ModelForm):
         ]
         widgets = {
             "date_of_birth": forms.DateInput(attrs={"type": "date"}),
+            "height": forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g. 5'8\" or 68 in"}),
+            "weight": forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g. 150 lbs"}),
+            "saddle_preference": forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g. 15\" Western, Youth, etc."}),
+            "rider_notes": forms.Textarea(attrs={"rows": 3, "placeholder": "Special horse matching notes, saddle size, comfort requirements, or riding goals."}),
             "years_return": forms.NumberInput(attrs={"class": "form-control", "min": 1, "placeholder": "e.g. 5"}),
             "dietary_notes": forms.Textarea(attrs={"rows": 4}),
             "medical_notes": forms.Textarea(attrs={"rows": 4}),

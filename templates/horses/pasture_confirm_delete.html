@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Delete Pasture | Pastures | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Operations{% endblock %}
+{% block page_title %}Remove Pasture Column{% endblock %}
+
+{% block content %}
+<div class="form-card">
+    {% if pasture.horses.exists %}
+        <div class="alert-box alert-error" style="margin-bottom: 1.5rem;">
+            <h3>Cannot Remove Pasture</h3>
+            <p><strong>{{ pasture.name }}</strong> currently contains <strong>{{ pasture.horses.count }}</strong> horse(s). Pasture columns cannot be removed while they contain horses.</p>
+            <p>Please move all horses to another pasture or to Unassigned before removing this pasture column.</p>
+        </div>
+        <div class="form-actions">
+            <a href="{% url 'horses:pasture_board' %}" class="button button-neutral">Return to Pasture Board</a>
+        </div>
+    {% else %}
+        <p>Are you sure you want to remove the pasture column <strong>"{{ pasture.name }}"</strong>?</p>
+        <p class="text-muted">This will delete the pasture column from the board. This action cannot be undone.</p>
+        
+        <form method="post" style="margin-top: 1.5rem;">
+            {% csrf_token %}
+            <div class="form-actions" style="display: flex; gap: 1rem;">
+                <button type="submit" class="button button-danger">Confirm Removal</button>
+                <a href="{% url 'horses:pasture_board' %}" class="button button-neutral">Cancel</a>
+            </div>
+        </form>
+    {% endif %}
+</div>
+{% endblock %}

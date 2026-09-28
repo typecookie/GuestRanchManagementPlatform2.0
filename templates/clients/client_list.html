@@ -134,7 +134,14 @@ Manage individual guest records, contact information, riding levels, preferences
 
                             <td>{{ client.get_client_type_display }}</td>
 
-                            <td>{{ client.get_riding_level_display }}</td>
+                            <td>
+                                <div>{{ client.get_riding_level_display }}</div>
+                                {% if client.height or client.weight %}
+                                    <div class="text-muted small">
+                                        {% if client.height %}{{ client.height }}{% endif %}{% if client.height and client.weight %} · {% endif %}{% if client.weight %}{{ client.weight }}{% endif %}
+                                    </div>
+                                {% endif %}
+                            </td>
 
                             <td>
                                 {% if client.effective_years_count %}

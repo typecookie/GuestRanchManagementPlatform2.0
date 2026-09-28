@@ -17,124 +17,64 @@
                     <span class="brand-text">Guest Ranch</span>
                 </div>
 
-                <nav class="sidebar-nav" aria-label="Primary navigation">
+                <div class="sidebar-section-title">DEPARTMENTS</div>
+
+                <nav class="sidebar-nav" aria-label="Department navigation">
                     <a
                         href="{% url 'core:dashboard' %}"
-                        class="sidebar-link {% if request.resolver_match.url_name == 'dashboard' %}is-active{% endif %}"
+                        class="sidebar-link {% if active_department == 'dashboard' %}is-active{% endif %}"
                     >
-                        Dashboard
+                        <span class="sidebar-link-icon">📊</span>
+                        <span class="sidebar-link-text">Dashboard</span>
                     </a>
 
                     <a
-                        href="{% url 'ranch:office_dashboard' %}"
-                        class="sidebar-link {% if request.resolver_match.url_name == 'office_dashboard' or 'report' in request.resolver_match.url_name %}is-active{% endif %}"
+                        href="{% url 'ranch:office_dashboard' %}?dept=office"
+                        class="sidebar-link {% if active_department == 'office' %}is-active{% endif %}"
                     >
-                        Office
+                        <span class="sidebar-link-icon">🏢</span>
+                        <span class="sidebar-link-text">Office</span>
                     </a>
 
                     <a
-                        href="{% url 'clients:contact_dashboard' %}"
-                        class="sidebar-link {% if request.resolver_match.namespace == 'clients' %}is-active{% endif %}"
+                        href="{% url 'horses:horse_list' %}?dept=barn"
+                        class="sidebar-link {% if active_department == 'barn' %}is-active{% endif %}"
                     >
-                        Clients
+                        <span class="sidebar-link-icon">🌾</span>
+                        <span class="sidebar-link-text">Barn</span>
                     </a>
 
                     <a
-                        href="{% url 'reservations:reservation_list' %}"
-                        class="sidebar-link {% if request.resolver_match.namespace == 'reservations' %}is-active{% endif %}"
+                        href="{% url 'bar:inventory_list' %}?dept=bar"
+                        class="sidebar-link {% if active_department == 'bar' %}is-active{% endif %}"
                     >
-                        Reservations
+                        <span class="sidebar-link-icon">🍹</span>
+                        <span class="sidebar-link-text">Bar</span>
                     </a>
 
                     <a
-                        href="{% url 'horses:horse_list' %}"
-                        class="sidebar-link {% if request.resolver_match.namespace == 'horses' and 'saddle' not in request.resolver_match.url_name %}is-active{% endif %}"
+                        href="{% url 'cabins:cabin_list' %}?dept=housekeeping"
+                        class="sidebar-link {% if active_department == 'housekeeping' %}is-active{% endif %}"
                     >
-                        Horses
+                        <span class="sidebar-link-icon">🧹</span>
+                        <span class="sidebar-link-text">Housekeeping</span>
                     </a>
 
                     <a
-                        href="{% url 'horses:saddle_list' %}"
-                        class="sidebar-link {% if 'saddle' in request.resolver_match.url_name %}is-active{% endif %}"
+                        href="{% url 'vehicles:vehicle_list' %}?dept=maintenance"
+                        class="sidebar-link {% if active_department == 'maintenance' %}is-active{% endif %}"
                     >
-                        Saddles
+                        <span class="sidebar-link-icon">🔧</span>
+                        <span class="sidebar-link-text">Maintenance</span>
                     </a>
 
+                    {% if user.is_staff or perms.employees.view_employee or perms.auth.view_user or perms.auth.view_group %}
                     <a
-                        href="{% url 'cabins:cabin_list' %}"
-                        class="sidebar-link {% if request.resolver_match.namespace == 'cabins' %}is-active{% endif %}"
+                        href="{% url 'reservations:operating_dates_list' %}?dept=admin"
+                        class="sidebar-link {% if active_department == 'admin' %}is-active{% endif %}"
                     >
-                        Cabins
-                    </a>
-
-                    <a
-                        href="{% url 'vehicles:vehicle_list' %}"
-                        class="sidebar-link {% if request.resolver_match.namespace == 'vehicles' %}is-active{% endif %}"
-                    >
-                        Vehicles
-                    </a>
-
-                    <a
-                        href="{% url 'ranch:ranch_operations' %}"
-                        class="sidebar-link {% if request.resolver_match.url_name == 'ranch_operations' %}is-active{% endif %}"
-                    >
-                        Ranch Operations
-                    </a>
-
-                    <a
-                        href="{% url 'projects:kanban_board' %}"
-                        class="sidebar-link {% if request.resolver_match.namespace == 'projects' %}is-active{% endif %}"
-                    >
-                        Projects
-                    </a>
-
-                    <a
-                        href="{% url 'bar:inventory_list' %}"
-                        class="sidebar-link {% if request.resolver_match.namespace == 'bar' %}is-active{% endif %}"
-                    >
-                        Bar
-                    </a>
-
-                    <a
-                        href="{% url 'contractors:contractor_list' %}"
-                        class="sidebar-link {% if request.resolver_match.namespace == 'contractors' %}is-active{% endif %}"
-                    >
-                        Distributors & Contractors
-                    </a>
-
-                    {% if perms.employees.view_employee %}
-                    <a
-                        href="{% url 'employees:employee_list' %}"
-                        class="sidebar-link {% if request.resolver_match.namespace == 'employees' %}is-active{% endif %}"
-                    >
-                        Employees
-                    </a>
-                    {% endif %}
-
-                    {% if perms.auth.view_user %}
-                    <a
-                        href="{% url 'accounts:user_list' %}"
-                        class="sidebar-link {% if request.resolver_match.namespace == 'accounts' %}is-active{% endif %}"
-                    >
-                        User Management
-                    </a>
-                    {% endif %}
-
-                    {% if perms.auth.view_group %}
-                    <a
-                        href="{% url 'groups:group_list' %}"
-                        class="sidebar-link {% if request.resolver_match.namespace == 'groups' %}is-active{% endif %}"
-                    >
-                        Group Management
-                    </a>
-                    {% endif %}
-
-                    {% if user.is_staff %}
-                    <a
-                        href="/admin/"
-                        class="sidebar-link {% if '/admin/' in request.path %}is-active{% endif %}"
-                    >
-                        Admin
+                        <span class="sidebar-link-icon">⚙️</span>
+                        <span class="sidebar-link-text">Admin</span>
                     </a>
                     {% endif %}
                 </nav>
@@ -146,6 +86,240 @@
         </aside>
 
         <main class="main-content">
+            <nav class="department-subnav" aria-label="Department sub-navigation">
+                <div class="department-badge">
+                    <span class="department-badge-label">{{ active_department_label }}</span>
+                </div>
+
+                <div class="department-links">
+                    {% if active_department == 'admin' %}
+                        <a
+                            href="{% url 'reservations:operating_dates_list' %}?dept=admin"
+                            class="subnav-link {% if 'operating' in request.resolver_match.url_name %}is-active{% endif %}"
+                        >
+                            Operating Dates
+                        </a>
+
+                        {% if perms.employees.view_employee %}
+                        <a
+                            href="{% url 'employees:employee_list' %}?dept=admin"
+                            class="subnav-link {% if request.resolver_match.namespace == 'employees' %}is-active{% endif %}"
+                        >
+                            Employees
+                        </a>
+                        {% endif %}
+
+                        {% if perms.auth.view_user %}
+                        <a
+                            href="{% url 'accounts:user_list' %}?dept=admin"
+                            class="subnav-link {% if request.resolver_match.namespace == 'accounts' %}is-active{% endif %}"
+                        >
+                            User Management
+                        </a>
+                        {% endif %}
+
+                        {% if perms.auth.view_group %}
+                        <a
+                            href="{% url 'groups:group_list' %}?dept=admin"
+                            class="subnav-link {% if request.resolver_match.namespace == 'groups' %}is-active{% endif %}"
+                        >
+                            Group Management
+                        </a>
+                        {% endif %}
+
+                        {% if user.is_staff %}
+                        <a
+                            href="/admin/"
+                            class="subnav-link {% if '/admin/' in request.path %}is-active{% endif %}"
+                        >
+                            Admin
+                        </a>
+                        {% endif %}
+
+                        <a
+                            href="{% url 'contractors:contractor_list' %}?dept=admin"
+                            class="subnav-link {% if request.resolver_match.namespace == 'contractors' %}is-active{% endif %}"
+                        >
+                            Distributors & Contractors
+                        </a>
+
+                        <a
+                            href="{% url 'ranch:ranch_operations' %}?dept=admin"
+                            class="subnav-link {% if request.resolver_match.url_name == 'ranch_operations' %}is-active{% endif %}"
+                        >
+                            Ranch Operations
+                        </a>
+
+                    {% elif active_department == 'office' %}
+                        <a
+                            href="{% url 'ranch:office_dashboard' %}?dept=office"
+                            class="subnav-link {% if request.resolver_match.url_name == 'office_dashboard' or 'report' in request.resolver_match.url_name %}is-active{% endif %}"
+                        >
+                            Office
+                        </a>
+
+                        <a
+                            href="{% url 'clients:contact_dashboard' %}?dept=office"
+                            class="subnav-link {% if request.resolver_match.namespace == 'clients' %}is-active{% endif %}"
+                        >
+                            Clients
+                        </a>
+
+                        <a
+                            href="{% url 'reservations:reservation_list' %}?dept=office"
+                            class="subnav-link {% if request.resolver_match.namespace == 'reservations' and 'operating' not in request.resolver_match.url_name %}is-active{% endif %}"
+                        >
+                            Reservations
+                        </a>
+
+                        <a
+                            href="{% url 'cabins:cabin_list' %}?dept=office"
+                            class="subnav-link {% if request.resolver_match.namespace == 'cabins' %}is-active{% endif %}"
+                        >
+                            Cabins
+                        </a>
+
+                        <a
+                            href="{% url 'contractors:contractor_list' %}?dept=office"
+                            class="subnav-link {% if request.resolver_match.namespace == 'contractors' %}is-active{% endif %}"
+                        >
+                            Distributors & Contractors
+                        </a>
+
+                        <a
+                            href="{% url 'ranch:ranch_operations' %}?dept=office"
+                            class="subnav-link {% if request.resolver_match.url_name == 'ranch_operations' %}is-active{% endif %}"
+                        >
+                            Ranch Operations
+                        </a>
+
+                    {% elif active_department == 'barn' %}
+                        <a
+                            href="{% url 'horses:horse_list' %}?dept=barn"
+                            class="subnav-link {% if request.resolver_match.namespace == 'horses' and 'pasture' not in request.resolver_match.url_name and 'saddle' not in request.resolver_match.url_name %}is-active{% endif %}"
+                        >
+                            Horses
+                        </a>
+
+                        <a
+                            href="{% url 'horses:pasture_board' %}?dept=barn"
+                            class="subnav-link {% if 'pasture' in request.resolver_match.url_name %}is-active{% endif %}"
+                        >
+                            Pasture Board
+                        </a>
+
+                        <a
+                            href="{% url 'horses:saddle_list' %}?dept=barn"
+                            class="subnav-link {% if 'saddle' in request.resolver_match.url_name %}is-active{% endif %}"
+                        >
+                            Saddles
+                        </a>
+
+                        <a
+                            href="{% url 'contractors:contractor_list' %}?dept=barn"
+                            class="subnav-link {% if request.resolver_match.namespace == 'contractors' %}is-active{% endif %}"
+                        >
+                            Distributors & Contractors
+                        </a>
+
+                        <a
+                            href="{% url 'ranch:ranch_operations' %}?dept=barn"
+                            class="subnav-link {% if request.resolver_match.url_name == 'ranch_operations' %}is-active{% endif %}"
+                        >
+                            Ranch Operations
+                        </a>
+
+                    {% elif active_department == 'bar' %}
+                        <a
+                            href="{% url 'bar:inventory_list' %}?dept=bar"
+                            class="subnav-link {% if request.resolver_match.namespace == 'bar' %}is-active{% endif %}"
+                        >
+                            Bar Inventory
+                        </a>
+
+                        <a
+                            href="{% url 'contractors:contractor_list' %}?dept=bar"
+                            class="subnav-link {% if request.resolver_match.namespace == 'contractors' %}is-active{% endif %}"
+                        >
+                            Distributors & Contractors
+                        </a>
+
+                        <a
+                            href="{% url 'ranch:ranch_operations' %}?dept=bar"
+                            class="subnav-link {% if request.resolver_match.url_name == 'ranch_operations' %}is-active{% endif %}"
+                        >
+                            Ranch Operations
+                        </a>
+
+                    {% elif active_department == 'housekeeping' %}
+                        <a
+                            href="{% url 'cabins:cabin_list' %}?dept=housekeeping"
+                            class="subnav-link {% if request.resolver_match.namespace == 'cabins' %}is-active{% endif %}"
+                        >
+                            Cabins
+                        </a>
+
+                    {% elif active_department == 'maintenance' %}
+                        <a
+                            href="{% url 'vehicles:vehicle_list' %}?dept=maintenance"
+                            class="subnav-link {% if request.resolver_match.namespace == 'vehicles' %}is-active{% endif %}"
+                        >
+                            Vehicles
+                        </a>
+
+                        <a
+                            href="{% url 'cabins:cabin_list' %}?dept=maintenance"
+                            class="subnav-link {% if request.resolver_match.namespace == 'cabins' %}is-active{% endif %}"
+                        >
+                            Cabins
+                        </a>
+
+                        <a
+                            href="{% url 'projects:kanban_board' %}?dept=maintenance"
+                            class="subnav-link {% if request.resolver_match.namespace == 'projects' %}is-active{% endif %}"
+                        >
+                            Projects
+                        </a>
+
+                        <a
+                            href="{% url 'contractors:contractor_list' %}?dept=maintenance"
+                            class="subnav-link {% if request.resolver_match.namespace == 'contractors' %}is-active{% endif %}"
+                        >
+                            Distributors & Contractors
+                        </a>
+
+                        <a
+                            href="{% url 'ranch:ranch_operations' %}?dept=maintenance"
+                            class="subnav-link {% if request.resolver_match.url_name == 'ranch_operations' %}is-active{% endif %}"
+                        >
+                            Ranch Operations
+                        </a>
+
+                    {% else %}
+                        <a
+                            href="{% url 'core:dashboard' %}"
+                            class="subnav-link {% if request.resolver_match.url_name == 'dashboard' %}is-active{% endif %}"
+                        >
+                            Overview
+                        </a>
+
+                        <a
+                            href="{% url 'ranch:ranch_operations' %}"
+                            class="subnav-link {% if request.resolver_match.url_name == 'ranch_operations' %}is-active{% endif %}"
+                        >
+                            Ranch Operations
+                        </a>
+
+                        <a
+                            href="{% url 'contractors:contractor_list' %}"
+                            class="subnav-link {% if request.resolver_match.namespace == 'contractors' %}is-active{% endif %}"
+                        >
+                            Distributors & Contractors
+                        </a>
+                    {% endif %}
+                </div>
+            </nav>
+
             <header class="topbar">
                 <div class="page-heading">
                     <span class="eyebrow">{% block eyebrow %}Operations{% endblock %}</span>

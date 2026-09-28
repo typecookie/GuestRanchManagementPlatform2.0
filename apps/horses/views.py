@@ -1,49 +1,222 @@
 from django.shortcuts import render, get_object_or_404, redirect
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Q
 from django.db.models.functions import Length
 from django.utils import timezone
 from apps.groups.decorators import module_permission_required
-from .models import Horse, Saddle, SaddleMaintenanceLog, MedicalRecord, MedicalCareStep
-from .forms import HorseForm, SaddleForm, SaddleMaintenanceLogForm, MedicalRecordForm, MedicalCareStepForm
+from .models import Horse, Pasture, Saddle, SaddleMaintenanceLog, MedicalRecord, MedicalCareStep
+from .forms import HorseForm, PastureForm, SaddleForm, SaddleMaintenanceLogForm, MedicalRecordForm, MedicalCareStepForm
 
 @module_permission_required('Horses', 'read')
 def horse_list(request):
     search_query = request.GET.get('q', '')
     status_filter = request.GET.get('status', '')
+    pasture_filter = request.GET.get('pasture', '')
     
-    horses = Horse.objects.all()
+    horses = Horse.objects.select_related('pasture').all()
     
     if search_query:
         horses = horses.filter(
             Q(name__icontains=search_query) |
             Q(breed__icontains=search_query) |
             Q(color__icontains=search_query) |
-            Q(notes__icontains=search_query)
+            Q(notes__icontains=search_query) |
+            Q(pasture__name__icontains=search_query)
         )
         
     if status_filter:
         horses = horses.filter(status=status_filter)
         
+    if pasture_filter:
+        if pasture_filter == 'unassigned':
+            horses = horses.filter(pasture__isnull=True)
+        else:
+            horses = horses.filter(pasture_id=pasture_filter)
+        
     context = {
         'horses': horses,
         'search_query': search_query,
         'status_filter': status_filter,
+        'pasture_filter': pasture_filter,
         'status_choices': Horse.Status.choices,
+        'pastures': Pasture.objects.all(),
         'total_horses': Horse.objects.count(),
         'active_horses': Horse.objects.filter(status=Horse.Status.ACTIVE).count(),
+        'total_pastures': Pasture.objects.count(),
     }
     return render(request, "horses/horse_list.html", context)
 
 @module_permission_required('Horses', 'read')
 def horse_detail(request, pk):
-    horse = get_object_or_404(Horse, pk=pk)
+    horse = get_object_or_404(Horse.objects.select_related('pasture'), pk=pk)
     medical_records = horse.medical_records.all().prefetch_related('care_steps')
     return render(request, "horses/horse_detail.html", {
         'horse': horse,
         'medical_records': medical_records
     })
+
+# Pasture Board & Management Views
+
+@module_permission_required('Horses', 'read')
+def pasture_board(request):
+    search_query = request.GET.get('q', '').strip()
+    
+    horses_qs = Horse.objects.all().prefetch_related(
+        'medical_records'
+    )
+    if search_query:
+        horses_qs = horses_qs.filter(
+            Q(name__icontains=search_query) |
+            Q(breed__icontains=search_query) |
+            Q(color__icontains=search_query)
+        )
+        
+    # Group horses by pasture
+    pastures = list(Pasture.objects.all())
+    unassigned_horses = list(horses_qs.filter(pasture__isnull=True))
+    
+    # Map horses to pasture
+    pasture_columns = []
+    for pasture in pastures:
+        pasture_horses = list(horses_qs.filter(pasture=pasture))
+        pasture_columns.append({
+            'pasture': pasture,
+            'horses': pasture_horses,
+            'count': len(pasture_horses),
+            'can_delete': len(pasture_horses) == 0,
+        })
+        
+    context = {
+        'pasture_columns': pasture_columns,
+        'unassigned_horses': unassigned_horses,
+        'unassigned_count': len(unassigned_horses),
+        'total_horses': Horse.objects.count(),
+        'total_pastures': len(pastures),
+        'pasture_form': PastureForm(),
+        'search_query': search_query,
+    }
+    return render(request, "horses/pasture_board.html", context)
+
+@module_permission_required('Horses', 'write')
+def pasture_create(request):
+    is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
+    if request.method == 'POST':
+        form = PastureForm(request.POST)
+        if form.is_valid():
+            pasture = form.save()
+            if is_ajax:
+                return JsonResponse({
+                    'status': 'success',
+                    'id': pasture.pk,
+                    'name': pasture.name,
+                    'description': pasture.description,
+                    'display_order': pasture.display_order,
+                    'message': f"Pasture '{pasture.name}' created successfully."
+                })
+            messages.success(request, f"Pasture '{pasture.name}' created successfully.")
+            return redirect('horses:pasture_board')
+        else:
+            if is_ajax:
+                return JsonResponse({'status': 'error', 'errors': form.errors}, status=400)
+    else:
+        form = PastureForm()
+        
+    return render(request, "horses/pasture_form.html", {
+        'form': form,
+        'title': 'Add New Pasture'
+    })
+
+@module_permission_required('Horses', 'write')
+def pasture_update(request, pk):
+    pasture = get_object_or_404(Pasture, pk=pk)
+    is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
+    if request.method == 'POST':
+        form = PastureForm(request.POST, instance=pasture)
+        if form.is_valid():
+            pasture = form.save()
+            if is_ajax:
+                return JsonResponse({
+                    'status': 'success',
+                    'id': pasture.pk,
+                    'name': pasture.name,
+                    'description': pasture.description,
+                    'display_order': pasture.display_order,
+                    'message': f"Pasture '{pasture.name}' updated successfully."
+                })
+            messages.success(request, f"Pasture '{pasture.name}' updated successfully.")
+            return redirect('horses:pasture_board')
+        else:
+            if is_ajax:
+                return JsonResponse({'status': 'error', 'errors': form.errors}, status=400)
+    else:
+        form = PastureForm(instance=pasture)
+        
+    return render(request, "horses/pasture_form.html", {
+        'form': form,
+        'pasture': pasture,
+        'title': f'Edit Pasture: {pasture.name}'
+    })
+
+@module_permission_required('Horses', 'delete')
+def pasture_delete(request, pk):
+    pasture = get_object_or_404(Pasture, pk=pk)
+    is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.POST.get('ajax') == 'true'
+    
+    # Check if pasture contains horses
+    if pasture.horses.exists():
+        horse_count = pasture.horses.count()
+        error_msg = f"Cannot remove pasture '{pasture.name}' because it contains {horse_count} horse(s). Move all horses to another pasture or unassign them first."
+        if is_ajax:
+            return JsonResponse({'status': 'error', 'message': error_msg}, status=400)
+        messages.error(request, error_msg)
+        return redirect('horses:pasture_board')
+        
+    if request.method == 'POST':
+        name = pasture.name
+        pasture.delete()
+        if is_ajax:
+            return JsonResponse({
+                'status': 'success',
+                'id': pk,
+                'message': f"Pasture '{name}' removed successfully."
+            })
+        messages.success(request, f"Pasture '{name}' removed successfully.")
+        return redirect('horses:pasture_board')
+        
+    return render(request, 'horses/pasture_confirm_delete.html', {'pasture': pasture})
+
+@module_permission_required('Horses', 'write')
+@require_POST
+def update_horse_pasture(request, pk):
+    horse = get_object_or_404(Horse, pk=pk)
+    pasture_id = request.POST.get('pasture_id', '').strip()
+    
+    if not pasture_id or pasture_id in ('unassigned', 'none', '0', 'null'):
+        horse.pasture = None
+        horse.save(update_fields=['pasture', 'updated_at'])
+        return JsonResponse({
+            'status': 'success',
+            'horse_id': horse.pk,
+            'horse_name': horse.name,
+            'pasture_id': None,
+            'pasture_name': 'Unassigned',
+            'message': f"{horse.name} moved to Unassigned."
+        })
+    else:
+        pasture = get_object_or_404(Pasture, pk=pasture_id)
+        horse.pasture = pasture
+        horse.save(update_fields=['pasture', 'updated_at'])
+        return JsonResponse({
+            'status': 'success',
+            'horse_id': horse.pk,
+            'horse_name': horse.name,
+            'pasture_id': pasture.pk,
+            'pasture_name': pasture.name,
+            'message': f"{horse.name} moved to {pasture.name}."
+        })
 
 @module_permission_required('Horses', 'write')
 def horse_create(request):

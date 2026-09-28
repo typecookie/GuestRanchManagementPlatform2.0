@@ -78,12 +78,17 @@ def client_detail(request, pk):
     notes = client.notes.select_related("created_by")
     note_form = ClientNoteForm()
 
+    past_stays = ReservationGuest.objects.filter(
+        client=client
+    ).select_related("reservation", "horse", "saddle", "cabin").order_by("-reservation__arrival_date")
+
     context = {
         "client": client,
         "household_memberships": household_memberships,
         "travel_group_memberships": travel_group_memberships,
         "notes": notes,
         "note_form": note_form,
+        "past_stays": past_stays,
     }
 
     return render(request, "clients/client_detail.html", context)

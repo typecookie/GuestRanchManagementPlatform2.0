@@ -136,7 +136,7 @@ class ReservationCabin(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["arrival_date", "cabin__sort_order", "cabin__name"]
+        ordering = ["arrival_date", "cabin__capacity", "cabin__sort_order", "cabin__name"]
         indexes = [
             models.Index(fields=["arrival_date"]),
             models.Index(fields=["departure_date"]),
@@ -266,6 +266,46 @@ class ReservationGuest(models.Model):
     def __str__(self):
         return f"{self.client} - {self.reservation}"
 
+    def save(self, *args, **kwargs):
+        if self.client_id:
+            # Auto-populate height from client profile if not explicitly set on guest card
+            if not self.height and self.client.height:
+                self.height = self.client.height
+            # Auto-populate weight from client profile if not explicitly set on guest card
+            if not self.weight and self.client.weight:
+                self.weight = self.client.weight
+            # Auto-populate riding experience from client profile if unknown
+            if (not self.riding_experience or self.riding_experience == self.RidingExperience.UNKNOWN) and self.client.riding_level and self.client.riding_level != 'unknown':
+                self.riding_experience = self.client.riding_level
+            # If client is marked as non-rider in client profile and record is new, default is_riding to False
+            if not self.pk and (not self.client.is_rider or self.client.riding_level == self.RidingExperience.NON_RIDER):
+                self.is_riding = False
+        super().save(*args, **kwargs)
+
+    @property
+    def effective_height(self):
+        if self.height and str(self.height).strip():
+            return self.height
+        if self.client_id and self.client.height:
+            return self.client.height
+        return ""
+
+    @property
+    def effective_weight(self):
+        if self.weight and str(self.weight).strip():
+            return self.weight
+        if self.client_id and self.client.weight:
+            return self.client.weight
+        return ""
+
+    @property
+    def effective_riding_experience(self):
+        if self.riding_experience and self.riding_experience != self.RidingExperience.UNKNOWN:
+            return self.riding_experience
+        if self.client_id and self.client.riding_level and self.client.riding_level != 'unknown':
+            return self.client.riding_level
+        return self.RidingExperience.UNKNOWN
+
     @property
     def years_count(self):
         # 1. Direct Client explicit years_return
@@ -324,3 +364,93 @@ class ReservationGuest(models.Model):
     def years_display(self):
         from apps.clients.models import format_years_ordinal
         return format_years_ordinal(self.years_count)
+
+
+class OperatingSeason(models.Model):
+    name = models.CharField(
+        max_length=100,
+        help_text="Name or label for the operating season (e.g. 'Summer 2026', 'Main Season').",
+    )
+    start_date = models.DateField(
+        help_text="Opening date for the ranch.",
+    )
+    end_date = models.DateField(
+        help_text="Closing date for the ranch.",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether this operating season is currently active.",
+    )
+    notes = models.TextField(
+        blank=True,
+        help_text="Optional notes or details about this operating season.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["start_date", "name"]
+        verbose_name = "Operating Season"
+        verbose_name_plural = "Operating Seasons"
+        indexes = [
+            models.Index(fields=["start_date", "end_date"]),
+            models.Index(fields=["is_active"]),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.start_date.strftime('%b %d, %Y')} – {self.end_date.strftime('%b %d, %Y')})"
+
+    def clean(self):
+        super().clean()
+        if self.start_date and self.end_date and self.start_date > self.end_date:
+            raise ValidationError({"end_date": "End date must be after start date."})
+
+    def contains_date(self, target_date):
+        return self.start_date <= target_date <= self.end_date
+
+    def overlaps_week(self, week_start, week_end):
+        return self.start_date < week_end and self.end_date >= week_start
+
+    def is_prior(self, reference_date=None):
+        """
+        A season is considered prior as soon as its last day open passes (reference_date > end_date).
+        """
+        from datetime import date
+        if reference_date is None:
+            reference_date = date.today()
+        return reference_date > self.end_date
+
+    def is_current(self, reference_date=None):
+        """
+        A season is current if reference_date is between start_date and end_date (inclusive).
+        """
+        from datetime import date
+        if reference_date is None:
+            reference_date = date.today()
+        return self.start_date <= reference_date <= self.end_date
+
+    def is_upcoming(self, reference_date=None):
+        """
+        A season is upcoming if reference_date is before start_date.
+        """
+        from datetime import date
+        if reference_date is None:
+            reference_date = date.today()
+        return reference_date < self.start_date
+
+    def status_label(self, reference_date=None):
+        if self.is_current(reference_date):
+            return "Current Season"
+        if self.is_prior(reference_date):
+            return "Prior Season"
+        return "Next Season" if self.is_upcoming(reference_date) else "Upcoming Season"
+
+    @property
+    def duration_days(self):
+        if self.start_date and self.end_date:
+            return (self.end_date - self.start_date).days + 1
+        return 0
+
+    @property
+    def duration_weeks(self):
+        return round(self.duration_days / 7, 1)

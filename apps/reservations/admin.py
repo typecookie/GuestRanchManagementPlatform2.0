@@ -1,6 +1,33 @@
 from django.contrib import admin
 
-from .models import Reservation, ReservationCabin, ReservationGuest
+from .models import OperatingSeason, Reservation, ReservationCabin, ReservationGuest
+
+
+@admin.register(OperatingSeason)
+class OperatingSeasonAdmin(admin.ModelAdmin):
+    list_display = [
+        "name",
+        "start_date",
+        "end_date",
+        "duration_days",
+        "duration_weeks",
+        "is_active",
+        "updated_at",
+    ]
+    list_filter = [
+        "is_active",
+        "start_date",
+        "end_date",
+    ]
+    search_fields = [
+        "name",
+        "notes",
+    ]
+    date_hierarchy = "start_date"
+    ordering = [
+        "start_date",
+        "name",
+    ]
 
 
 class ReservationCabinInline(admin.TabularInline):
@@ -103,6 +130,7 @@ class ReservationCabinAdmin(admin.ModelAdmin):
     date_hierarchy = "arrival_date"
     ordering = [
         "arrival_date",
+        "cabin__capacity",
         "cabin__sort_order",
         "cabin__name",
     ]

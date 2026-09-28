@@ -64,6 +64,14 @@
                 {% endif %}
             </div>
             
+            <div class="form-field">
+                <label for="{{ form.pasture.id_for_label }}">Pasture Location</label>
+                {{ form.pasture }}
+                {% if form.pasture.errors %}
+                    <div class="form-error">{{ form.pasture.errors }}</div>
+                {% endif %}
+            </div>
+            
             <div class="form-grid-full" style="margin-top: 1rem;">
                 <h3>Notes & Medical</h3>
             </div>
