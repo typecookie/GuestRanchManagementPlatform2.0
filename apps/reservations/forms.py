@@ -4,8 +4,36 @@ from django import forms
 from django.urls import reverse_lazy
 from django.db.models.functions import Length
 
-from .models import Reservation, ReservationCabin, ReservationGuest
+from .models import OperatingSeason, Reservation, ReservationCabin, ReservationGuest
 from apps.horses.models import Horse, Saddle
+
+
+class OperatingSeasonForm(forms.ModelForm):
+    class Meta:
+        model = OperatingSeason
+        fields = [
+            "name",
+            "start_date",
+            "end_date",
+            "is_active",
+            "notes",
+        ]
+        widgets = {
+            "name": forms.TextInput(attrs={"placeholder": "e.g. Summer Season 2026"}),
+            "start_date": forms.DateInput(attrs={"type": "date"}),
+            "end_date": forms.DateInput(attrs={"type": "date"}),
+            "notes": forms.Textarea(attrs={"rows": 3, "placeholder": "Optional notes or details..."}),
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        start_date = cleaned_data.get("start_date")
+        end_date = cleaned_data.get("end_date")
+
+        if start_date and end_date and end_date < start_date:
+            raise forms.ValidationError("Closing date (end date) must be on or after opening date (start date).")
+
+        return cleaned_data
 
 
 class ReservationForm(forms.ModelForm):

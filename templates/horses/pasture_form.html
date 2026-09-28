@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} | Pastures | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Operations{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="form-card">
+    <form method="post">
+        {% csrf_token %}
+        
+        <div class="form-grid">
+            <div class="form-field form-grid-full">
+                <label for="{{ form.name.id_for_label }}">Pasture Name *</label>
+                {{ form.name }}
+                {% if form.name.errors %}
+                    <div class="form-error">{{ form.name.errors }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-field form-grid-full">
+                <label for="{{ form.description.id_for_label }}">Description / Acreage / Notes</label>
+                {{ form.description }}
+                {% if form.description.errors %}
+                    <div class="form-error">{{ form.description.errors }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-field">
+                <label for="{{ form.display_order.id_for_label }}">Display Order (Column sequence)</label>
+                {{ form.display_order }}
+                {% if form.display_order.errors %}
+                    <div class="form-error">{{ form.display_order.errors }}</div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="button button-primary">Save Pasture</button>
+            <a href="{% url 'horses:pasture_board' %}" class="button button-neutral">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

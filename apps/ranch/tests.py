@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 from apps.cabins.models import Cabin
 from apps.clients.models import Client as RanchClient, Household, TravelGroup
-from apps.reservations.models import Reservation, ReservationGuest
+from apps.reservations.models import OperatingSeason, Reservation, ReservationGuest
 from apps.horses.models import Horse, Saddle
 
 User = get_user_model()
@@ -378,3 +378,196 @@ class WeeklyReportsTests(TestCase):
         self.assertEqual(resp_over.status_code, 200)
         self.assertContains(resp_over, "Cabin Over Capacity: Tiny Cabin")
         self.assertContains(resp_over, "exceeding its maximum capacity of 1")
+
+    def test_office_dashboard_skip_closed_weeks_navigation(self):
+        url = reverse("ranch:office_dashboard")
+        # End of season week (Sept 27, 2026)
+        response = self.client.get(f"{url}?week=2026-09-27")
+        self.assertEqual(response.status_code, 200)
+        # Next week should skip off-season and point to 2027 season opening
+        next_week = response.context["next_week"]
+        self.assertEqual(next_week.year, 2027)
+        self.assertIn(next_week.month, [5, 6])
+
+        # Previous week should point to Sept 20, 2026
+        prev_week = response.context["previous_week"]
+        self.assertEqual(prev_week, date(2026, 9, 20))
+
+    def test_office_dashboard_season_selector(self):
+        # Create prior, current, and upcoming operating seasons
+        prior_season = OperatingSeason.objects.create(
+            name="2025 Summer Season",
+            start_date=date(2025, 6, 1),
+            end_date=date(2025, 9, 30),
+            is_active=True,
+        )
+        current_season = OperatingSeason.objects.create(
+            name="2026 Summer Season",
+            start_date=date(2026, 6, 1),
+            end_date=date(2026, 9, 30),
+            is_active=True,
+        )
+        upcoming_season = OperatingSeason.objects.create(
+            name="2027 Summer Season",
+            start_date=date(2027, 6, 1),
+            end_date=date(2027, 9, 30),
+            is_active=True,
+        )
+
+        url = reverse("ranch:office_dashboard")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+        # Season dropdown banner presence
+        self.assertContains(response, "Operating Season:")
+        self.assertContains(response, "Current &amp; Upcoming Seasons")
+        self.assertContains(response, "Prior Seasons")
+        self.assertContains(response, "2025 Summer Season (Prior Season)")
+        self.assertContains(response, "2026 Summer Season")
+        self.assertContains(response, "2027 Summer Season")
+
+        # Test selecting a prior season by ?season=<pk>
+        resp_prior = self.client.get(f"{url}?season={prior_season.pk}")
+        self.assertEqual(resp_prior.status_code, 200)
+        self.assertEqual(resp_prior.context["current_season"], prior_season)
+        # Should jump to the start of the 2025 season
+        self.assertEqual(resp_prior.context["week_start"].year, 2025)
+        # Task cards and headings should be rendered for that season
+        self.assertContains(resp_prior, "Horse &amp; Saddle Assignments &amp; Rider Readiness")
+        self.assertContains(resp_prior, "Guest Intake: Release &amp; Deposit Status")
+
+        # Test selecting an upcoming season by ?season=<pk>
+        resp_upcoming = self.client.get(f"{url}?season={upcoming_season.pk}")
+        self.assertEqual(resp_upcoming.status_code, 200)
+        self.assertEqual(resp_upcoming.context["current_season"], upcoming_season)
+        self.assertEqual(resp_upcoming.context["week_start"].year, 2027)
+
+        # Test with ?dept=office query parameter
+        resp_dept = self.client.get(f"{url}?dept=office&season={prior_season.pk}")
+        self.assertEqual(resp_dept.status_code, 200)
+        self.assertContains(resp_dept, 'id="horse-card-season-select"')
+        self.assertContains(resp_dept, 'id="intake-card-season-select"')
+        self.assertContains(resp_dept, "dept=office")
+
+    def test_weekly_reports_season_selector(self):
+        prior_season = OperatingSeason.objects.create(
+            name="2025 Summer Season",
+            start_date=date(2025, 6, 1),
+            end_date=date(2025, 9, 30),
+            is_active=True,
+        )
+        current_season = OperatingSeason.objects.create(
+            name="2026 Summer Season",
+            start_date=date(2026, 6, 1),
+            end_date=date(2026, 9, 30),
+            is_active=True,
+        )
+
+        # 1. Horse Assignment Report
+        horse_url = reverse("ranch:weekly_horse_assignment_report")
+        horse_resp = self.client.get(f"{horse_url}?season={prior_season.pk}")
+        self.assertEqual(horse_resp.status_code, 200)
+        self.assertContains(horse_resp, "Operating Season:")
+        self.assertContains(horse_resp, "2025 Summer Season (Prior Season)")
+        self.assertEqual(horse_resp.context["week_start"].year, 2025)
+
+        # 2. Dining Report
+        dining_url = reverse("ranch:weekly_dining_guest_list_report")
+        dining_resp = self.client.get(f"{dining_url}?season={prior_season.pk}")
+        self.assertEqual(dining_resp.status_code, 200)
+        self.assertContains(dining_resp, "Operating Season:")
+        self.assertEqual(dining_resp.context["week_start"].year, 2025)
+
+        # 3. Special Requests Report
+        req_url = reverse("ranch:weekly_special_requests_report")
+        req_resp = self.client.get(f"{req_url}?season={prior_season.pk}")
+        self.assertEqual(req_resp.status_code, 200)
+        self.assertContains(req_resp, "Operating Season:")
+        self.assertEqual(req_resp.context["week_start"].year, 2025)
+
+    def test_office_dashboard_monthly_view(self):
+        url = reverse("ranch:office_dashboard")
+        
+        # Test viewing by month
+        response = self.client.get(f"{url}?view=month&year=2026&month=7")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["view_mode"], "month")
+        self.assertEqual(response.context["target_year"], 2026)
+        self.assertEqual(response.context["target_month"], 7)
+        self.assertEqual(response.context["previous_month_year"], 2026)
+        self.assertEqual(response.context["previous_month_month"], 6)
+        self.assertEqual(response.context["next_month_year"], 2026)
+        self.assertEqual(response.context["next_month_month"], 8)
+        
+        self.assertContains(response, "Month of July 2026")
+        self.assertContains(response, "By Month")
+        self.assertContains(response, "By Week")
+        self.assertContains(response, "Next Month →")
+        self.assertContains(response, "← Previous Month")
+        
+        # Check carousel month tabs
+        self.assertTrue(len(response.context["horse_saddle_months"]) >= 1)
+        self.assertTrue(len(response.context["intake_months"]) >= 1)
+        self.assertContains(response, "carousel-section-months")
+        self.assertContains(response, "carousel-section-weeks")
+
+    def test_reports_monthly_view(self):
+        # 1. Horse Assignment Report in Monthly View
+        horse_url = reverse("ranch:weekly_horse_assignment_report")
+        resp_horse = self.client.get(f"{horse_url}?view=month&year=2026&month=6")
+        self.assertEqual(resp_horse.status_code, 200)
+        self.assertEqual(resp_horse.context["view_mode"], "month")
+        self.assertEqual(resp_horse.context["target_month"], 6)
+        self.assertContains(resp_horse, "Month of June 2026")
+        self.assertContains(resp_horse, "Next Month &rarr;")
+
+        # 2. Dining Report in Monthly View
+        dining_url = reverse("ranch:weekly_dining_guest_list_report")
+        resp_dining = self.client.get(f"{dining_url}?view=month&year=2026&month=7")
+        self.assertEqual(resp_dining.status_code, 200)
+        self.assertEqual(resp_dining.context["view_mode"], "month")
+        self.assertContains(resp_dining, "Month of July 2026")
+
+        # 3. Special Requests Report in Monthly View
+        req_url = reverse("ranch:weekly_special_requests_report")
+        resp_req = self.client.get(f"{req_url}?view=month&year=2026&month=8")
+        self.assertEqual(resp_req.status_code, 200)
+        self.assertEqual(resp_req.context["view_mode"], "month")
+        self.assertContains(resp_req, "August 1 - August 31, 2026")
+
+    def test_rider_readiness_uses_client_profile_height_weight(self):
+        # Create client with physical data set on client profile
+        rider = RanchClient.objects.create(
+            first_name="RiderWithProfile",
+            last_name="Data",
+            email="riderdata@example.com",
+            is_rider=True,
+            riding_level=RanchClient.RidingLevel.BEGINNER,
+            height="5'9\"",
+            weight="160 lbs",
+            saddle_preference="15\" Trail",
+        )
+        res = Reservation.objects.create(
+            reservation_name="Rider Profile Test Stay",
+            primary_contact=rider,
+            arrival_date=date(2026, 8, 30),
+            departure_date=date(2026, 9, 6),
+            status=Reservation.ReservationStatus.CONFIRMED,
+        )
+        guest = ReservationGuest.objects.create(
+            reservation=res,
+            client=rider,
+            age_at_stay=30,
+        )
+
+        url = reverse("ranch:office_dashboard")
+        resp = self.client.get(f"{url}?week=2026-08-30")
+        self.assertEqual(resp.status_code, 200)
+
+        # Horse assignment report
+        horse_url = reverse("ranch:weekly_horse_assignment_report")
+        horse_resp = self.client.get(f"{horse_url}?week=2026-08-30")
+        self.assertEqual(horse_resp.status_code, 200)
+        self.assertContains(horse_resp, "5&#x27;9&quot;")
+        self.assertContains(horse_resp, "160 lbs")
+        self.assertContains(horse_resp, "Saddle Pref: 15&quot; Trail")

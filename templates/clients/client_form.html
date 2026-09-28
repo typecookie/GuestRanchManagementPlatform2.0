@@ -106,7 +106,35 @@
         </div>
 
         <div class="form-field">
-            <label for="{{ form.riding_level.id_for_label }}">Riding Level</label>
+            <label for="{{ form.years_return.id_for_label }}">Years Return (Years at Paradise)</label>
+            {{ form.years_return }}
+            {% for error in form.years_return.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <!-- Rider & Physical Profile Section -->
+        <div class="form-field form-grid-full" style="margin-top: 16px; margin-bottom: 4px; padding-bottom: 8px; border-bottom: 2px solid var(--color-border);">
+            <h3 style="margin: 0; font-size: 1.1rem; color: var(--color-charcoal); display: flex; align-items: center; gap: 8px;">
+                <span>🐴</span> Rider &amp; Physical Profile (Horse Assignments Data)
+            </h3>
+            <p style="margin: 4px 0 0; font-size: 0.85rem; color: var(--color-muted);">
+                Enter height, weight, riding experience, and saddle preferences used for horse matching and rider readiness reports.
+            </p>
+        </div>
+
+        <div class="form-field checkbox-field">
+            <label>
+                {{ form.is_rider }}
+                <strong>Participates in Horseback Riding</strong>
+            </label>
+            {% for error in form.is_rider.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.riding_level.id_for_label }}">Riding Level / Experience</label>
             {{ form.riding_level }}
             {% for error in form.riding_level.errors %}
                 <span class="form-error">{{ error }}</span>
@@ -114,11 +142,46 @@
         </div>
 
         <div class="form-field">
-            <label for="{{ form.years_return.id_for_label }}">Years Return (Years at Paradise)</label>
-            {{ form.years_return }}
-            {% for error in form.years_return.errors %}
+            <label for="{{ form.height.id_for_label }}">Height</label>
+            {{ form.height }}
+            {% for error in form.height.errors %}
                 <span class="form-error">{{ error }}</span>
             {% endfor %}
+            <span class="form-help">e.g. 5'8", 68 in, or 5ft 8in</span>
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.weight.id_for_label }}">Weight</label>
+            {{ form.weight }}
+            {% for error in form.weight.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+            <span class="form-help">e.g. 150 lbs</span>
+        </div>
+
+        <div class="form-field form-grid-full">
+            <label for="{{ form.saddle_preference.id_for_label }}">Saddle Preference / Size</label>
+            {{ form.saddle_preference }}
+            {% for error in form.saddle_preference.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+            <span class="form-help">e.g. 15" Western, Youth saddle, wide gullet, padded stirrups</span>
+        </div>
+
+        <div class="form-field form-grid-full">
+            <label for="{{ form.rider_notes.id_for_label }}">Riding &amp; Horse Notes</label>
+            {{ form.rider_notes }}
+            {% for error in form.rider_notes.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+            <span class="form-help">Horse personality preferences, gait preferences, physical restrictions, past favorite horses, etc.</span>
+        </div>
+
+        <!-- Notes Section -->
+        <div class="form-field form-grid-full" style="margin-top: 16px; margin-bottom: 4px; padding-bottom: 8px; border-bottom: 2px solid var(--color-border);">
+            <h3 style="margin: 0; font-size: 1.1rem; color: var(--color-charcoal); display: flex; align-items: center; gap: 8px;">
+                <span>📋</span> Notes &amp; Preferences
+            </h3>
         </div>
 
         <div class="form-field form-grid-full">

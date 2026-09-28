@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}Operating Dates & Seasons | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Ranch Configuration{% endblock %}
+
+{% block page_title %}Operating Dates & Seasons{% endblock %}
+
+{% block page_subtitle %}
+Set the opening and closing dates when the guest ranch is in operation. These dates control availability in the Cabin Grid and filter out off-season periods across ranch views.
+{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'reservations:reservation_grid' %}" class="button button-secondary">Cabin Grid</a>
+<a href="{% url 'reservations:operating_season_create' %}" class="button button-primary">+ Add Operating Season</a>
+{% endblock %}
+
+{% block content %}
+<div class="stat-grid">
+    <div class="stat-card">
+        <span>Today's Status</span>
+        <strong>
+            {% if is_open_today %}
+                <span class="badge badge-success" style="font-size: 1rem; padding: 6px 12px;">Open for Guests</span>
+            {% else %}
+                <span class="badge badge-warning" style="font-size: 1rem; padding: 6px 12px;">Off-Season (Closed)</span>
+            {% endif %}
+        </strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Active Seasons</span>
+        <strong>{{ active_seasons_count }}</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Current / Next Season</span>
+        <strong style="font-size: 1.1rem; line-height: 1.3;">
+            {% if current_season %}
+                {{ current_season.name }}
+                <div style="font-size: 0.8rem; font-weight: normal; color: var(--color-muted);">
+                    {{ current_season.start_date|date:"M j, Y" }} – {{ current_season.end_date|date:"M j, Y" }}
+                </div>
+            {% elif upcoming_season %}
+                {{ upcoming_season.name }}
+                <div style="font-size: 0.8rem; font-weight: normal; color: var(--color-muted);">
+                    Opens {{ upcoming_season.start_date|date:"M j, Y" }}
+                </div>
+            {% else %}
+                Default (June – Sept)
+            {% endif %}
+        </strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Default Season Window</span>
+        <strong style="font-size: 1.1rem; line-height: 1.3;">
+            June 1 – Sept 30
+            <div style="font-size: 0.8rem; font-weight: normal; color: var(--color-muted);">
+                Standard Summer Operation
+            </div>
+        </strong>
+    </div>
+</div>
+
+<div class="page-toolbar" style="margin-bottom: 1.5rem; justify-content: space-between;">
+    <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+        <span style="font-weight: 700; color: var(--color-text);">Operating Season Settings</span>
+        <span style="color: var(--color-muted); font-size: 0.9rem;">(Default: June to September)</span>
+    </div>
+
+    <div style="display: flex; gap: 0.5rem; align-items: center;">
+        <form method="post" action="{% url 'reservations:operating_season_reset_defaults' %}" style="display: inline;">
+            {% csrf_token %}
+            <button type="submit" class="button button-secondary" title="Populate standard June 1 to September 30 season for the current year">
+                ⚡ Set Standard Season (June – Sept)
+            </button>
+        </form>
+        <a href="{% url 'reservations:operating_season_create' %}" class="button button-primary">+ New Season</a>
+    </div>
+</div>
+
+{% if seasons %}
+    <div class="table-card">
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Season Name</th>
+                        <th>Opening Date</th>
+                        <th>Closing Date</th>
+                        <th>Duration</th>
+                        <th>Status</th>
+                        <th>Notes</th>
+                        <th class="text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for season in seasons %}
+                        <tr>
+                            <td>
+                                <strong>{{ season.name }}</strong>
+                                {% if season.start_date <= today and season.end_date >= today %}
+                                    <span class="badge badge-success" style="margin-left: 6px; font-size: 0.72rem;">Current</span>
+                                {% elif season.end_date < today %}
+                                    <span class="badge badge-info" style="margin-left: 6px; font-size: 0.72rem; opacity: 0.85;">Prior</span>
+                                {% elif season.start_date > today %}
+                                    <span class="badge badge-warning" style="margin-left: 6px; font-size: 0.72rem;">Upcoming</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ season.start_date|date:"l, M j, Y" }}</td>
+                            <td>{{ season.end_date|date:"l, M j, Y" }}</td>
+                            <td>{{ season.duration_days }} days ({{ season.duration_weeks }} wks)</td>
+                            <td>
+                                {% if season.is_active %}
+                                    <span class="badge badge-success">Active</span>
+                                {% else %}
+                                    <span class="badge badge-warning">Inactive</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if season.notes %}
+                                    <span title="{{ season.notes }}">{{ season.notes|truncatechars:45 }}</span>
+                                {% else %}
+                                    <span class="table-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="table-actions">
+                                    <a href="{% url 'reservations:reservation_grid' %}?year={{ season.start_date.year }}&month={{ season.start_date.month }}" class="button button-small button-secondary" title="View Cabin Grid for this season">Grid</a>
+                                    <a href="{% url 'reservations:operating_season_update' season.pk %}" class="button button-small button-primary">Edit</a>
+                                    <a href="{% url 'reservations:operating_season_delete' season.pk %}" class="button button-small button-danger">Delete</a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% else %}
+    <div class="empty-state">
+        <div class="empty-state-content">
+            <div class="empty-state-icon">📅</div>
+            <h2>No Custom Operating Seasons Configured</h2>
+            <p>
+                The platform is currently operating on <strong>default ranch dates: June 1 through September 30</strong>.<br>
+                You can create custom operating season date ranges, or click below to save the standard summer season.
+            </p>
+            <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 1rem;">
+                <form method="post" action="{% url 'reservations:operating_season_reset_defaults' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="button button-primary">
+                        Set Standard Season (June 1 – Sept 30)
+                    </button>
+                </form>
+                <a href="{% url 'reservations:operating_season_create' %}" class="button button-secondary">
+                    Custom Season Dates
+                </a>
+            </div>
+        </div>
+    </div>
+{% endif %}
+
+<div class="form-card" style="margin-top: 2rem; background: var(--color-panel);">
+    <h3 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 1.1rem;">How Operating Dates Work</h3>
+    <ul style="margin: 0; padding-left: 1.25rem; color: var(--color-muted); line-height: 1.6; font-size: 0.92rem;">
+        <li><strong>Cabin Grid View:</strong> The cabin grid highlights open operating weeks and clearly indicates closed / off-season weeks. You can also use the "Filter Closed Weeks" toggle to display only open weeks.</li>
+        <li><strong>Default Landing:</strong> When opening the Cabin Grid or dashboard, the system automatically focuses on the active operating season (June to September by default) rather than closed winter months.</li>
+        <li><strong>Reservation List:</strong> You can filter reservations specifically by active operating seasons or view off-season reservations.</li>
+        <li><strong>Defaults:</strong> If no explicit season records are in the database, the system automatically uses the standard ranch schedule (June 1 to September 30).</li>
+    </ul>
+</div>
+{% endblock %}

@@ -42,8 +42,9 @@ Welcome to your guest ranch command center.
             <div class="dashboard-card">
                 <div class="dashboard-card-icon">🐴</div>
                 <h3>Horses</h3>
-                <p>View horse availability, health notes, riding levels, and assignments.</p>
+                <p>View horse availability, pasture assignments, health notes, and riding levels.</p>
                 <a href="{% url 'horses:horse_list' %}" class="card-link">Open Horses</a>
+                <a href="{% url 'horses:pasture_board' %}" class="card-link">Open Pasture Board</a>
             </div>
 
             <div class="dashboard-card">

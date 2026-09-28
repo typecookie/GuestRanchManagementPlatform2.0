@@ -60,6 +60,19 @@
                         {% endif %}
                     </div>
                 </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Pasture Location</div>
+                    <div class="detail-value">
+                        {% if horse.pasture %}
+                            <a href="{% url 'horses:pasture_board' %}" class="badge badge-neutral" style="text-decoration: none;">
+                                🌿 {{ horse.pasture.name }}
+                            </a>
+                        {% else %}
+                            <span class="text-muted">Unassigned / Barn</span>
+                        {% endif %}
+                    </div>
+                </div>
             </div>
         </div>
 

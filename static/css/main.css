@@ -104,17 +104,28 @@ textarea:focus-visible {
     font-size: 1.5rem;
 }
 
+.sidebar-section-title {
+    padding: 0 10px;
+    margin: 12px 0 6px;
+    color: rgba(220, 161, 93, 0.75);
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
 .sidebar-nav {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 
 .sidebar-link {
     display: flex;
     align-items: center;
-    min-height: 44px;
-    padding: 12px 14px;
+    gap: 12px;
+    min-height: 42px;
+    padding: 10px 14px;
     border-radius: 12px;
     color: #f9efe2;
     text-decoration: none;
@@ -123,6 +134,19 @@ textarea:focus-visible {
         background 0.18s ease,
         color 0.18s ease,
         transform 0.18s ease;
+}
+
+.sidebar-link-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    line-height: 1;
+}
+
+.sidebar-link-text {
+    flex: 1;
+    font-size: 0.95rem;
 }
 
 .sidebar-link:hover,
@@ -139,6 +163,67 @@ textarea:focus-visible {
 
 .sidebar-link.is-active:hover {
     background: #ffffff;
+}
+
+/* Department Top Sub-navigation */
+
+.department-subnav {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 10px 16px;
+    margin-bottom: 24px;
+    background: #ffffff;
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    box-shadow: var(--shadow-card);
+}
+
+.department-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 14px;
+    background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-dark) 100%);
+    color: #ffffff;
+    border-radius: 999px;
+    font-weight: 800;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    box-shadow: 0 2px 6px rgba(155, 95, 45, 0.25);
+    white-space: nowrap;
+}
+
+.department-links {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    flex: 1;
+}
+
+.subnav-link {
+    display: inline-flex;
+    align-items: center;
+    padding: 7px 14px;
+    border-radius: 8px;
+    color: var(--color-muted);
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.subnav-link:hover {
+    background: rgba(155, 95, 45, 0.12);
+    color: var(--color-text);
+}
+
+.subnav-link.is-active {
+    background: var(--color-sidebar);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(47, 36, 29, 0.2);
 }
 .sidebar-footer {
     display: flex;
@@ -1544,6 +1629,123 @@ button.badge:hover {
     background: #ded2c0;
 }
 
+.legend-closed {
+    background: #9d8e7e;
+}
+
+.reservation-grid-closed {
+    background: repeating-linear-gradient(
+        -45deg,
+        rgba(235, 225, 212, 0.45),
+        rgba(235, 225, 212, 0.45) 8px,
+        rgba(245, 238, 228, 0.45) 8px,
+        rgba(245, 238, 228, 0.45) 16px
+    ) !important;
+}
+
+.closed-cell-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 84px;
+    border-radius: 16px;
+    border: 1px dashed rgba(175, 160, 145, 0.5);
+    background: rgba(245, 238, 228, 0.35);
+    padding: 8px;
+    box-sizing: border-box;
+}
+
+.closed-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: rgba(140, 125, 110, 0.18);
+    color: var(--color-muted);
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.closed-sub {
+    margin-top: 3px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--color-muted);
+    opacity: 0.85;
+}
+
+.week-closed-header {
+    background: #e7ded2 !important;
+    opacity: 0.9;
+}
+
+.closed-label-text {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: rgba(150, 130, 110, 0.2);
+    color: var(--color-muted);
+    font-size: 0.72rem;
+    font-weight: 800;
+}
+
+.season-grid-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 12px 18px;
+    background: var(--color-panel);
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    margin-bottom: 14px;
+}
+
+.season-banner-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.season-month-pills {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.season-month-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--color-border);
+    background: #ffffff;
+    color: var(--color-text);
+    font-size: 0.82rem;
+    font-weight: 800;
+    text-decoration: none;
+    transition: all 0.15s ease;
+}
+
+.season-month-pill:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+    background: #fffdf9;
+}
+
+.season-month-pill.is-active {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: #ffffff;
+}
+
 .reservation-grid-card {
     overflow: hidden;
     background: linear-gradient(180deg, #ffffff 0%, #fbf7f0 100%);
@@ -2368,6 +2570,40 @@ button.badge:hover {
 
 .card-week-pane.is-active {
     display: block;
+}
+
+.card-mode-btn {
+    border: none;
+    background: transparent;
+    padding: 4px 12px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--color-charcoal);
+    transition: all 0.15s ease;
+}
+
+.card-mode-btn:hover {
+    color: var(--color-accent);
+}
+
+.card-mode-btn.is-active {
+    background: #ffffff !important;
+    color: var(--color-accent) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.carousel-section-months {
+    display: none;
+}
+
+.task-card-carousel.mode-months .carousel-section-weeks {
+    display: none !important;
+}
+
+.task-card-carousel.mode-months .carousel-section-months {
+    display: block !important;
 }
 
 .card-week-pane .table-card {

@@ -1,3 +1,4 @@
+import calendar
 from collections import Counter
 from datetime import date, datetime, timedelta
 
@@ -6,8 +7,26 @@ from django.db.models import Count, Q
 from django.shortcuts import render, redirect, get_object_or_404
 from apps.groups.decorators import module_permission_required
 
-from apps.reservations.models import Reservation, ReservationCabin, ReservationGuest
+from apps.reservations.models import OperatingSeason, Reservation, ReservationCabin, ReservationGuest
 from apps.reservations.forms import HorseAssignmentForm
+from apps.reservations.season_utils import (
+    get_next_open_week,
+    get_previous_open_week,
+    get_open_weeks_sequence,
+    get_open_months_sequence,
+    get_next_open_month,
+    get_previous_open_month,
+    is_week_open,
+    is_month_open,
+    is_date_open,
+    get_previous_month_tuple,
+    get_next_month_tuple,
+    get_current_or_upcoming_season,
+    get_categorized_seasons,
+    get_default_season,
+    get_active_season_for_date,
+    get_default_grid_year_month,
+)
 from apps.horses.models import Horse
 from apps.cabins.models import Cabin
 from apps.projects.models import Project
@@ -18,19 +37,154 @@ def get_current_sunday():
     return today - timedelta(days=days_since_sunday)
 
 
+def resolve_season_and_week(request):
+    """
+    Resolves season context, week bounds, month bounds, view_mode ('week' vs 'month'),
+    and navigation for office views and reports.
+    Supports ?season=<id>, ?week=<YYYY-MM-DD>, ?view=month/week, ?month=<1-12>, and ?year=<YYYY>.
+    """
+    today = date.today()
+    categorized_seasons = get_categorized_seasons(today)
+    season_param = request.GET.get("season", "").strip()
+    week_param = request.GET.get("week", "").strip()
+    month_param = request.GET.get("month", "").strip()
+    year_param = request.GET.get("year", "").strip()
+    view_param = request.GET.get("view", request.GET.get("view_mode", request.GET.get("period", ""))).strip().lower()
+
+    selected_season = None
+    if season_param and season_param.isdigit():
+        selected_season = OperatingSeason.objects.filter(pk=int(season_param), is_active=True).first()
+
+    if week_param:
+        try:
+            parsed_date = datetime.strptime(week_param, "%Y-%m-%d").date()
+            days_since_sunday = (parsed_date.weekday() + 1) % 7
+            week_start = parsed_date - timedelta(days=days_since_sunday)
+        except ValueError:
+            week_start = get_current_sunday()
+    elif selected_season:
+        if selected_season.contains_date(today):
+            target_date = today
+        else:
+            target_date = selected_season.start_date
+        s_days = (target_date.weekday() + 1) % 7
+        target_sunday = target_date - timedelta(days=s_days)
+        if is_week_open(target_sunday, target_sunday + timedelta(days=7)):
+            week_start = target_sunday
+        else:
+            week_start = get_next_open_week(target_sunday - timedelta(days=7))
+    else:
+        days_since_sunday = (today.weekday() + 1) % 7
+        today_sunday = today - timedelta(days=days_since_sunday)
+        if is_week_open(today_sunday, today_sunday + timedelta(days=7)):
+            week_start = today_sunday
+        else:
+            default_s = categorized_seasons.get("default_season")
+            if default_s:
+                s_date = default_s.start_date
+                s_days = (s_date.weekday() + 1) % 7
+                season_sunday = s_date - timedelta(days=s_days)
+                if is_week_open(season_sunday, season_sunday + timedelta(days=7)):
+                    week_start = season_sunday
+                else:
+                    week_start = get_next_open_week(season_sunday - timedelta(days=7))
+            else:
+                week_start = get_next_open_week(today_sunday - timedelta(days=7))
+
+    week_end = week_start + timedelta(days=7)
+    previous_week = get_previous_open_week(week_start)
+    next_week = get_next_open_week(week_start)
+
+    # Determine view_mode: 'month' or 'week'
+    if view_param == "month" or (month_param and not week_param):
+        view_mode = "month"
+    else:
+        view_mode = "week"
+
+    # Determine target year and month
+    if year_param.isdigit() and month_param.isdigit():
+        target_year = int(year_param)
+        target_month = int(month_param)
+    elif month_param.isdigit():
+        target_month = int(month_param)
+        target_year = selected_season.start_date.year if selected_season else (int(year_param) if year_param.isdigit() else (week_start.year if week_param else today.year))
+    elif selected_season:
+        if selected_season.contains_date(today):
+            target_year = today.year
+            target_month = today.month
+        else:
+            target_year = selected_season.start_date.year
+            target_month = selected_season.start_date.month
+    elif week_param:
+        target_year = week_start.year
+        target_month = week_start.month
+    else:
+        def_y, def_m = get_default_grid_year_month(today)
+        target_year = def_y
+        target_month = def_m
+
+    if target_month < 1 or target_month > 12:
+        target_month = 6
+
+    last_day_of_month = calendar.monthrange(target_year, target_month)[1]
+    month_start = date(target_year, target_month, 1)
+    month_end = date(target_year, target_month, last_day_of_month) + timedelta(days=1)
+    month_end_display = date(target_year, target_month, last_day_of_month)
+
+    previous_month_year, previous_month_month = get_previous_open_month(target_year, target_month)
+    next_month_year, next_month_month = get_next_open_month(target_year, target_month)
+    previous_month_start = date(previous_month_year, previous_month_month, 1)
+    next_month_start = date(next_month_year, next_month_month, 1)
+
+    current_season = (
+        selected_season
+        or (get_active_season_for_date(month_start) if view_mode == "month" else None)
+        or get_active_season_for_date(week_start)
+        or get_active_season_for_date(week_end - timedelta(days=1))
+        or categorized_seasons.get("default_season")
+    )
+
+    is_open = is_week_open(week_start, week_end)
+    is_month_open_flag = is_month_open(target_year, target_month)
+
+    # Sequence of open months for carousel tabs and navigation
+    month_seq_start = month_start if view_mode == "month" else (selected_season.start_date if selected_season else (week_start if is_date_open(week_start) else None))
+    open_months = get_open_months_sequence(start_date=month_seq_start, num_months=4, season=selected_season)
+
+    period_start = month_start if view_mode == "month" else week_start
+    period_end = month_end if view_mode == "month" else week_end
+
+    return {
+        "today": today,
+        "view_mode": view_mode,
+        "week_start": week_start,
+        "week_end": week_end,
+        "month_start": month_start,
+        "month_end": month_end,
+        "month_end_display": month_end_display,
+        "target_year": target_year,
+        "target_month": target_month,
+        "period_start": period_start,
+        "period_end": period_end,
+        "previous_week": previous_week,
+        "next_week": next_week,
+        "previous_month_year": previous_month_year,
+        "previous_month_month": previous_month_month,
+        "next_month_year": next_month_year,
+        "next_month_month": next_month_month,
+        "previous_month_start": previous_month_start,
+        "next_month_start": next_month_start,
+        "categorized_seasons": categorized_seasons,
+        "current_season": current_season,
+        "is_week_open": is_open,
+        "is_month_open": is_month_open_flag,
+        "selected_season": selected_season,
+        "open_months": open_months,
+    }
+
+
 def parse_week_start(request):
-    week_value = request.GET.get("week")
-
-    if not week_value:
-        return get_current_sunday()
-
-    try:
-        parsed_date = datetime.strptime(week_value, "%Y-%m-%d").date()
-    except ValueError:
-        return get_current_sunday()
-
-    days_since_sunday = (parsed_date.weekday() + 1) % 7
-    return parsed_date - timedelta(days=days_since_sunday)
+    return resolve_season_and_week(request)["week_start"]
 
 
 @module_permission_required('Ranch', 'read')
@@ -45,12 +199,12 @@ def ranch_operations(request):
 def build_weekly_horse_saddle_task(week_start, num_weeks=4):
     """
     Builds week-by-week horse, saddle, and rider readiness data
-    for current and upcoming weeks.
+    for current and upcoming open weeks.
     """
     weeks_data = []
+    open_weeks = get_open_weeks_sequence(week_start, num_weeks=num_weeks)
 
-    for w_idx in range(num_weeks):
-        w_start = week_start + timedelta(days=7 * w_idx)
+    for w_idx, w_start in enumerate(open_weeks):
         w_end = w_start + timedelta(days=7)
 
         reservations = Reservation.objects.select_related(
@@ -68,7 +222,7 @@ def build_weekly_horse_saddle_task(week_start, num_weeks=4):
             "reservation", "client", "cabin", "horse", "saddle"
         ).filter(
             reservation_id__in=res_ids
-        ).order_by("cabin__sort_order", "cabin__name", "client__last_name", "client__first_name")
+        ).order_by("cabin__capacity", "cabin__sort_order", "cabin__name", "client__last_name", "client__first_name")
 
         res_guest_map = {r.id: [] for r in reservations}
 
@@ -81,14 +235,18 @@ def build_weekly_horse_saddle_task(week_start, num_weeks=4):
             is_rider = g.is_riding and g.riding_experience != ReservationGuest.RidingExperience.NON_RIDER
             g.is_rider = is_rider
 
+            effective_h = g.height or (g.client.height if g.client else "")
+            effective_w = g.weight or (g.client.weight if g.client else "")
+            effective_exp = g.riding_experience if (g.riding_experience and g.riding_experience != ReservationGuest.RidingExperience.UNKNOWN) else (g.client.riding_level if g.client and g.client.riding_level != 'unknown' else ReservationGuest.RidingExperience.UNKNOWN)
+
             missing_fields = []
             if is_rider:
                 total_riders += 1
-                if not g.height or not str(g.height).strip():
+                if not effective_h or not str(effective_h).strip():
                     missing_fields.append("Height")
-                if not g.weight or not str(g.weight).strip():
+                if not effective_w or not str(effective_w).strip():
                     missing_fields.append("Weight")
-                if not g.riding_experience or g.riding_experience == ReservationGuest.RidingExperience.UNKNOWN:
+                if not effective_exp or effective_exp == ReservationGuest.RidingExperience.UNKNOWN:
                     missing_fields.append("Experience")
                 if g.age_at_stay is None and not (g.client and g.client.date_of_birth):
                     missing_fields.append("Age")
@@ -152,12 +310,12 @@ def build_weekly_horse_saddle_task(week_start, num_weeks=4):
 def build_weekly_intake_task(week_start, num_weeks=4):
     """
     Builds week-by-week intake task data (release forms, deposits, missing info)
-    for current and upcoming weeks.
+    for current and upcoming open weeks.
     """
     weeks_data = []
+    open_weeks = get_open_weeks_sequence(week_start, num_weeks=num_weeks)
 
-    for w_idx in range(num_weeks):
-        w_start = week_start + timedelta(days=7 * w_idx)
+    for w_idx, w_start in enumerate(open_weeks):
         w_end = w_start + timedelta(days=7)
 
         reservations = Reservation.objects.select_related(
@@ -175,7 +333,7 @@ def build_weekly_intake_task(week_start, num_weeks=4):
             "reservation", "client", "cabin"
         ).filter(
             reservation_id__in=res_ids
-        ).order_by("cabin__sort_order", "cabin__name", "client__last_name", "client__first_name")
+        ).order_by("cabin__capacity", "cabin__sort_order", "cabin__name", "client__last_name", "client__first_name")
 
         res_guest_map = {r.id: [] for r in reservations}
         for g in guests:
@@ -273,9 +431,260 @@ def build_weekly_intake_task(week_start, num_weeks=4):
     return weeks_data
 
 
-def build_booking_alerts(week_start):
+def build_monthly_horse_saddle_task(target_date=None, num_months=4, season=None):
     """
-    Detects operational oddities and booking anomalies for the given week:
+    Builds month-by-month horse, saddle, and rider readiness data
+    for current and upcoming open months.
+    """
+    months_data = []
+    open_months = get_open_months_sequence(target_date, num_months=num_months, season=season)
+
+    for m_idx, m_item in enumerate(open_months):
+        m_start = m_item["start_date"]
+        m_end = m_item["end_date"] + timedelta(days=1)
+
+        reservations = Reservation.objects.select_related(
+            "primary_contact", "household", "travel_group"
+        ).filter(
+            arrival_date__lt=m_end,
+            departure_date__gt=m_start,
+        ).exclude(
+            status=Reservation.ReservationStatus.CANCELLED,
+        ).order_by("arrival_date", "reservation_name")
+
+        res_ids = reservations.values_list("id", flat=True)
+
+        guests = ReservationGuest.objects.select_related(
+            "reservation", "client", "cabin", "horse", "saddle"
+        ).filter(
+            reservation_id__in=res_ids
+        ).order_by("cabin__capacity", "cabin__sort_order", "cabin__name", "client__last_name", "client__first_name")
+
+        res_guest_map = {r.id: [] for r in reservations}
+
+        horses_assigned = 0
+        saddles_assigned = 0
+        missing_info_count = 0
+        total_riders = 0
+
+        for g in guests:
+            is_rider = g.is_riding and g.riding_experience != ReservationGuest.RidingExperience.NON_RIDER
+            g.is_rider = is_rider
+
+            effective_h = g.height or (g.client.height if g.client else "")
+            effective_w = g.weight or (g.client.weight if g.client else "")
+            effective_exp = g.riding_experience if (g.riding_experience and g.riding_experience != ReservationGuest.RidingExperience.UNKNOWN) else (g.client.riding_level if g.client and g.client.riding_level != 'unknown' else ReservationGuest.RidingExperience.UNKNOWN)
+
+            missing_fields = []
+            if is_rider:
+                total_riders += 1
+                if not effective_h or not str(effective_h).strip():
+                    missing_fields.append("Height")
+                if not effective_w or not str(effective_w).strip():
+                    missing_fields.append("Weight")
+                if not effective_exp or effective_exp == ReservationGuest.RidingExperience.UNKNOWN:
+                    missing_fields.append("Experience")
+                if g.age_at_stay is None and not (g.client and g.client.date_of_birth):
+                    missing_fields.append("Age")
+
+                if g.horse_id:
+                    horses_assigned += 1
+                if g.saddle_id:
+                    saddles_assigned += 1
+                if missing_fields:
+                    missing_info_count += 1
+
+            g.missing_rider_fields = missing_fields
+            g.needs_horse = is_rider and not g.horse_id
+            g.needs_saddle = is_rider and not g.saddle_id
+
+            if g.reservation_id in res_guest_map:
+                res_guest_map[g.reservation_id].append(g)
+
+        missing_horses = total_riders - horses_assigned
+        missing_saddles = total_riders - saddles_assigned
+
+        reservation_items = []
+        for r in reservations:
+            r_guests = res_guest_map.get(r.id, [])
+            r_riders = [g for g in r_guests if g.is_rider]
+            r_needs_horses = [g for g in r_riders if g.needs_horse]
+            r_needs_saddles = [g for g in r_riders if g.needs_saddle]
+            r_missing_info = [g for g in r_riders if g.missing_rider_fields]
+
+            reservation_items.append({
+                "reservation": r,
+                "guests": r_guests,
+                "riders": r_riders,
+                "riders_count": len(r_riders),
+                "needs_horses_count": len(r_needs_horses),
+                "needs_saddles_count": len(r_needs_saddles),
+                "missing_info_count": len(r_missing_info),
+                "is_ready": (len(r_riders) == 0) or (len(r_needs_horses) == 0 and len(r_needs_saddles) == 0 and len(r_missing_info) == 0),
+            })
+
+        months_data.append({
+            "month_idx": m_idx,
+            "is_first_month": m_idx == 0,
+            "month_info": m_item,
+            "month_label": m_item["label"],
+            "month_short": m_item["short_label"],
+            "month_name": m_item["month_name"],
+            "year": m_item["year"],
+            "month": m_item["month"],
+            "month_start": m_start,
+            "month_end": m_item["end_date"],
+            "total_reservations": reservations.count(),
+            "total_guests": len(guests),
+            "total_riders": total_riders,
+            "horses_assigned": horses_assigned,
+            "saddles_assigned": saddles_assigned,
+            "missing_horses": missing_horses,
+            "missing_saddles": missing_saddles,
+            "missing_info_count": missing_info_count,
+            "is_all_complete": total_riders > 0 and missing_horses == 0 and missing_saddles == 0 and missing_info_count == 0,
+            "reservations": reservation_items,
+            "has_records": len(guests) > 0,
+        })
+
+    return months_data
+
+
+def build_monthly_intake_task(target_date=None, num_months=4, season=None):
+    """
+    Builds month-by-month intake task data (release forms, deposits, missing info)
+    for current and upcoming open months.
+    """
+    months_data = []
+    open_months = get_open_months_sequence(target_date, num_months=num_months, season=season)
+
+    for m_idx, m_item in enumerate(open_months):
+        m_start = m_item["start_date"]
+        m_end = m_item["end_date"] + timedelta(days=1)
+
+        reservations = Reservation.objects.select_related(
+            "primary_contact", "household", "travel_group"
+        ).filter(
+            arrival_date__lt=m_end,
+            departure_date__gt=m_start,
+        ).exclude(
+            status=Reservation.ReservationStatus.CANCELLED,
+        ).order_by("arrival_date", "reservation_name")
+
+        res_ids = reservations.values_list("id", flat=True)
+
+        guests = ReservationGuest.objects.select_related(
+            "reservation", "client", "cabin"
+        ).filter(
+            reservation_id__in=res_ids
+        ).order_by("cabin__capacity", "cabin__sort_order", "cabin__name", "client__last_name", "client__first_name")
+
+        res_guest_map = {r.id: [] for r in reservations}
+        for g in guests:
+            if g.reservation_id in res_guest_map:
+                res_guest_map[g.reservation_id].append(g)
+
+        deposits_received = 0
+        deposits_requested = 0
+        deposits_needed = 0
+
+        total_signed_releases = 0
+        total_unsigned_releases = 0
+
+        reservation_items = []
+
+        for r in reservations:
+            r_guests = res_guest_map.get(r.id, [])
+            total_r_guests = len(r_guests)
+
+            signed_guests = [g for g in r_guests if g.signed_release]
+            unsigned_guests = [g for g in r_guests if not g.signed_release]
+
+            total_signed_releases += len(signed_guests)
+            total_unsigned_releases += len(unsigned_guests)
+
+            if r.deposit_received:
+                deposits_received += 1
+                deposit_status = "received"
+                deposit_badge = "badge-success"
+                deposit_label = "Deposit Received"
+            elif r.deposit_request_sent:
+                deposits_requested += 1
+                deposit_status = "sent"
+                deposit_badge = "badge-warning"
+                deposit_label = "Request Sent"
+            else:
+                deposits_needed += 1
+                deposit_status = "needed"
+                deposit_badge = "badge-danger"
+                deposit_label = "Deposit Needed"
+
+            missing_items = []
+            if not r.deposit_received:
+                if not r.deposit_request_sent:
+                    missing_items.append("Deposit Not Requested")
+                else:
+                    missing_items.append("Deposit Pending")
+
+            if unsigned_guests:
+                missing_items.append(f"{len(unsigned_guests)} Unsigned Release{'s' if len(unsigned_guests) > 1 else ''}")
+
+            unassigned_cabins = [g for g in r_guests if not g.cabin_id]
+            if unassigned_cabins:
+                missing_items.append(f"{len(unassigned_cabins)} Unassigned Cabin{'s' if len(unassigned_cabins) > 1 else ''}")
+
+            primary = r.primary_contact
+            if not primary:
+                missing_items.append("No Primary Contact")
+            else:
+                if not primary.phone and not primary.email:
+                    missing_items.append("Missing Contact Info")
+
+            is_complete = (len(missing_items) == 0 and r.deposit_received and len(unsigned_guests) == 0)
+
+            reservation_items.append({
+                "reservation": r,
+                "guests": r_guests,
+                "total_guests": total_r_guests,
+                "signed_count": len(signed_guests),
+                "unsigned_count": len(unsigned_guests),
+                "unsigned_guests": unsigned_guests,
+                "deposit_status": deposit_status,
+                "deposit_badge": deposit_badge,
+                "deposit_label": deposit_label,
+                "missing_items": missing_items,
+                "is_complete": is_complete,
+            })
+
+        months_data.append({
+            "month_idx": m_idx,
+            "is_first_month": m_idx == 0,
+            "month_info": m_item,
+            "month_label": m_item["label"],
+            "month_short": m_item["short_label"],
+            "month_name": m_item["month_name"],
+            "year": m_item["year"],
+            "month": m_item["month"],
+            "month_start": m_start,
+            "month_end": m_item["end_date"],
+            "total_reservations": reservations.count(),
+            "total_guests": len(guests),
+            "deposits_received": deposits_received,
+            "deposits_requested": deposits_requested,
+            "deposits_needed": deposits_needed,
+            "total_signed_releases": total_signed_releases,
+            "total_unsigned_releases": total_unsigned_releases,
+            "is_all_complete": len(reservations) > 0 and deposits_needed == 0 and total_unsigned_releases == 0 and all(item["is_complete"] for item in reservation_items),
+            "reservations": reservation_items,
+            "has_records": len(reservations) > 0,
+        })
+
+    return months_data
+
+
+def build_booking_alerts(period_start, period_end=None):
+    """
+    Detects operational oddities and booking anomalies for the given time period (week or month):
     - Multiple individuals / parties in a cabin without a TravelGroup
     - Multi-guest reservations without a Household or TravelGroup
     - Multiple active reservations overlapping in the same cabin
@@ -285,7 +694,8 @@ def build_booking_alerts(week_start):
     - Active reservations with zero guests attached
     - Cabin assignments outside reservation stay dates
     """
-    week_end = week_start + timedelta(days=7)
+    if period_end is None:
+        period_end = period_start + timedelta(days=7)
     alerts = []
 
     reservations = Reservation.objects.select_related(
@@ -296,8 +706,8 @@ def build_booking_alerts(week_start):
         "guests__cabin",
         "cabin_assignments__cabin",
     ).filter(
-        arrival_date__lt=week_end,
-        departure_date__gt=week_start,
+        arrival_date__lt=period_end,
+        departure_date__gt=period_start,
     ).exclude(
         status=Reservation.ReservationStatus.CANCELLED,
     ).order_by("arrival_date", "reservation_name")
@@ -420,7 +830,7 @@ def build_booking_alerts(week_start):
     # Cabin level checks
     all_occupied_cabins = set(cabin_guests_map.keys()) | set(cabin_reservations_map.keys())
 
-    for cabin in sorted(all_occupied_cabins, key=lambda c: (c.sort_order, c.name)):
+    for cabin in sorted(all_occupied_cabins, key=lambda c: (c.capacity, c.sort_order, c.name)):
         c_guests_pairs = cabin_guests_map.get(cabin, [])
         c_reservations = list(cabin_reservations_map.get(cabin, []))
         total_cabin_guests = len(c_guests_pairs)
@@ -461,7 +871,7 @@ def build_booking_alerts(week_start):
                     "severity": "warning",
                     "badge_class": "badge-warning",
                     "title": f"Multiple Reservations Sharing Cabin: {cabin.name}",
-                    "description": f"{len(c_reservations)} distinct unlinked reservations ({res_names_str}) are assigned to {cabin.name} in the week of {week_start.strftime('%b %d, %Y')}.",
+                    "description": f"{len(c_reservations)} distinct unlinked reservations ({res_names_str}) are assigned to {cabin.name} in the period of {period_start.strftime('%b %d, %Y')}.",
                     "cabin": cabin,
                     "reservations": c_reservations,
                     "quick_actions": [
@@ -532,19 +942,37 @@ def build_booking_alerts(week_start):
 
 @module_permission_required('Ranch', 'read')
 def office_dashboard(request):
-    week_start = parse_week_start(request)
-    week_end = week_start + timedelta(days=7)
+    season_info = resolve_season_and_week(request)
+    view_mode = season_info["view_mode"]
+    week_start = season_info["week_start"]
+    week_end = season_info["week_end"]
+    month_start = season_info["month_start"]
+    month_end = season_info["month_end"]
+    month_end_display = season_info["month_end_display"]
+    period_start = season_info["period_start"]
+    period_end = season_info["period_end"]
+    previous_week = season_info["previous_week"]
+    next_week = season_info["next_week"]
+    previous_month_year = season_info["previous_month_year"]
+    previous_month_month = season_info["previous_month_month"]
+    next_month_year = season_info["next_month_year"]
+    next_month_month = season_info["next_month_month"]
+    previous_month_start = season_info["previous_month_start"]
+    next_month_start = season_info["next_month_start"]
+    current_season = season_info["current_season"]
+    categorized_seasons = season_info["categorized_seasons"]
+    is_week_open_flag = season_info["is_week_open"]
+    is_month_open_flag = season_info["is_month_open"]
+    today = season_info["today"]
+    open_months = season_info["open_months"]
 
-    previous_week = week_start - timedelta(days=7)
-    next_week = week_start + timedelta(days=7)
-
-    reservations_this_week = Reservation.objects.select_related(
+    reservations_period = Reservation.objects.select_related(
         "primary_contact",
         "household",
         "travel_group",
     ).filter(
-        arrival_date__lt=week_end,
-        departure_date__gt=week_start,
+        arrival_date__lt=period_end,
+        departure_date__gt=period_start,
     ).exclude(
         status=Reservation.ReservationStatus.CANCELLED,
     ).order_by(
@@ -552,9 +980,9 @@ def office_dashboard(request):
         "reservation_name",
     )
 
-    reservation_ids = reservations_this_week.values_list("id", flat=True)
+    reservation_ids = reservations_period.values_list("id", flat=True)
 
-    unassigned_guest_reservations = reservations_this_week.annotate(
+    unassigned_guest_reservations = reservations_period.annotate(
         unassigned_guest_count=Count(
             "guests",
             filter=Q(guests__cabin__isnull=True),
@@ -563,7 +991,7 @@ def office_dashboard(request):
         unassigned_guest_count__gt=0,
     )
 
-    reservation_guests_this_week = ReservationGuest.objects.select_related(
+    reservation_guests_period = ReservationGuest.objects.select_related(
         "reservation",
         "client",
         "cabin",
@@ -571,35 +999,63 @@ def office_dashboard(request):
         reservation_id__in=reservation_ids,
     )
 
-    cabin_assignments_this_week = ReservationCabin.objects.select_related(
+    cabin_assignments_period = ReservationCabin.objects.select_related(
         "reservation",
         "cabin",
     ).filter(
         reservation_id__in=reservation_ids,
-        arrival_date__lt=week_end,
-        departure_date__gt=week_start,
+        arrival_date__lt=period_end,
+        departure_date__gt=period_start,
     ).order_by(
+        "cabin__capacity",
         "cabin__sort_order",
         "cabin__name",
     )
 
     horse_saddle_weeks = build_weekly_horse_saddle_task(week_start, num_weeks=4)
+    horse_saddle_months = build_monthly_horse_saddle_task(month_start, num_months=4, season=current_season)
+
     intake_weeks = build_weekly_intake_task(week_start, num_weeks=4)
-    booking_alerts = build_booking_alerts(week_start)
+    intake_months = build_monthly_intake_task(month_start, num_months=4, season=current_season)
+
+    booking_alerts = build_booking_alerts(period_start, period_end)
 
     context = {
+        "today": today,
+        "view_mode": view_mode,
         "week_start": week_start,
         "week_end": week_end,
+        "month_start": month_start,
+        "month_end": month_end,
+        "month_end_display": month_end_display,
+        "target_year": season_info["target_year"],
+        "target_month": season_info["target_month"],
+        "period_start": period_start,
+        "period_end": period_end,
         "previous_week": previous_week,
         "next_week": next_week,
-        "reservations_this_week": reservations_this_week,
+        "previous_month_year": previous_month_year,
+        "previous_month_month": previous_month_month,
+        "next_month_year": next_month_year,
+        "next_month_month": next_month_month,
+        "previous_month_start": previous_month_start,
+        "next_month_start": next_month_start,
+        "current_season": current_season,
+        "categorized_seasons": categorized_seasons,
+        "is_week_open": is_week_open_flag,
+        "is_month_open": is_month_open_flag,
+        "reservations_this_week": reservations_period,
+        "reservations_period": reservations_period,
         "unassigned_guest_reservations": unassigned_guest_reservations,
-        "reservation_count": reservations_this_week.count(),
-        "guest_count": reservation_guests_this_week.count(),
-        "unassigned_guest_count": reservation_guests_this_week.filter(cabin__isnull=True).count(),
-        "occupied_cabin_count": cabin_assignments_this_week.values("cabin").distinct().count(),
+        "reservation_count": reservations_period.count(),
+        "guest_count": reservation_guests_period.count(),
+        "unassigned_guest_count": reservation_guests_period.filter(cabin__isnull=True).count(),
+        "occupied_cabin_count": cabin_assignments_period.values("cabin").distinct().count(),
         "horse_saddle_weeks": horse_saddle_weeks,
+        "horse_saddle_months": horse_saddle_months,
         "intake_weeks": intake_weeks,
+        "intake_months": intake_months,
+        "open_months": open_months,
         "booking_alerts": booking_alerts,
         "booking_alert_count": len(booking_alerts),
     }
@@ -697,15 +1153,30 @@ def build_cabin_dining_parties(guests):
 
 @module_permission_required('Ranch', 'read')
 def weekly_dining_guest_list_report(request):
-    week_start = parse_week_start(request)
-    week_end = week_start + timedelta(days=7)
-
-    previous_week = week_start - timedelta(days=7)
-    next_week = week_start + timedelta(days=7)
+    season_info = resolve_season_and_week(request)
+    view_mode = season_info["view_mode"]
+    period_start = season_info["period_start"]
+    period_end = season_info["period_end"]
+    week_start = season_info["week_start"]
+    week_end = season_info["week_end"]
+    month_start = season_info["month_start"]
+    month_end = season_info["month_end"]
+    month_end_display = season_info["month_end_display"]
+    previous_week = season_info["previous_week"]
+    next_week = season_info["next_week"]
+    previous_month_year = season_info["previous_month_year"]
+    previous_month_month = season_info["previous_month_month"]
+    next_month_year = season_info["next_month_year"]
+    next_month_month = season_info["next_month_month"]
+    current_season = season_info["current_season"]
+    categorized_seasons = season_info["categorized_seasons"]
+    is_week_open_flag = season_info["is_week_open"]
+    is_month_open_flag = season_info["is_month_open"]
+    today = season_info["today"]
 
     reservations_this_week = Reservation.objects.filter(
-        arrival_date__lt=week_end,
-        departure_date__gt=week_start,
+        arrival_date__lt=period_end,
+        departure_date__gt=period_start,
     ).exclude(
         status=Reservation.ReservationStatus.CANCELLED,
     )
@@ -715,6 +1186,7 @@ def weekly_dining_guest_list_report(request):
     cabins = Cabin.objects.filter(
         reservation_guests__reservation_id__in=reservation_ids,
     ).distinct().order_by(
+        "capacity",
         "sort_order",
         "name",
     )
@@ -727,6 +1199,7 @@ def weekly_dining_guest_list_report(request):
     ).filter(
         reservation_id__in=reservation_ids,
     ).order_by(
+        "cabin__capacity",
         "cabin__sort_order",
         "cabin__name",
         "client__last_name",
@@ -790,10 +1263,27 @@ def weekly_dining_guest_list_report(request):
         )
 
     context = {
+        "today": today,
+        "view_mode": view_mode,
+        "period_start": period_start,
+        "period_end": period_end,
         "week_start": week_start,
         "week_end": week_end,
+        "month_start": month_start,
+        "month_end": month_end,
+        "month_end_display": month_end_display,
+        "target_year": season_info["target_year"],
+        "target_month": season_info["target_month"],
         "previous_week": previous_week,
         "next_week": next_week,
+        "previous_month_year": previous_month_year,
+        "previous_month_month": previous_month_month,
+        "next_month_year": next_month_year,
+        "next_month_month": next_month_month,
+        "current_season": current_season,
+        "categorized_seasons": categorized_seasons,
+        "is_week_open": is_week_open_flag,
+        "is_month_open": is_month_open_flag,
         "cabin_sections": cabin_sections,
         "reservation_count": reservations_this_week.count(),
         "guest_count": reservation_guests.count(),
@@ -804,15 +1294,30 @@ def weekly_dining_guest_list_report(request):
 
 @module_permission_required('Ranch', 'read')
 def weekly_special_requests_report(request):
-    week_start = parse_week_start(request)
-    week_end = week_start + timedelta(days=7)
-
-    previous_week = week_start - timedelta(days=7)
-    next_week = week_start + timedelta(days=7)
+    season_info = resolve_season_and_week(request)
+    view_mode = season_info["view_mode"]
+    period_start = season_info["period_start"]
+    period_end = season_info["period_end"]
+    week_start = season_info["week_start"]
+    week_end = season_info["week_end"]
+    month_start = season_info["month_start"]
+    month_end = season_info["month_end"]
+    month_end_display = season_info["month_end_display"]
+    previous_week = season_info["previous_week"]
+    next_week = season_info["next_week"]
+    previous_month_year = season_info["previous_month_year"]
+    previous_month_month = season_info["previous_month_month"]
+    next_month_year = season_info["next_month_year"]
+    next_month_month = season_info["next_month_month"]
+    current_season = season_info["current_season"]
+    categorized_seasons = season_info["categorized_seasons"]
+    is_week_open_flag = season_info["is_week_open"]
+    is_month_open_flag = season_info["is_month_open"]
+    today = season_info["today"]
 
     reservations_this_week = Reservation.objects.filter(
-        arrival_date__lt=week_end,
-        departure_date__gt=week_start,
+        arrival_date__lt=period_end,
+        departure_date__gt=period_start,
     ).exclude(
         status=Reservation.ReservationStatus.CANCELLED,
     ).select_related("primary_contact", "household")
@@ -822,6 +1327,7 @@ def weekly_special_requests_report(request):
     cabins = Cabin.objects.filter(
         reservation_guests__reservation_id__in=reservation_ids,
     ).distinct().order_by(
+        "capacity",
         "sort_order",
         "name",
     )
@@ -835,6 +1341,7 @@ def weekly_special_requests_report(request):
     ).filter(
         reservation_id__in=reservation_ids,
     ).order_by(
+        "cabin__capacity",
         "cabin__sort_order",
         "cabin__name",
         "reservation__id",
@@ -998,10 +1505,27 @@ def weekly_special_requests_report(request):
         })
 
     context = {
+        "today": today,
+        "view_mode": view_mode,
+        "period_start": period_start,
+        "period_end": period_end,
         "week_start": week_start,
         "week_end": week_end,
+        "month_start": month_start,
+        "month_end": month_end,
+        "month_end_display": month_end_display,
+        "target_year": season_info["target_year"],
+        "target_month": season_info["target_month"],
         "previous_week": previous_week,
         "next_week": next_week,
+        "previous_month_year": previous_month_year,
+        "previous_month_month": previous_month_month,
+        "next_month_year": next_month_year,
+        "next_month_month": next_month_month,
+        "current_season": current_season,
+        "categorized_seasons": categorized_seasons,
+        "is_week_open": is_week_open_flag,
+        "is_month_open": is_month_open_flag,
         "cabin_sections": cabin_sections,
         "reservation_count": reservations_this_week.count(),
         "guest_count": reservation_guests.count(),
@@ -1012,11 +1536,28 @@ def weekly_special_requests_report(request):
 
 @module_permission_required('Ranch', 'read')
 def weekly_horse_assignment_report(request):
-    week_start = parse_week_start(request)
-    week_end = week_start + timedelta(days=7)
-
-    previous_week = week_start - timedelta(days=7)
-    next_week = week_start + timedelta(days=7)
+    season_info = resolve_season_and_week(request)
+    view_mode = season_info["view_mode"]
+    period_start = season_info["period_start"]
+    period_end = season_info["period_end"]
+    week_start = season_info["week_start"]
+    week_end = season_info["week_end"]
+    month_start = season_info["month_start"]
+    month_end = season_info["month_end"]
+    month_end_display = season_info["month_end_display"]
+    target_year = season_info["target_year"]
+    target_month = season_info["target_month"]
+    previous_week = season_info["previous_week"]
+    next_week = season_info["next_week"]
+    previous_month_year = season_info["previous_month_year"]
+    previous_month_month = season_info["previous_month_month"]
+    next_month_year = season_info["next_month_year"]
+    next_month_month = season_info["next_month_month"]
+    current_season = season_info["current_season"]
+    categorized_seasons = season_info["categorized_seasons"]
+    is_week_open_flag = season_info["is_week_open"]
+    is_month_open_flag = season_info["is_month_open"]
+    today = season_info["today"]
 
     if request.method == "POST":
         # Handle bulk save
@@ -1028,7 +1569,15 @@ def weekly_horse_assignment_report(request):
                     form = HorseAssignmentForm(request.POST, instance=guest, prefix=f"guest_{guest_id}")
                     if form.is_valid():
                         form.save()
-            return redirect(f"{request.path}?week={week_start.strftime('%Y-%m-%d')}")
+            if view_mode == "month":
+                redirect_url = f"{request.path}?view=month&year={target_year}&month={target_month}"
+            else:
+                redirect_url = f"{request.path}?week={week_start.strftime('%Y-%m-%d')}"
+            if current_season:
+                redirect_url += f"&season={current_season.pk}"
+            if request.GET.get("dept"):
+                redirect_url += f"&dept={request.GET.get('dept')}"
+            return redirect(redirect_url)
         
         # Keep single guest save for backward compatibility or direct posts
         guest_id = request.POST.get("guest_id")
@@ -1037,11 +1586,19 @@ def weekly_horse_assignment_report(request):
             form = HorseAssignmentForm(request.POST, instance=guest)
             if form.is_valid():
                 form.save()
-                return redirect(f"{request.path}?week={week_start.strftime('%Y-%m-%d')}")
+                if view_mode == "month":
+                    redirect_url = f"{request.path}?view=month&year={target_year}&month={target_month}"
+                else:
+                    redirect_url = f"{request.path}?week={week_start.strftime('%Y-%m-%d')}"
+                if current_season:
+                    redirect_url += f"&season={current_season.pk}"
+                if request.GET.get("dept"):
+                    redirect_url += f"&dept={request.GET.get('dept')}"
+                return redirect(redirect_url)
 
     reservations_this_week = Reservation.objects.filter(
-        arrival_date__lt=week_end,
-        departure_date__gt=week_start,
+        arrival_date__lt=period_end,
+        departure_date__gt=period_start,
     ).exclude(
         status=Reservation.ReservationStatus.CANCELLED,
     )
@@ -1051,6 +1608,7 @@ def weekly_horse_assignment_report(request):
     cabins = Cabin.objects.filter(
         reservation_guests__reservation_id__in=reservation_ids,
     ).distinct().order_by(
+        "capacity",
         "sort_order",
         "name",
     )
@@ -1064,6 +1622,7 @@ def weekly_horse_assignment_report(request):
     ).filter(
         reservation_id__in=reservation_ids,
     ).order_by(
+        "cabin__capacity",
         "cabin__sort_order",
         "cabin__name",
         "client__last_name",
@@ -1120,11 +1679,29 @@ def weekly_horse_assignment_report(request):
         )
 
     context = {
+        "today": today,
+        "view_mode": view_mode,
+        "period_start": period_start,
+        "period_end": period_end,
         "week_start": week_start,
         "week_end": week_end,
+        "month_start": month_start,
+        "month_end": month_end,
+        "month_end_display": month_end_display,
+        "target_year": target_year,
+        "target_month": target_month,
         "previous_week": previous_week,
         "next_week": next_week,
+        "previous_month_year": previous_month_year,
+        "previous_month_month": previous_month_month,
+        "next_month_year": next_month_year,
+        "next_month_month": next_month_month,
+        "current_season": current_season,
+        "categorized_seasons": categorized_seasons,
+        "is_week_open": is_week_open_flag,
+        "is_month_open": is_month_open_flag,
         "cabin_sections": cabin_sections,
+        "unassigned_guests": unassigned_guests,
         "reservation_count": reservations_this_week.count(),
         "guest_count": reservation_guests.count(),
     }

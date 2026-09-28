@@ -302,3 +302,111 @@ class GroupBuilderTests(TestCase):
         self.assertEqual(res1.household, valek_hh)
         self.assertEqual(res2.travel_group, tg)
         self.assertEqual(res2.household, wheeler_hh)
+
+
+class ClientRiderProfileTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username="ranchmanager",
+            password="password123",
+            email="manager@ranch.local",
+        )
+        self.client = Client()
+        self.client.force_login(self.user)
+
+    def test_client_rider_and_physical_fields_creation(self):
+        client = RanchClient.objects.create(
+            first_name="Clint",
+            last_name="Eastwood",
+            email="clint@example.com",
+            phone="307-555-0199",
+            is_rider=True,
+            riding_level=RanchClient.RidingLevel.ADVANCED,
+            height="6'4\"",
+            weight="205 lbs",
+            saddle_preference="16\" Highback Roper",
+            rider_notes="Prefers energetic horses, great balance on steep trails.",
+        )
+
+        self.assertEqual(client.height, "6'4\"")
+        self.assertEqual(client.weight, "205 lbs")
+        self.assertTrue(client.is_rider)
+        self.assertEqual(client.saddle_preference, "16\" Highback Roper")
+        self.assertIn("energetic horses", client.rider_notes)
+
+    def test_client_create_and_update_views_with_rider_data(self):
+        create_url = reverse("clients:client_create")
+        post_data = {
+            "first_name": "Sarah",
+            "last_name": "Connor",
+            "email": "sarah@example.com",
+            "phone": "555-0100",
+            "client_type": RanchClient.ClientType.ADULT,
+            "is_rider": True,
+            "riding_level": RanchClient.RidingLevel.INTERMEDIATE,
+            "height": "5'6\"",
+            "weight": "135 lbs",
+            "saddle_preference": "15\" Western Trail Saddle",
+            "rider_notes": "Experienced with calm geldings",
+            "is_active": True,
+        }
+
+        resp = self.client.post(create_url, post_data)
+        self.assertEqual(resp.status_code, 302)
+
+        client = RanchClient.objects.get(email="sarah@example.com")
+        self.assertEqual(client.height, "5'6\"")
+        self.assertEqual(client.weight, "135 lbs")
+        self.assertEqual(client.saddle_preference, "15\" Western Trail Saddle")
+        self.assertEqual(client.rider_notes, "Experienced with calm geldings")
+
+        # View Client Detail page
+        detail_url = reverse("clients:client_detail", args=[client.pk])
+        detail_resp = self.client.get(detail_url)
+        self.assertEqual(detail_resp.status_code, 200)
+        self.assertContains(detail_resp, "Rider &amp; Physical Information")
+        self.assertContains(detail_resp, "5&#x27;6&quot;")
+        self.assertContains(detail_resp, "135 lbs")
+        self.assertContains(detail_resp, "15&quot; Western Trail Saddle")
+        self.assertContains(detail_resp, "Experienced with calm geldings")
+        self.assertContains(detail_resp, "Active Rider")
+
+        # View Client List page
+        list_url = reverse("clients:client_list")
+        list_resp = self.client.get(list_url)
+        self.assertEqual(list_resp.status_code, 200)
+        self.assertContains(list_resp, "5&#x27;6&quot;")
+        self.assertContains(list_resp, "135 lbs")
+
+    def test_reservation_guest_auto_populates_physical_data_from_client(self):
+        rider_client = RanchClient.objects.create(
+            first_name="Wyatt",
+            last_name="Earp",
+            email="wyatt@example.com",
+            is_rider=True,
+            riding_level=RanchClient.RidingLevel.ADVANCED,
+            height="6'0\"",
+            weight="190 lbs",
+        )
+
+        res = Reservation.objects.create(
+            reservation_name="Earp Stay",
+            primary_contact=rider_client,
+            arrival_date=date(2026, 7, 5),
+            departure_date=date(2026, 7, 12),
+            status=Reservation.ReservationStatus.CONFIRMED,
+        )
+
+        # Create ReservationGuest without explicitly providing height & weight
+        guest = ReservationGuest.objects.create(
+            reservation=res,
+            client=rider_client,
+        )
+
+        # Should auto-populate from client profile on save
+        self.assertEqual(guest.height, "6'0\"")
+        self.assertEqual(guest.weight, "190 lbs")
+        self.assertEqual(guest.riding_experience, ReservationGuest.RidingExperience.ADVANCED)
+        self.assertTrue(guest.is_riding)
+        self.assertEqual(guest.effective_height, "6'0\"")
+        self.assertEqual(guest.effective_weight, "190 lbs")

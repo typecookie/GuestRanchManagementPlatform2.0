@@ -45,11 +45,6 @@ View contact details, preferences, household connections, travel groups, and not
                 </div>
 
                 <div class="detail-row">
-                    <div class="detail-label">Riding Level</div>
-                    <div class="detail-value">{{ client.get_riding_level_display }}</div>
-                </div>
-
-                <div class="detail-row">
                     <div class="detail-label">Years Return</div>
                     <div class="detail-value">
                         {% if client.years_return %}
@@ -80,6 +75,81 @@ View contact details, preferences, household connections, travel groups, and not
                             <span class="badge badge-success">Active</span>
                         {% else %}
                             <span class="badge badge-neutral">Inactive</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="detail-card">
+            <div class="section-heading" style="margin-bottom: 12px;">
+                <div>
+                    <h2 style="display: flex; align-items: center; gap: 8px;">
+                        <span>🐴</span> Rider &amp; Physical Information
+                    </h2>
+                    <p>Required data for horse and saddle assignments, weight limits, and trail ride readiness.</p>
+                </div>
+            </div>
+
+            <div class="detail-list">
+                <div class="detail-row">
+                    <div class="detail-label">Rider Status</div>
+                    <div class="detail-value">
+                        {% if client.is_rider and client.riding_level != 'non_rider' %}
+                            <span class="badge badge-success">Active Rider</span>
+                        {% else %}
+                            <span class="badge badge-neutral">Non-Rider</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Riding Level / Experience</div>
+                    <div class="detail-value">
+                        <span class="badge badge-info">{{ client.get_riding_level_display }}</span>
+                    </div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Height</div>
+                    <div class="detail-value">
+                        {% if client.height %}
+                            <strong>{{ client.height }}</strong>
+                        {% else %}
+                            <span class="text-danger font-weight-bold">Missing Height</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Weight</div>
+                    <div class="detail-value">
+                        {% if client.weight %}
+                            <strong>{{ client.weight }}</strong>
+                        {% else %}
+                            <span class="text-danger font-weight-bold">Missing Weight</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Saddle Preference / Size</div>
+                    <div class="detail-value">
+                        {% if client.saddle_preference %}
+                            {{ client.saddle_preference }}
+                        {% else %}
+                            <span class="text-muted">Not specified</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Riding &amp; Horse Notes</div>
+                    <div class="detail-value">
+                        {% if client.rider_notes %}
+                            {{ client.rider_notes|linebreaks }}
+                        {% else %}
+                            <span class="text-muted">No specific horse preferences or notes recorded.</span>
                         {% endif %}
                     </div>
                 </div>
@@ -275,10 +345,31 @@ View contact details, preferences, household connections, travel groups, and not
         </div>
 
         <div class="detail-card">
-            <h2>Future Reservation History</h2>
-            <p class="text-muted mb-0">
-                Reservation history will appear here once the reservation platform is connected.
-            </p>
+            <h2>Reservation &amp; Horse History</h2>
+            {% if past_stays %}
+                <div class="side-list">
+                    {% for stay in past_stays %}
+                        <div class="side-list-item" style="padding: 10px 0; border-bottom: 1px solid var(--color-border);">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+                                <a href="{% url 'reservations:reservation_detail' stay.reservation.pk %}">
+                                    <strong>{{ stay.reservation.reservation_name }}</strong>
+                                </a>
+                                <span class="badge badge-neutral" style="font-size: 0.75rem;">{{ stay.reservation.arrival_date|date:"Y" }}</span>
+                            </div>
+                            <div style="font-size: 0.8rem; color: var(--color-muted); margin-top: 2px;">
+                                {{ stay.reservation.arrival_date|date:"M j" }} – {{ stay.reservation.departure_date|date:"M j, Y" }}
+                                {% if stay.cabin %} · Cabin: <strong>{{ stay.cabin.name }}</strong>{% endif %}
+                            </div>
+                            <div style="font-size: 0.8rem; margin-top: 4px; display: flex; flex-direction: column; gap: 2px;">
+                                <div>🐴 Horse: {% if stay.horse %}<strong><a href="{% url 'horses:horse_detail' stay.horse.pk %}">{{ stay.horse.name }}</a></strong>{% else %}<span class="text-muted">None</span>{% endif %}</div>
+                                <div>🪑 Saddle: {% if stay.saddle %}<strong><a href="{% url 'horses:saddle_detail' stay.saddle.pk %}">{{ stay.saddle }}</a></strong>{% else %}<span class="text-muted">None</span>{% endif %}</div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-muted mb-0">No past reservations or horse assignments on file.</p>
+            {% endif %}
         </div>
 
         <div class="detail-card">

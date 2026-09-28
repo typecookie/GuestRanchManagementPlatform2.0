@@ -1,4 +1,34 @@
+from django.core.exceptions import ValidationError
 from django.db import models
+
+class Pasture(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True, help_text="Pasture notes, acreage, or location description")
+    display_order = models.PositiveIntegerField(default=0, help_text="Column display order on board")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["display_order", "name"]
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def horse_count(self):
+        return self.horses.count()
+
+    def can_be_deleted(self):
+        return not self.horses.exists()
+
+    def delete(self, *args, **kwargs):
+        if self.horses.exists():
+            raise ValidationError(
+                f"Cannot delete pasture '{self.name}' because it contains {self.horses.count()} horse(s). "
+                "Move horses to another pasture or unassign them first."
+            )
+        return super().delete(*args, **kwargs)
 
 class Horse(models.Model):
     class Gender(models.TextChoices):
@@ -18,6 +48,14 @@ class Horse(models.Model):
     birth_year = models.PositiveIntegerField(null=True, blank=True)
     gender = models.CharField(max_length=20, choices=Gender.choices, default=Gender.GELDING)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
+    pasture = models.ForeignKey(
+        Pasture,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="horses",
+        help_text="Current pasture location of the horse"
+    )
     
     notes = models.TextField(blank=True)
     medical_notes = models.TextField(blank=True, help_text="Legacy medical notes")

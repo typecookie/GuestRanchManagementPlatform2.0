@@ -11,15 +11,89 @@ Sunday-to-Sunday cabin reservation board. Click an available cabin week to creat
 {% endblock %}
 
 {% block page_actions %}
+<a href="{% url 'reservations:operating_dates_list' %}" class="button button-secondary">⚙ Operating Dates</a>
 <a href="{% url 'reservations:reservation_list' %}" class="button button-secondary">Reservation List</a>
 <a href="{% url 'reservations:reservation_create' %}" class="button button-primary">New Reservation</a>
 {% endblock %}
 
 {% block content %}
+<div class="season-grid-banner">
+    <div class="season-banner-info" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <label for="grid-season-select" style="font-weight: 800; color: var(--color-text); font-size: 0.85rem; margin: 0; white-space: nowrap;">Operating Season:</label>
+        <select
+            id="grid-season-select"
+            class="form-select"
+            style="font-weight: 600; font-size: 0.85rem; padding: 4px 10px; height: 34px; min-width: 230px;"
+            onchange="if(this.value) window.location.href=this.value;"
+        >
+            {% if categorized_seasons.current_and_upcoming %}
+                <optgroup label="Current &amp; Upcoming Seasons">
+                    {% for s in categorized_seasons.current_and_upcoming %}
+                        <option
+                            value="{% url 'reservations:reservation_grid' %}?season={{ s.pk }}{% if not filter_closed %}&filter_closed=false{% endif %}"
+                            {% if current_season and current_season.pk == s.pk %}selected{% endif %}
+                        >
+                            {{ s.name }} ({{ s.status_label }}) · {{ s.start_date|date:"M j" }} – {{ s.end_date|date:"M j, Y" }}
+                        </option>
+                    {% endfor %}
+                </optgroup>
+            {% endif %}
+            {% if categorized_seasons.prior_seasons %}
+                <optgroup label="Prior Seasons">
+                    {% for s in categorized_seasons.prior_seasons %}
+                        <option
+                            value="{% url 'reservations:reservation_grid' %}?season={{ s.pk }}{% if not filter_closed %}&filter_closed=false{% endif %}"
+                            {% if current_season and current_season.pk == s.pk %}selected{% endif %}
+                        >
+                            {{ s.name }} (Prior Season) · {{ s.start_date|date:"M j" }} – {{ s.end_date|date:"M j, Y" }}
+                        </option>
+                    {% endfor %}
+                </optgroup>
+            {% endif %}
+            {% if not categorized_seasons.current_and_upcoming and not categorized_seasons.prior_seasons %}
+                <option value="{% url 'reservations:reservation_grid' %}?year={{ today.year }}&month=6">Summer Season {{ today.year }} (Default)</option>
+            {% endif %}
+        </select>
+
+        {% if is_month_open %}
+            <span class="badge badge-success" style="font-size: 0.75rem;">Open Month</span>
+        {% else %}
+            <span class="badge badge-warning" style="font-size: 0.75rem;">Off-Season Month</span>
+        {% endif %}
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+        <div class="season-month-pills">
+            <span style="font-size: 0.8rem; font-weight: 700; color: var(--color-muted); margin-right: 2px;">Season Months:</span>
+            {% for item in season_nav_months %}
+                <a
+                    href="{% url 'reservations:reservation_grid' %}?year={{ year }}&month={{ item.month }}{% if current_season %}&season={{ current_season.pk }}{% endif %}{% if not filter_closed %}&filter_closed=false{% endif %}"
+                    class="season-month-pill {% if item.is_current %}is-active{% endif %}"
+                    title="{{ item.full_name }} {{ year }}"
+                >
+                    {{ item.name }}
+                </a>
+            {% endfor %}
+        </div>
+
+        <div>
+            {% if filter_closed %}
+                <a href="{% url 'reservations:reservation_grid' %}?year={{ year }}&month={{ month }}{% if current_season %}&season={{ current_season.pk }}{% endif %}&filter_closed=false" class="button button-small button-secondary">
+                    Show All Weeks
+                </a>
+            {% else %}
+                <a href="{% url 'reservations:reservation_grid' %}?year={{ year }}&month={{ month }}{% if current_season %}&season={{ current_season.pk }}{% endif %}&filter_closed=true" class="button button-small button-secondary" title="Hide off-season / closed weeks from grid">
+                    Filter Closed Weeks
+                </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
 <div class="reservation-board-header">
     <div class="reservation-board-nav">
         <a
-            href="{% url 'reservations:reservation_grid' %}?year={{ previous_year }}&month={{ previous_month }}"
+            href="{% url 'reservations:reservation_grid' %}?year={{ previous_year }}&month={{ previous_month }}{% if not filter_closed %}&filter_closed=false{% endif %}"
             class="button button-secondary"
         >
             ← Previous Month
@@ -31,7 +105,7 @@ Sunday-to-Sunday cabin reservation board. Click an available cabin week to creat
         </div>
 
         <a
-            href="{% url 'reservations:reservation_grid' %}?year={{ next_year }}&month={{ next_month }}"
+            href="{% url 'reservations:reservation_grid' %}?year={{ next_year }}&month={{ next_month }}{% if not filter_closed %}&filter_closed=false{% endif %}"
             class="button button-secondary"
         >
             Next Month →
@@ -63,6 +137,11 @@ Sunday-to-Sunday cabin reservation board. Click an available cabin week to creat
             <span class="legend-dot legend-available"></span>
             Available
         </span>
+
+        <span class="legend-item">
+            <span class="legend-dot legend-closed"></span>
+            Closed / Off-Season
+        </span>
     </div>
 </div>
 
@@ -76,76 +155,102 @@ Sunday-to-Sunday cabin reservation board. Click an available cabin week to creat
                     </th>
 
                     {% for week in weeks %}
-                        <th class="reservation-grid-week-header">
+                        <th class="reservation-grid-week-header {% if week.is_closed %}week-closed-header{% endif %}">
                             <span class="week-label">{{ week.label }}</span>
-                            <span class="week-subtitle">Sun-Sun</span>
+                            <span class="week-subtitle">
+                                {% if week.is_closed %}
+                                    <span class="closed-label-text">Closed</span>
+                                {% else %}
+                                    Sun-Sun
+                                {% endif %}
+                            </span>
                         </th>
                     {% endfor %}
                 </tr>
             </thead>
 
             <tbody>
-                {% for row in grid_rows %}
+                {% if not weeks %}
                     <tr>
-                        <th class="reservation-grid-cabin-name">
-                            <a href="{% url 'cabins:cabin_detail' row.cabin.pk %}">
-                                <span class="cabin-name-main">{{ row.cabin.name }}</span>
-
-                                {% if row.cabin.cabin_number %}
-                                    <span class="cabin-name-sub">#{{ row.cabin.cabin_number }}</span>
-                                {% endif %}
+                        <td colspan="2" style="text-align: center; padding: 40px 20px;">
+                            <div style="font-size: 1.1rem; font-weight: 700; color: var(--color-text); margin-bottom: 6px;">All Weeks Closed in {{ month_name }} {{ year }}</div>
+                            <div style="color: var(--color-muted); font-size: 0.9rem; margin-bottom: 16px;">The ranch is closed during this off-season month.</div>
+                            <a href="{% url 'reservations:reservation_grid' %}?year={{ year }}&month={{ month }}&filter_closed=false" class="button button-small button-secondary">
+                                Show Closed / Off-Season Weeks
                             </a>
-                        </th>
-
-                        {% for cell in row.cells %}
-                            {% if cell.is_available %}
-                                <td class="reservation-grid-cell reservation-grid-available">
-                                    <a href="{{ cell.create_url }}" class="reservation-grid-link available-link">
-                                        <span class="available-plus">+</span>
-                                        <span class="available-text">Book</span>
-                                    </a>
-                                </td>
-                            {% else %}
-                                <td class="reservation-grid-cell reservation-grid-booked">
-                                    <div class="reservation-week-track">
-                                        {% for item in cell.assignments %}
-                                            <a
-                                                href="{% url 'reservations:reservation_detail' item.reservation.pk %}"
-                                                class="reservation-grid-link booked-link reservation-status-{{ item.reservation.status }} {% if item.position.is_partial %}is-partial{% endif %}"
-                                                style="left: {{ item.position.left_percent }}%; width: {{ item.position.width_percent }}%;"
-                                            >
-                                                <span class="reservation-cell-name">
-                                                    {{ item.reservation.reservation_name }}
-                                                </span>
-
-                                                <span class="reservation-cell-meta">
-                                                    {{ item.reservation.get_status_display }}
-                                                </span>
-
-                                                <span class="reservation-cell-dates">
-                                                    {{ item.assignment.arrival_date }} → {{ item.assignment.departure_date }}
-                                                </span>
-                                            </a>
-                                        {% endfor %}
-                                    </div>
-                                </td>
-                            {% endif %}
-                        {% endfor %}
-                    </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="{{ weeks|length|add:1 }}">
-                            <div class="empty-state">
-                                <div class="empty-state-content">
-                                    <div class="empty-state-icon">🏠</div>
-                                    <h2>No active cabins</h2>
-                                    <p>Create active cabins before using the reservation grid.</p>
-                                    <a href="{% url 'cabins:cabin_create' %}" class="button button-primary">Add Cabin</a>
-                                </div>
-                            </div>
                         </td>
                     </tr>
-                {% endfor %}
+                {% else %}
+                    {% for row in grid_rows %}
+                        <tr>
+                            <th class="reservation-grid-cabin-name">
+                                <a href="{% url 'cabins:cabin_detail' row.cabin.pk %}">
+                                    <span class="cabin-name-main">{{ row.cabin.name }}</span>
+
+                                    <span class="cabin-name-sub">
+                                        {% if row.cabin.cabin_number %}#{{ row.cabin.cabin_number }} · {% endif %}Cap: {{ row.cabin.capacity }}
+                                    </span>
+                                </a>
+                            </th>
+
+                            {% for cell in row.cells %}
+                                {% if cell.is_closed and not cell.assignments %}
+                                    <td class="reservation-grid-cell reservation-grid-closed" title="Ranch is closed during this period (Off-Season)">
+                                        <div class="closed-cell-content">
+                                            <span class="closed-badge">Closed</span>
+                                            <span class="closed-sub">Off-Season</span>
+                                        </div>
+                                    </td>
+                                {% elif cell.is_available %}
+                                    <td class="reservation-grid-cell reservation-grid-available">
+                                        <a href="{{ cell.create_url }}" class="reservation-grid-link available-link">
+                                            <span class="available-plus">+</span>
+                                            <span class="available-text">Book</span>
+                                        </a>
+                                    </td>
+                                {% else %}
+                                    <td class="reservation-grid-cell reservation-grid-booked {% if cell.is_closed %}reservation-grid-closed-booked{% endif %}">
+                                        <div class="reservation-week-track">
+                                            {% for item in cell.assignments %}
+                                                <a
+                                                    href="{% url 'reservations:reservation_detail' item.reservation.pk %}"
+                                                    class="reservation-grid-link booked-link reservation-status-{{ item.reservation.status }} {% if item.position.is_partial %}is-partial{% endif %}"
+                                                    style="left: {{ item.position.left_percent }}%; width: {{ item.position.width_percent }}%;"
+                                                >
+                                                    <span class="reservation-cell-name">
+                                                        {{ item.reservation.reservation_name }}
+                                                    </span>
+
+                                                    <span class="reservation-cell-meta">
+                                                        {{ item.reservation.get_status_display }}
+                                                        {% if cell.is_closed %}· Off-Season{% endif %}
+                                                    </span>
+
+                                                    <span class="reservation-cell-dates">
+                                                        {{ item.assignment.arrival_date }} → {{ item.assignment.departure_date }}
+                                                    </span>
+                                                </a>
+                                            {% endfor %}
+                                        </div>
+                                    </td>
+                                {% endif %}
+                            {% endfor %}
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="{{ weeks|length|add:1 }}">
+                                <div class="empty-state">
+                                    <div class="empty-state-content">
+                                        <div class="empty-state-icon">🏠</div>
+                                        <h2>No active cabins</h2>
+                                        <p>Create active cabins before using the reservation grid.</p>
+                                        <a href="{% url 'cabins:cabin_create' %}" class="button button-primary">Add Cabin</a>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% endif %}
             </tbody>
         </table>
     </div>

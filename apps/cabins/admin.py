@@ -27,6 +27,7 @@ class CabinAdmin(admin.ModelAdmin):
         "notes",
     ]
     ordering = [
+        "capacity",
         "sort_order",
         "name",
     ]

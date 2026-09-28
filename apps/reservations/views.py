@@ -13,8 +13,25 @@ from apps.clients.forms import ClientForm
 from apps.clients.models import Client, TravelGroup, Household, TravelGroupMember, HouseholdMember
 from django.http import JsonResponse
 
-from .forms import ReservationCabinForm, ReservationForm, ReservationGuestForm
-from .models import Reservation, ReservationCabin, ReservationGuest
+from .forms import OperatingSeasonForm, ReservationCabinForm, ReservationForm, ReservationGuestForm
+from .models import OperatingSeason, Reservation, ReservationCabin, ReservationGuest
+from .season_utils import (
+    get_active_operating_seasons,
+    get_active_season_for_date,
+    get_current_or_upcoming_season,
+    get_default_grid_year_month,
+    get_default_season_dates,
+    get_default_season,
+    get_categorized_seasons,
+    get_next_open_month,
+    get_previous_open_month,
+    get_next_month_tuple,
+    get_previous_month_tuple,
+    is_date_open,
+    is_month_open,
+    is_week_open,
+    ensure_default_operating_season,
+)
 
 
 def format_week_label(week_start, week_end):
@@ -36,11 +53,14 @@ def get_month_sunday_weeks(year, month):
         week_end = current_sunday + timedelta(days=7)
 
         if week_end > first_day and week_start <= last_day:
+            open_status = is_week_open(week_start, week_end)
             weeks.append(
                 {
                     "start": week_start,
                     "end": week_end,
                     "label": format_week_label(week_start, week_end),
+                    "is_open": open_status,
+                    "is_closed": not open_status,
                 }
             )
 
@@ -81,6 +101,10 @@ def reservation_list(request):
     date_start = request.GET.get("date_start", "").strip()
     date_end = request.GET.get("date_end", "").strip()
     show_past = request.GET.get("show_past") == "true"
+    season_filter = request.GET.get("season", "").strip()
+
+    active_seasons = list(get_active_operating_seasons())
+    categorized_seasons = get_categorized_seasons(date.today())
 
     reservations = Reservation.objects.select_related(
         "primary_contact",
@@ -112,9 +136,30 @@ def reservation_list(request):
         except (ValueError, ValidationError):
             pass
 
+    if season_filter:
+        if season_filter == "open_season":
+            if active_seasons:
+                season_q = Q()
+                for s in active_seasons:
+                    season_q |= Q(arrival_date__lte=s.end_date, departure_date__gte=s.start_date)
+                reservations = reservations.filter(season_q)
+            else:
+                reservations = reservations.filter(
+                    Q(arrival_date__month__in=[6, 7, 8, 9]) | Q(departure_date__month__in=[6, 7, 8, 9])
+                )
+        elif season_filter.isdigit():
+            try:
+                selected_season = OperatingSeason.objects.get(pk=int(season_filter))
+                reservations = reservations.filter(
+                    arrival_date__lte=selected_season.end_date,
+                    departure_date__gte=selected_season.start_date,
+                )
+            except OperatingSeason.DoesNotExist:
+                pass
+
     # Default logic: Hide past reservations unless explicitly searching or showing them
     # Past reservations are those where departure_date < today
-    is_lookup_active = search_query or date_start or date_end
+    is_lookup_active = search_query or date_start or date_end or season_filter
 
     if not show_past and not is_lookup_active:
         reservations = reservations.filter(departure_date__gte=date.today())
@@ -133,6 +178,9 @@ def reservation_list(request):
         "date_start": date_start,
         "date_end": date_end,
         "show_past": show_past,
+        "season_filter": season_filter,
+        "active_seasons": active_seasons,
+        "categorized_seasons": categorized_seasons,
         "total_reservations": Reservation.objects.count(),
         "penciled_reservations": Reservation.objects.filter(
             status=Reservation.ReservationStatus.PENCILED
@@ -527,6 +575,7 @@ def create_reservation_guest_from_client(reservation, client):
         reservation.arrival_date,
     )
     assigned_cabin = get_single_assigned_cabin(reservation)
+    is_riding = bool(client.is_rider and client.riding_level != 'non_rider')
 
     guest, created = ReservationGuest.objects.get_or_create(
         reservation=reservation,
@@ -534,6 +583,9 @@ def create_reservation_guest_from_client(reservation, client):
         defaults={
             "cabin": assigned_cabin,
             "age_at_stay": age_at_stay,
+            "height": client.height or "",
+            "weight": client.weight or "",
+            "is_riding": is_riding,
             "riding_experience": client.riding_level,
             "allergies": client.medical_notes,
             "food_requests": client.dietary_notes,
@@ -748,18 +800,59 @@ def reservation_guest_unassign_cabin(request, pk):
 @module_permission_required('Reservations', 'read')
 def reservation_grid(request):
     today = date.today()
+    categorized_seasons = get_categorized_seasons(today)
+    default_season = categorized_seasons["default_season"]
 
-    year = int(request.GET.get("year", today.year))
-    month = int(request.GET.get("month", today.month))
+    season_param = request.GET.get("season", "").strip()
+    selected_season = None
+    if season_param and season_param.isdigit():
+        selected_season = OperatingSeason.objects.filter(pk=int(season_param)).first()
+
+    if selected_season:
+        target_season = selected_season
+        if "year" not in request.GET and "month" not in request.GET:
+            if selected_season.contains_date(today):
+                year = today.year
+                month = today.month
+            else:
+                year = selected_season.start_date.year
+                month = selected_season.start_date.month
+        else:
+            default_year, default_month = get_default_grid_year_month(today)
+            year = int(request.GET.get("year", default_year))
+            month = int(request.GET.get("month", default_month))
+    else:
+        if "year" in request.GET and "month" in request.GET:
+            year = int(request.GET["year"])
+            month = int(request.GET["month"])
+            target_season = get_active_season_for_date(date(year, month, 1)) or get_current_or_upcoming_season(date(year, month, 1))
+        elif "year" in request.GET:
+            year = int(request.GET["year"])
+            month = int(request.GET.get("month", 6))
+            target_season = get_active_season_for_date(date(year, month, 1)) or get_current_or_upcoming_season(date(year, month, 1))
+        else:
+            year, month = get_default_grid_year_month(today)
+            target_season = default_season
+
+    filter_closed_param = request.GET.get("filter_closed")
+    if filter_closed_param is None:
+        filter_closed = True
+    else:
+        filter_closed = filter_closed_param.lower() not in ("false", "0", "no", "off")
 
     weeks = get_month_sunday_weeks(year, month)
-    previous_year, previous_month = get_previous_month(year, month)
-    next_year, next_month = get_next_month(year, month)
+    if filter_closed:
+        weeks = [w for w in weeks if w["is_open"]]
+        previous_year, previous_month = get_previous_open_month(year, month)
+        next_year, next_month = get_next_open_month(year, month)
+    else:
+        previous_year, previous_month = get_previous_month_tuple(year, month)
+        next_year, next_month = get_next_month_tuple(year, month)
 
-    cabins = Cabin.objects.filter(is_active=True).order_by("sort_order", "name")
+    cabins = Cabin.objects.filter(is_active=True).order_by("capacity", "sort_order", "name")
 
-    month_start = weeks[0]["start"]
-    month_end = weeks[-1]["end"]
+    month_start = weeks[0]["start"] if weeks else date(year, month, 1)
+    month_end = weeks[-1]["end"] if weeks else date(year, month, calendar.monthrange(year, month)[1])
 
     cabin_assignments = ReservationCabin.objects.select_related(
         "reservation",
@@ -802,7 +895,9 @@ def reservation_grid(request):
                 {
                     "week": week,
                     "assignments": positioned_assignments,
-                    "is_available": not positioned_assignments,
+                    "is_open": week["is_open"],
+                    "is_closed": week["is_closed"],
+                    "is_available": not positioned_assignments and week["is_open"],
                     "create_url": (
                         f"/reservations/new/"
                         f"?cabin={cabin.pk}"
@@ -814,6 +909,32 @@ def reservation_grid(request):
 
         grid_rows.append(row)
 
+    active_seasons = get_active_operating_seasons()
+    current_season = target_season
+
+    # Season months for quick navigation
+    if active_seasons.filter(start_date__year__lte=year, end_date__year__gte=year).exists():
+        year_seasons = active_seasons.filter(start_date__year__lte=year, end_date__year__gte=year)
+        month_set = set()
+        for s in year_seasons:
+            s_month = s.start_date.month if s.start_date.year == year else 1
+            e_month = s.end_date.month if s.end_date.year == year else 12
+            for m in range(s_month, e_month + 1):
+                month_set.add(m)
+        season_months = sorted(list(month_set))
+    else:
+        season_months = [6, 7, 8, 9]
+
+    season_nav_months = [
+        {
+            "month": m,
+            "name": calendar.month_abbr[m],
+            "full_name": calendar.month_name[m],
+            "is_current": m == month,
+        }
+        for m in season_months
+    ]
+
     context = {
         "year": year,
         "month": month,
@@ -824,9 +945,123 @@ def reservation_grid(request):
         "previous_month": previous_month,
         "next_year": next_year,
         "next_month": next_month,
+        "filter_closed": filter_closed,
+        "active_seasons": active_seasons,
+        "categorized_seasons": categorized_seasons,
+        "current_season": current_season,
+        "selected_season": selected_season,
+        "season_nav_months": season_nav_months,
+        "is_month_open": is_month_open(year, month),
+        "today": today,
     }
 
     return render(request, "reservations/reservation_grid.html", context)
+
+
+@module_permission_required('Reservations', 'read')
+def operating_dates_list(request):
+    seasons = OperatingSeason.objects.all().order_by("start_date")
+    today = date.today()
+    active_seasons = seasons.filter(is_active=True)
+
+    current_season = get_active_season_for_date(today)
+    upcoming_season = get_current_or_upcoming_season(today)
+    is_open_today = is_date_open(today)
+
+    context = {
+        "seasons": seasons,
+        "today": today,
+        "active_seasons_count": active_seasons.count(),
+        "current_season": current_season,
+        "upcoming_season": upcoming_season,
+        "is_open_today": is_open_today,
+        "has_custom_seasons": seasons.exists(),
+    }
+    return render(request, "reservations/operating_dates_list.html", context)
+
+
+@module_permission_required('Reservations', 'write')
+def operating_season_create(request):
+    if request.method == "POST":
+        form = OperatingSeasonForm(request.POST)
+        if form.is_valid():
+            season = form.save()
+            messages.success(request, f"Operating season '{season.name}' was created successfully.")
+            return redirect("reservations:operating_dates_list")
+        else:
+            messages.error(request, "Please correct the errors below.")
+    else:
+        today = date.today()
+        start_d, end_d = get_default_season_dates(today.year)
+        form = OperatingSeasonForm(
+            initial={
+                "name": f"Summer Season {today.year}",
+                "start_date": start_d,
+                "end_date": end_d,
+                "is_active": True,
+            }
+        )
+
+    context = {
+        "form": form,
+        "form_title": "Add Operating Season",
+        "form_subtitle": "Configure dates when the guest ranch is open for reservations.",
+        "submit_label": "Save Operating Season",
+    }
+    return render(request, "reservations/operating_season_form.html", context)
+
+
+@module_permission_required('Reservations', 'write')
+def operating_season_update(request, pk):
+    season = get_object_or_404(OperatingSeason, pk=pk)
+    if request.method == "POST":
+        form = OperatingSeasonForm(request.POST, instance=season)
+        if form.is_valid():
+            season = form.save()
+            messages.success(request, f"Operating season '{season.name}' was updated successfully.")
+            return redirect("reservations:operating_dates_list")
+        else:
+            messages.error(request, "Please correct the errors below.")
+    else:
+        form = OperatingSeasonForm(instance=season)
+
+    context = {
+        "form": form,
+        "season": season,
+        "form_title": f"Edit {season.name}",
+        "form_subtitle": f"Update the open and close dates for {season.name}.",
+        "submit_label": "Save Changes",
+    }
+    return render(request, "reservations/operating_season_form.html", context)
+
+
+@module_permission_required('Reservations', 'delete')
+def operating_season_delete(request, pk):
+    season = get_object_or_404(OperatingSeason, pk=pk)
+    if request.method == "POST":
+        season_name = season.name
+        season.delete()
+        messages.success(request, f"Operating season '{season_name}' was removed.")
+        return redirect("reservations:operating_dates_list")
+
+    context = {
+        "season": season,
+        "title": f"Delete {season.name}",
+        "confirm_message": f"Are you sure you want to delete '{season.name}' ({season.start_date} to {season.end_date})?",
+    }
+    return render(request, "reservations/operating_season_confirm_delete.html", context)
+
+
+@module_permission_required('Reservations', 'write')
+def operating_season_reset_defaults(request):
+    if request.method == "POST":
+        today = date.today()
+        season = ensure_default_operating_season(today.year)
+        messages.success(
+            request,
+            f"Standard operating season '{season.name}' (June 1 to September 30, {today.year}) is ready.",
+        )
+    return redirect("reservations:operating_dates_list")
     
 @module_permission_required('Reservations', 'write')
 def reservation_toggle_deposit_request(request, pk):

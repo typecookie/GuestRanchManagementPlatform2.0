@@ -10,6 +10,13 @@ urlpatterns = [
     path("<int:pk>/", views.horse_detail, name="horse_detail"),
     path("<int:pk>/update/", views.horse_update, name="horse_update"),
     path("<int:pk>/delete/", views.horse_delete, name="horse_delete"),
+    path("<int:pk>/update-pasture/", views.update_horse_pasture, name="update_horse_pasture"),
+    
+    # Pastures & Kanban Board
+    path("pastures/", views.pasture_board, name="pasture_board"),
+    path("pastures/create/", views.pasture_create, name="pasture_create"),
+    path("pastures/<int:pk>/update/", views.pasture_update, name="pasture_update"),
+    path("pastures/<int:pk>/delete/", views.pasture_delete, name="pasture_delete"),
     
     # Saddles
     path("saddles/", views.saddle_list, name="saddle_list"),

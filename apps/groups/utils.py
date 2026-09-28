@@ -12,9 +12,11 @@ MODULE_MAPPING = {
     ],
     'Reservations': [
         ('reservations', 'reservation'),
+        ('reservations', 'operatingseason'),
     ],
     'Horses': [
         ('horses', 'horse'),
+        ('horses', 'pasture'),
     ],
     'Cabins': [
         ('cabins', 'cabin'),

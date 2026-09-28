@@ -9,6 +9,11 @@ urlpatterns = [
     path("", views.reservation_list, name="reservation_list"),
     path("grid/", views.reservation_grid, name="reservation_grid"),
     path("new/", views.reservation_create, name="reservation_create"),
+    path("operating-dates/", views.operating_dates_list, name="operating_dates_list"),
+    path("operating-dates/new/", views.operating_season_create, name="operating_season_create"),
+    path("operating-dates/reset-defaults/", views.operating_season_reset_defaults, name="operating_season_reset_defaults"),
+    path("operating-dates/<int:pk>/edit/", views.operating_season_update, name="operating_season_update"),
+    path("operating-dates/<int:pk>/delete/", views.operating_season_delete, name="operating_season_delete"),
 
     path("<int:pk>/", views.reservation_detail, name="reservation_detail"),
     path("<int:pk>/edit/", views.reservation_update, name="reservation_update"),

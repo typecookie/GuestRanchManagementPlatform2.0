@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Delete Operating Season | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Ranch Configuration{% endblock %}
+
+{% block page_title %}Delete Operating Season: {{ season.name }}{% endblock %}
+
+{% block content %}
+<div class="form-card">
+    <p>Are you sure you want to delete the operating season "<strong>{{ season.name }}</strong>" ({{ season.start_date|date:"M j, Y" }} – {{ season.end_date|date:"M j, Y" }})?</p>
+    <p class="help-text">This will remove this custom season date range. Views will fall back to other active seasons or the default schedule (June 1 – September 30).</p>
+    
+    <form method="post" style="margin-top: 2rem;">
+        {% csrf_token %}
+        <div class="form-actions" style="display: flex; gap: 1rem;">
+            <button type="submit" class="button button-danger">Confirm Delete</button>
+            <a href="{% url 'reservations:operating_dates_list' %}" class="button button-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

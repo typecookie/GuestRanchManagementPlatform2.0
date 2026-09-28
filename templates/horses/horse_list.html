@@ -13,9 +13,14 @@ Manage horse profiles, status, medical notes, and ranch assignments.
 
 {% block page_actions %}
 {% can_do user "Horses" "write" as can_write %}
-{% if can_write %}
-<a href="{% url 'horses:horse_create' %}" class="button button-primary">Add Horse</a>
-{% endif %}
+<div class="actions-group" style="display: flex; gap: 0.5rem;">
+    <a href="{% url 'horses:pasture_board' %}" class="button button-secondary">
+        📊 Pasture Board
+    </a>
+    {% if can_write %}
+    <a href="{% url 'horses:horse_create' %}" class="button button-primary">+ Add Horse</a>
+    {% endif %}
+</div>
 {% endblock %}
 
 {% block content %}
@@ -30,6 +35,11 @@ Manage horse profiles, status, medical notes, and ranch assignments.
         <span>Active</span>
         <strong>{{ active_horses }}</strong>
     </div>
+
+    <div class="stat-card">
+        <span>Pastures</span>
+        <strong>{{ total_pastures }}</strong>
+    </div>
 </div>
 
 <div class="page-toolbar">
@@ -39,7 +49,7 @@ Manage horse profiles, status, medical notes, and ranch assignments.
                 type="search"
                 name="q"
                 class="search-input"
-                placeholder="Search horses by name, breed, or notes"
+                placeholder="Search horses by name, breed, or pasture"
                 value="{{ search_query }}"
             >
 
@@ -52,15 +62,26 @@ Manage horse profiles, status, medical notes, and ranch assignments.
                 {% endfor %}
             </select>
 
+            <select name="pasture" class="form-select">
+                <option value="">All Pastures</option>
+                <option value="unassigned" {% if pasture_filter == 'unassigned' %}selected{% endif %}>Unassigned / Stalls</option>
+                {% for p in pastures %}
+                    <option value="{{ p.id }}" {% if pasture_filter == p.id|stringformat:"i" %}selected{% endif %}>
+                        {{ p.name }}
+                    </option>
+                {% endfor %}
+            </select>
+
             <button type="submit" class="button button-secondary">Search</button>
             
-            {% if search_query or status_filter %}
+            {% if search_query or status_filter or pasture_filter %}
                 <a href="{% url 'horses:horse_list' %}" class="button button-secondary">Clear</a>
             {% endif %}
         </form>
     </div>
 
     <div class="page-toolbar-actions">
+        <a href="{% url 'horses:pasture_board' %}" class="button button-secondary">📊 Pasture Board</a>
         {% if can_write %}
         <a href="{% url 'horses:horse_create' %}" class="button button-primary">Add Horse</a>
         {% endif %}
@@ -76,6 +97,7 @@ Manage horse profiles, status, medical notes, and ranch assignments.
                         <th>Horse</th>
                         <th>Breed</th>
                         <th>Gender</th>
+                        <th>Pasture Location</th>
                         <th>Status</th>
                         <th class="text-right">Actions</th>
                     </tr>
@@ -87,6 +109,13 @@ Manage horse profiles, status, medical notes, and ranch assignments.
                             <td><strong>{{ horse.name }}</strong></td>
                             <td>{{ horse.breed|default:"—" }}</td>
                             <td>{{ horse.get_gender_display }}</td>
+                            <td>
+                                {% if horse.pasture %}
+                                    <span class="badge badge-neutral">{{ horse.pasture.name }}</span>
+                                {% else %}
+                                    <span class="text-muted">Unassigned</span>
+                                {% endif %}
+                            </td>
                             <td>
                                 {% if horse.status == "active" %}
                                     <span class="badge badge-success">{{ horse.get_status_display }}</span>

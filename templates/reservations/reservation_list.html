@@ -11,6 +11,7 @@ Track guest stays, cabin assignments, work crew lodging, farrier stays, and rese
 {% endblock %}
 
 {% block page_actions %}
+<a href="{% url 'reservations:operating_dates_list' %}" class="button button-secondary">⚙ Operating Dates</a>
 <a href="{% url 'reservations:reservation_grid' %}" class="button button-secondary">Cabin Grid</a>
 <a href="{% url 'reservations:reservation_create' %}" class="button button-primary">New Reservation</a>
 {% endblock %}
@@ -73,6 +74,31 @@ Track guest stays, cabin assignments, work crew lodging, farrier stays, and rese
                 {% endfor %}
             </select>
 
+            <select name="season" class="form-select" title="Filter by Operating Season">
+                <option value="">All seasons & off-season</option>
+                <option value="open_season" {% if season_filter == "open_season" %}selected{% endif %}>
+                    All Operating Seasons Only (Open)
+                </option>
+                {% if categorized_seasons.current_and_upcoming %}
+                    <optgroup label="Current &amp; Upcoming Seasons">
+                        {% for s in categorized_seasons.current_and_upcoming %}
+                            <option value="{{ s.pk }}" {% if season_filter == s.pk|stringformat:"i" %}selected{% endif %}>
+                                {{ s.name }} ({{ s.status_label }}) · {{ s.start_date|date:"M j" }} – {{ s.end_date|date:"M j, Y" }}
+                            </option>
+                        {% endfor %}
+                    </optgroup>
+                {% endif %}
+                {% if categorized_seasons.prior_seasons %}
+                    <optgroup label="Prior Seasons">
+                        {% for s in categorized_seasons.prior_seasons %}
+                            <option value="{{ s.pk }}" {% if season_filter == s.pk|stringformat:"i" %}selected{% endif %}>
+                                {{ s.name }} (Prior Season) · {{ s.start_date|date:"M j" }} – {{ s.end_date|date:"M j, Y" }}
+                            </option>
+                        {% endfor %}
+                    </optgroup>
+                {% endif %}
+            </select>
+
             <label class="checkbox-label" style="display: flex; align-items: center; gap: 0.5rem; white-space: nowrap;">
                 <input type="checkbox" name="show_past" value="true" {% if show_past %}checked{% endif %}>
                 Show Past
@@ -80,7 +106,7 @@ Track guest stays, cabin assignments, work crew lodging, farrier stays, and rese
 
             <button type="submit" class="button button-secondary">Search</button>
 
-            {% if search_query or status_filter or reservation_type_filter or date_start or date_end or show_past %}
+            {% if search_query or status_filter or reservation_type_filter or date_start or date_end or show_past or season_filter %}
                 <a href="{% url 'reservations:reservation_list' %}" class="button button-secondary">Clear</a>
             {% endif %}
         </form>
