@@ -57,22 +57,6 @@
             </div>
 
             <div class="form-field">
-                <label for="{{ form.height.id_for_label }}">Height</label>
-                {{ form.height }}
-                {% for error in form.height.errors %}
-                    <span class="form-error">{{ error }}</span>
-                {% endfor %}
-            </div>
-
-            <div class="form-field">
-                <label for="{{ form.weight.id_for_label }}">Weight</label>
-                {{ form.weight }}
-                {% for error in form.weight.errors %}
-                    <span class="form-error">{{ error }}</span>
-                {% endfor %}
-            </div>
-
-            <div class="form-field">
                 <label for="{{ form.riding_experience.id_for_label }}">Riding Experience</label>
                 {{ form.riding_experience }}
                 {% for error in form.riding_experience.errors %}

@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}{{ form_title }} | Reservations{% endblock %}
+
+{% block eyebrow %}Flight Details{% endblock %}
+
+{% block page_title %}{{ form_title }}{% endblock %}
+
+{% block page_subtitle %}
+    {{ form_subtitle }}
+{% endblock %}
+
+{% block page_actions %}
+    <a href="{% url 'reservations:reservation_detail' reservation.pk %}" class="button button-secondary">Back to Reservation</a>
+{% endblock %}
+
+{% block content %}
+    <form method="post" class="form-card" novalidate>
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <div class="form-alert">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+
+        <div class="form-grid">
+            <div class="form-field">
+                <label for="{{ form.flight_type.id_for_label }}">Flight Type</label>
+                {{ form.flight_type }}
+                {% for error in form.flight_type.errors %}
+                    <span class="form-error">{{ error }}</span>
+                {% endfor %}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.airport.id_for_label }}">Airport</label>
+                {{ form.airport }}
+                {% for error in form.airport.errors %}
+                    <span class="form-error">{{ error }}</span>
+                {% endfor %}
+                <span class="form-help">e.g. Denver (DEN), Casper (CPR)</span>
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.flight_number.id_for_label }}">Flight Number</label>
+                {{ form.flight_number }}
+                {% for error in form.flight_number.errors %}
+                    <span class="form-error">{{ error }}</span>
+                {% endfor %}
+                <span class="form-help">e.g. UA 4521</span>
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.flight_date.id_for_label }}">Flight Date</label>
+                {{ form.flight_date }}
+                {% for error in form.flight_date.errors %}
+                    <span class="form-error">{{ error }}</span>
+                {% endfor %}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.flight_time.id_for_label }}" id="flight-time-label">
+                    {% if form.instance.flight_type == "departure" or form.flight_type.value == "departure" %}Departure Time{% else %}Arrival Time{% endif %}
+                </label>
+                {{ form.flight_time }}
+                {% for error in form.flight_time.errors %}
+                    <span class="form-error">{{ error }}</span>
+                {% endfor %}
+            </div>
+
+            <div class="form-field form-grid-full">
+                <label for="{{ form.notes.id_for_label }}">Flight Notes</label>
+                {{ form.notes }}
+                {% for error in form.notes.errors %}
+                    <span class="form-error">{{ error }}</span>
+                {% endfor %}
+                <span class="form-help">Optional notes (shuttle requests, passenger names, airline details).</span>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <a href="{% url 'reservations:reservation_detail' reservation.pk %}" class="button button-secondary">Cancel</a>
+            <button type="submit" class="button button-primary">{{ submit_label }}</button>
+        </div>
+    </form>
+
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const flightTypeSelect = document.getElementById("{{ form.flight_type.id_for_label }}");
+        const flightDateInput = document.getElementById("{{ form.flight_date.id_for_label }}");
+        const timeLabel = document.getElementById("flight-time-label");
+        const arrDateStr = "{{ reservation.arrival_date|date:'Y-m-d' }}";
+        const depDateStr = "{{ reservation.departure_date|date:'Y-m-d' }}";
+
+        function updateFlightFields() {
+            if (!flightTypeSelect) return;
+            if (flightTypeSelect.value === 'departure') {
+                if (timeLabel) timeLabel.textContent = 'Departure Time';
+                if (flightDateInput && (flightDateInput.value === arrDateStr || !flightDateInput.value) && depDateStr) {
+                    flightDateInput.value = depDateStr;
+                }
+            } else {
+                if (timeLabel) timeLabel.textContent = 'Arrival Time';
+                if (flightDateInput && (flightDateInput.value === depDateStr || !flightDateInput.value) && arrDateStr) {
+                    flightDateInput.value = arrDateStr;
+                }
+            }
+        }
+
+        if (flightTypeSelect) {
+            flightTypeSelect.addEventListener('change', updateFlightFields);
+            updateFlightFields();
+        }
+    });
+    </script>
+{% endblock %}

@@ -213,6 +213,191 @@
             {% endfor %}
         </div>
 
+        <div class="form-grid-full" style="margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--color-border);">
+            <h3 style="margin: 0 0 4px 0; font-size: 1.05rem; font-weight: 700;">Travel Information</h3>
+            <p style="font-size: 0.85rem; color: var(--color-muted); margin: 0 0 16px 0;">Select travel method (driving, flying, or both) and provide details.</p>
+        </div>
+
+        <div class="form-field checkbox-field">
+            <label>
+                {{ form.is_driving }}
+                Driving
+            </label>
+            {% for error in form.is_driving.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field checkbox-field">
+            <label>
+                {{ form.is_flying }}
+                Flying
+            </label>
+            {% for error in form.is_flying.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div id="driving-details-section" class="form-grid-full" style="display: none;">
+            <div class="form-field">
+                <label for="{{ form.driving_notes.id_for_label }}">Driving Notes</label>
+                {{ form.driving_notes }}
+                {% for error in form.driving_notes.errors %}
+                    <span class="form-error">{{ error }}</span>
+                {% endfor %}
+                <span class="form-help">Vehicle description, arrival window, route notes, etc.</span>
+            </div>
+        </div>
+
+        <div id="flying-details-section" class="form-grid-full" style="display: none;">
+            <div class="form-field" style="margin-bottom: 12px;">
+                <label for="{{ form.flying_notes.id_for_label }}">Flying Notes</label>
+                {{ form.flying_notes }}
+                {% for error in form.flying_notes.errors %}
+                    <span class="form-error">{{ error }}</span>
+                {% endfor %}
+                <span class="form-help">General flying notes, shuttle details, or connection info.</span>
+            </div>
+
+            {% if flight_formset %}
+                <div style="margin-top: 12px; padding-top: 16px; border-top: 1px dashed var(--color-border);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <div>
+                            <h4 style="margin: 0 0 4px 0; font-size: 0.95rem; font-weight: 700;">Flight Information</h4>
+                            <p style="font-size: 0.82rem; color: var(--color-muted); margin: 0;">Add arrival and departing flight details arranged by airport.</p>
+                        </div>
+                        <button type="button" class="button button-small button-secondary" id="add-flight-btn">+ Add Flight</button>
+                    </div>
+
+                    {{ flight_formset.management_form }}
+                    {% if flight_formset.non_form_errors %}
+                        <div class="form-alert">
+                            {{ flight_formset.non_form_errors }}
+                        </div>
+                    {% endif %}
+
+                    <div id="flight-formset-container" style="display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
+                        {% for f_form in flight_formset %}
+                            <div class="flight-form-row card js-flight-row" style="background: var(--color-bg-subtle, #f9fafb); border: 1px solid var(--color-border); border-radius: 8px; padding: 14px;">
+                                {{ f_form.id }}
+                                <div class="form-grid" style="margin-bottom: 0;">
+                                    <div class="form-field">
+                                        <label for="{{ f_form.flight_type.id_for_label }}">Flight Type</label>
+                                        {{ f_form.flight_type }}
+                                        {% for error in f_form.flight_type.errors %}
+                                            <span class="form-error">{{ error }}</span>
+                                        {% endfor %}
+                                    </div>
+
+                                    <div class="form-field">
+                                        <label for="{{ f_form.airport.id_for_label }}">Airport</label>
+                                        {{ f_form.airport }}
+                                        {% for error in f_form.airport.errors %}
+                                            <span class="form-error">{{ error }}</span>
+                                        {% endfor %}
+                                    </div>
+
+                                    <div class="form-field">
+                                        <label for="{{ f_form.flight_number.id_for_label }}">Flight Number</label>
+                                        {{ f_form.flight_number }}
+                                        {% for error in f_form.flight_number.errors %}
+                                            <span class="form-error">{{ error }}</span>
+                                        {% endfor %}
+                                    </div>
+
+                                    <div class="form-field">
+                                        <label for="{{ f_form.flight_date.id_for_label }}">Flight Date</label>
+                                        {{ f_form.flight_date }}
+                                        {% for error in f_form.flight_date.errors %}
+                                            <span class="form-error">{{ error }}</span>
+                                        {% endfor %}
+                                    </div>
+
+                                    <div class="form-field">
+                                        <label for="{{ f_form.flight_time.id_for_label }}" class="js-flight-time-label">
+                                            {% if f_form.flight_type.value == "departure" or f_form.instance.flight_type == "departure" %}Departure Time{% else %}Arrival Time{% endif %}
+                                        </label>
+                                        {{ f_form.flight_time }}
+                                        {% for error in f_form.flight_time.errors %}
+                                            <span class="form-error">{{ error }}</span>
+                                        {% endfor %}
+                                    </div>
+
+                                    <div class="form-field form-grid-full">
+                                        <label for="{{ f_form.notes.id_for_label }}">Flight Notes</label>
+                                        {{ f_form.notes }}
+                                        {% for error in f_form.notes.errors %}
+                                            <span class="form-error">{{ error }}</span>
+                                        {% endfor %}
+                                    </div>
+
+                                    {% if f_form.instance.pk %}
+                                        <div class="form-field checkbox-field form-grid-full" style="margin-top: 4px;">
+                                            <label>
+                                                {{ f_form.DELETE }}
+                                                Delete this flight
+                                            </label>
+                                        </div>
+                                    {% else %}
+                                        <div class="form-grid-full" style="text-align: right; margin-top: 4px;">
+                                            <button type="button" class="button button-small button-danger js-remove-flight-row">Remove</button>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                    <template id="empty-flight-form-template">
+                        <div class="flight-form-row card js-flight-row" style="background: var(--color-bg-subtle, #f9fafb); border: 1px solid var(--color-border); border-radius: 8px; padding: 14px;">
+                            <div class="form-grid" style="margin-bottom: 0;">
+                                <div class="form-field">
+                                    <label for="id_flights-__prefix__-flight_type">Flight Type</label>
+                                    <select name="flights-__prefix__-flight_type" id="id_flights-__prefix__-flight_type" class="form-select js-flight-type">
+                                        <option value="arrival" selected>Arrival</option>
+                                        <option value="departure">Departure</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-field">
+                                    <label for="id_flights-__prefix__-airport">Airport</label>
+                                    <input type="text" name="flights-__prefix__-airport" id="id_flights-__prefix__-airport" class="form-input" placeholder="e.g. Denver (DEN) or Casper (CPR)" maxlength="150">
+                                </div>
+
+                                <div class="form-field">
+                                    <label for="id_flights-__prefix__-flight_number">Flight Number</label>
+                                    <input type="text" name="flights-__prefix__-flight_number" id="id_flights-__prefix__-flight_number" class="form-input" placeholder="e.g. UA 4521" maxlength="50">
+                                </div>
+
+                                <div class="form-field">
+                                    <label for="id_flights-__prefix__-flight_date">Flight Date</label>
+                                    <input type="date" name="flights-__prefix__-flight_date" id="id_flights-__prefix__-flight_date" class="form-input js-flight-date">
+                                </div>
+
+                                <div class="form-field">
+                                    <label for="id_flights-__prefix__-flight_time" class="js-flight-time-label">Arrival Time</label>
+                                    <input type="time" name="flights-__prefix__-flight_time" id="id_flights-__prefix__-flight_time" class="form-input">
+                                </div>
+
+                                <div class="form-field form-grid-full">
+                                    <label for="id_flights-__prefix__-notes">Flight Notes</label>
+                                    <textarea name="flights-__prefix__-notes" id="id_flights-__prefix__-notes" class="form-input" rows="2" placeholder="Optional notes, passengers, shuttle requests..."></textarea>
+                                </div>
+
+                                <div class="form-grid-full" style="text-align: right; margin-top: 4px;">
+                                    <button type="button" class="button button-small button-danger js-remove-flight-row">Remove</button>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="form-grid-full" style="margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--color-border);">
+            <h3 style="margin: 0 0 4px 0; font-size: 1.05rem; font-weight: 700;">Notes & Additional Information</h3>
+        </div>
+
         <div class="form-field form-grid-full">
             <label for="{{ form.notes.id_for_label }}">Guest-Facing Notes</label>
             {{ form.notes }}
@@ -506,6 +691,134 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         });
     }
+
+    // Travel methods visibility toggle
+    const isDrivingCheckbox = document.getElementById('id_is_driving');
+    const isFlyingCheckbox = document.getElementById('id_is_flying');
+    const drivingDetailsSection = document.getElementById('driving-details-section');
+    const flyingDetailsSection = document.getElementById('flying-details-section');
+
+    function toggleTravelSections() {
+        if (drivingDetailsSection) {
+            drivingDetailsSection.style.display = (isDrivingCheckbox && isDrivingCheckbox.checked) ? 'block' : 'none';
+        }
+        if (flyingDetailsSection) {
+            const isFlying = (isFlyingCheckbox && isFlyingCheckbox.checked);
+            flyingDetailsSection.style.display = isFlying ? 'block' : 'none';
+            if (isFlying) {
+                syncAllFlightRows(false);
+            }
+        }
+    }
+
+    if (isDrivingCheckbox) {
+        isDrivingCheckbox.addEventListener('change', toggleTravelSections);
+    }
+    if (isFlyingCheckbox) {
+        isFlyingCheckbox.addEventListener('change', toggleTravelSections);
+    }
+
+    // Dynamic flight formset rows, date sync, and label updates
+    const arrivalDateInput = document.getElementById('id_arrival_date');
+    const departureDateInput = document.getElementById('id_departure_date');
+
+    function syncFlightRow(row, forceUpdate = false) {
+        if (!row) return;
+        const select = row.querySelector('.js-flight-type');
+        const label = row.querySelector('.js-flight-time-label');
+        const dateInput = row.querySelector('.js-flight-date, input[type="date"], input[name$="-flight_date"]');
+
+        const arrVal = arrivalDateInput ? arrivalDateInput.value : '';
+        const depVal = departureDateInput ? departureDateInput.value : '';
+
+        if (select) {
+            const isDep = select.value === 'departure';
+            if (label) {
+                label.textContent = isDep ? 'Departure Time' : 'Arrival Time';
+            }
+            if (dateInput) {
+                const targetVal = isDep ? depVal : arrVal;
+                if (targetVal) {
+                    if (forceUpdate || !dateInput.value || (isDep && dateInput.value === arrVal) || (!isDep && dateInput.value === depVal)) {
+                        dateInput.value = targetVal;
+                    }
+                }
+            }
+        }
+    }
+
+    function syncAllFlightRows(forceUpdate = false) {
+        document.querySelectorAll('.js-flight-row').forEach(row => {
+            syncFlightRow(row, forceUpdate);
+        });
+    }
+
+    document.addEventListener('change', function(e) {
+        if (e.target && e.target.classList.contains('js-flight-type')) {
+            const row = e.target.closest('.js-flight-row') || e.target.closest('.form-grid');
+            if (row) {
+                syncFlightRow(row, true);
+            }
+        }
+    });
+
+    if (arrivalDateInput) {
+        arrivalDateInput.addEventListener('change', function() {
+            document.querySelectorAll('.js-flight-row').forEach(row => {
+                const select = row.querySelector('.js-flight-type');
+                if (select && select.value === 'arrival') {
+                    const dateInput = row.querySelector('.js-flight-date, input[type="date"], input[name$="-flight_date"]');
+                    if (dateInput && arrivalDateInput.value) {
+                        dateInput.value = arrivalDateInput.value;
+                    }
+                }
+            });
+        });
+    }
+
+    if (departureDateInput) {
+        departureDateInput.addEventListener('change', function() {
+            document.querySelectorAll('.js-flight-row').forEach(row => {
+                const select = row.querySelector('.js-flight-type');
+                if (select && select.value === 'departure') {
+                    const dateInput = row.querySelector('.js-flight-date, input[type="date"], input[name$="-flight_date"]');
+                    if (dateInput && departureDateInput.value) {
+                        dateInput.value = departureDateInput.value;
+                    }
+                }
+            });
+        });
+    }
+
+    const addFlightBtn = document.getElementById('add-flight-btn');
+    const flightContainer = document.getElementById('flight-formset-container');
+    const totalFormsInput = document.getElementById('id_flights-TOTAL_FORMS');
+    const template = document.getElementById('empty-flight-form-template');
+
+    if (addFlightBtn && flightContainer && totalFormsInput && template) {
+        addFlightBtn.addEventListener('click', function() {
+            const currentCount = parseInt(totalFormsInput.value, 10);
+            const newHtml = template.innerHTML.replace(/__prefix__/g, currentCount);
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = newHtml.trim();
+            const newRow = tempDiv.firstChild;
+            flightContainer.appendChild(newRow);
+            totalFormsInput.value = currentCount + 1;
+            syncFlightRow(newRow, true);
+        });
+
+        flightContainer.addEventListener('click', function(e) {
+            if (e.target && e.target.classList.contains('js-remove-flight-row')) {
+                const row = e.target.closest('.js-flight-row');
+                if (row) {
+                    row.remove();
+                }
+            }
+        });
+    }
+
+    toggleTravelSections();
+    syncAllFlightRows(false);
 });
 </script>
 {% endblock %}

@@ -188,8 +188,6 @@
                                         <td>
                                             {% if guest.height %}
                                                 {{ guest.height }}
-                                            {% elif guest.client.height %}
-                                                {{ guest.client.height }} <span class="text-muted" style="font-size: 0.75rem;" title="From Client Profile">(Profile)</span>
                                             {% else %}
                                                 <span class="text-danger font-weight-bold">Missing</span>
                                             {% endif %}
@@ -197,8 +195,6 @@
                                         <td>
                                             {% if guest.weight %}
                                                 {{ guest.weight }}
-                                            {% elif guest.client.weight %}
-                                                {{ guest.client.weight }} <span class="text-muted" style="font-size: 0.75rem;" title="From Client Profile">(Profile)</span>
                                             {% else %}
                                                 <span class="text-danger font-weight-bold">Missing</span>
                                             {% endif %}

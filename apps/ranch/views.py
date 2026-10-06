@@ -235,8 +235,8 @@ def build_weekly_horse_saddle_task(week_start, num_weeks=4):
             is_rider = g.is_riding and g.riding_experience != ReservationGuest.RidingExperience.NON_RIDER
             g.is_rider = is_rider
 
-            effective_h = g.height or (g.client.height if g.client else "")
-            effective_w = g.weight or (g.client.weight if g.client else "")
+            effective_h = g.client.height if g.client else ""
+            effective_w = g.client.weight if g.client else ""
             effective_exp = g.riding_experience if (g.riding_experience and g.riding_experience != ReservationGuest.RidingExperience.UNKNOWN) else (g.client.riding_level if g.client and g.client.riding_level != 'unknown' else ReservationGuest.RidingExperience.UNKNOWN)
 
             missing_fields = []
@@ -471,8 +471,8 @@ def build_monthly_horse_saddle_task(target_date=None, num_months=4, season=None)
             is_rider = g.is_riding and g.riding_experience != ReservationGuest.RidingExperience.NON_RIDER
             g.is_rider = is_rider
 
-            effective_h = g.height or (g.client.height if g.client else "")
-            effective_w = g.weight or (g.client.weight if g.client else "")
+            effective_h = g.client.height if g.client else ""
+            effective_w = g.client.weight if g.client else ""
             effective_exp = g.riding_experience if (g.riding_experience and g.riding_experience != ReservationGuest.RidingExperience.UNKNOWN) else (g.client.riding_level if g.client and g.client.riding_level != 'unknown' else ReservationGuest.RidingExperience.UNKNOWN)
 
             missing_fields = []

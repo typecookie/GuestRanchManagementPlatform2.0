@@ -104,6 +104,238 @@
         <div class="detail-card">
             <div class="section-heading">
                 <div>
+                    <h2>Travel &amp; Flights</h2>
+                    <p>Transportation method, driving notes, and arrival / departure flight info.</p>
+                </div>
+                <div class="button-group">
+                    <a href="{% url 'reservations:reservation_update' reservation.pk %}" class="button button-small button-secondary">
+                        Edit Travel Notes
+                    </a>
+                </div>
+            </div>
+
+            <div class="detail-list" style="margin-bottom: 20px;">
+                <div class="detail-row">
+                    <div class="detail-label">Travel Method</div>
+                    <div class="detail-value">
+                        <div class="inline-list">
+                            {% if reservation.is_driving %}
+                                <span class="badge badge-info">Driving</span>
+                            {% endif %}
+                            {% if reservation.is_flying %}
+                                <span class="badge badge-info">Flying</span>
+                            {% endif %}
+                            {% if not reservation.is_driving and not reservation.is_flying %}
+                                <span class="text-muted">Not specified</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                {% if reservation.is_driving or reservation.driving_notes %}
+                    <div class="detail-row">
+                        <div class="detail-label">Driving Notes</div>
+                        <div class="detail-value">
+                            {% if reservation.driving_notes %}
+                                {{ reservation.driving_notes|linebreaks }}
+                            {% else %}
+                                <span class="text-muted">No driving notes recorded.</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endif %}
+
+                {% if reservation.is_flying or reservation.flying_notes %}
+                    <div class="detail-row">
+                        <div class="detail-label">Flying Notes</div>
+                        <div class="detail-value">
+                            {% if reservation.flying_notes %}
+                                {{ reservation.flying_notes|linebreaks }}
+                            {% else %}
+                                <span class="text-muted">No general flying notes recorded.</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+
+            {% if reservation.is_flying or flights %}
+                {% if can_write %}
+                    <h3 style="font-size: 1rem; margin-top: 16px; margin-bottom: 8px;">Add Flight</h3>
+                    <p style="font-size: 0.85rem; color: var(--color-muted); margin-bottom: 12px;">Add an arrival or departing flight for this reservation.</p>
+
+                    <form method="post" action="{% url 'reservations:reservation_flight_create' reservation.pk %}" class="note-form" novalidate id="detail-flight-add-form">
+                        {% csrf_token %}
+
+                        <div class="form-grid">
+                            <div class="form-field">
+                                <label for="{{ flight_form.flight_type.id_for_label }}">Flight Type</label>
+                                {{ flight_form.flight_type }}
+                            </div>
+
+                            <div class="form-field">
+                                <label for="{{ flight_form.airport.id_for_label }}">Airport</label>
+                                {{ flight_form.airport }}
+                            </div>
+
+                            <div class="form-field">
+                                <label for="{{ flight_form.flight_number.id_for_label }}">Flight Number</label>
+                                {{ flight_form.flight_number }}
+                            </div>
+
+                            <div class="form-field">
+                                <label for="{{ flight_form.flight_date.id_for_label }}">Flight Date</label>
+                                {{ flight_form.flight_date }}
+                            </div>
+
+                            <div class="form-field">
+                                <label for="{{ flight_form.flight_time.id_for_label }}" id="detail-flight-time-label">Arrival Time</label>
+                                {{ flight_form.flight_time }}
+                            </div>
+
+                            <div class="form-field form-grid-full">
+                                <label for="{{ flight_form.notes.id_for_label }}">Flight Notes</label>
+                                {{ flight_form.notes }}
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="button button-primary">Add Flight</button>
+                        </div>
+                    </form>
+
+                    <div class="divider"></div>
+                {% endif %}
+
+                <h3 style="font-size: 1rem; margin-top: 16px; margin-bottom: 12px;">Scheduled Flights (Arranged by Airport)</h3>
+                {% if airport_flight_groups %}
+                    <div style="display: flex; flex-direction: column; gap: 16px;">
+                        {% for group in airport_flight_groups %}
+                            <div class="card" style="border: 1px solid var(--color-border); border-radius: 8px; overflow: hidden;">
+                                <div style="background: var(--color-bg-subtle, #f3f4f6); padding: 10px 16px; border-bottom: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <span style="font-weight: 700; font-size: 0.95rem;">Airport: {{ group.airport }}</span>
+                                        <span class="text-muted" style="font-size: 0.85rem; margin-left: 8px;">({{ group.all_flights|length }} flight{{ group.all_flights|pluralize }})</span>
+                                    </div>
+                                </div>
+
+                                <div style="padding: 12px 16px; display: flex; flex-direction: column; gap: 16px;">
+                                    {% if group.arrival_flights %}
+                                        <div>
+                                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                                <span class="badge badge-success">Arrival Flights</span>
+                                            </div>
+                                            <div class="table-responsive">
+                                                <table class="data-table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Flight #</th>
+                                                            <th>Flight Date</th>
+                                                            <th>Arrival Time</th>
+                                                            <th>Notes</th>
+                                                            {% if can_write %}
+                                                                <th class="text-right">Actions</th>
+                                                            {% endif %}
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% for flight in group.arrival_flights %}
+                                                            <tr>
+                                                                <td><strong>{{ flight.flight_number|default:"—" }}</strong></td>
+                                                                <td>{{ flight.flight_date|default:"—" }}</td>
+                                                                <td>{{ flight.flight_time|default:"—" }}</td>
+                                                                <td>
+                                                                    {% if flight.notes %}
+                                                                        {{ flight.notes }}
+                                                                    {% else %}
+                                                                        <span class="table-muted">—</span>
+                                                                    {% endif %}
+                                                                </td>
+                                                                {% if can_write %}
+                                                                    <td class="text-right">
+                                                                        <div class="table-actions">
+                                                                            <a href="{% url 'reservations:reservation_flight_update' flight.pk %}" class="button button-small button-secondary">Edit</a>
+                                                                            <form method="post" action="{% url 'reservations:reservation_flight_delete' flight.pk %}" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this flight?');">
+                                                                                {% csrf_token %}
+                                                                                <button type="submit" class="button button-small button-danger">Delete</button>
+                                                                            </form>
+                                                                        </div>
+                                                                    </td>
+                                                                {% endif %}
+                                                            </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    {% endif %}
+
+                                    {% if group.departure_flights %}
+                                        <div>
+                                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                                <span class="badge badge-warning">Departure Flights</span>
+                                            </div>
+                                            <div class="table-responsive">
+                                                <table class="data-table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Flight #</th>
+                                                            <th>Flight Date</th>
+                                                            <th>Departure Time</th>
+                                                            <th>Notes</th>
+                                                            {% if can_write %}
+                                                                <th class="text-right">Actions</th>
+                                                            {% endif %}
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% for flight in group.departure_flights %}
+                                                            <tr>
+                                                                <td><strong>{{ flight.flight_number|default:"—" }}</strong></td>
+                                                                <td>{{ flight.flight_date|default:"—" }}</td>
+                                                                <td>{{ flight.flight_time|default:"—" }}</td>
+                                                                <td>
+                                                                    {% if flight.notes %}
+                                                                        {{ flight.notes }}
+                                                                    {% else %}
+                                                                        <span class="table-muted">—</span>
+                                                                    {% endif %}
+                                                                </td>
+                                                                {% if can_write %}
+                                                                    <td class="text-right">
+                                                                        <div class="table-actions">
+                                                                            <a href="{% url 'reservations:reservation_flight_update' flight.pk %}" class="button button-small button-secondary">Edit</a>
+                                                                            <form method="post" action="{% url 'reservations:reservation_flight_delete' flight.pk %}" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this flight?');">
+                                                                                {% csrf_token %}
+                                                                                <button type="submit" class="button button-small button-danger">Delete</button>
+                                                                            </form>
+                                                                        </div>
+                                                                    </td>
+                                                                {% endif %}
+                                                            </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted mb-0">No scheduled flights recorded for this reservation.</p>
+                {% endif %}
+            {% else %}
+                <p class="text-muted mb-0" style="font-size: 0.9rem;">
+                    Flight information is hidden because Flying is not selected for this reservation. Click <a href="{% url 'reservations:reservation_update' reservation.pk %}">Edit Travel Notes</a> to enable flying and add flight schedules.
+                </p>
+            {% endif %}
+        </div>
+
+        <div class="detail-card">
+            <div class="section-heading">
+                <div>
                     <h2>Cabin Assignments</h2>
                     <p>Add cabins occupied by this reservation.</p>
                 </div>
@@ -290,16 +522,6 @@
                     <div class="form-field">
                         <label for="{{ guest_form.age_at_stay.id_for_label }}">Age at Stay</label>
                         {{ guest_form.age_at_stay }}
-                    </div>
-
-                    <div class="form-field">
-                        <label for="{{ guest_form.height.id_for_label }}">Height</label>
-                        {{ guest_form.height }}
-                    </div>
-
-                    <div class="form-field">
-                        <label for="{{ guest_form.weight.id_for_label }}">Weight</label>
-                        {{ guest_form.weight }}
                     </div>
 
                     <div class="form-field">
@@ -832,6 +1054,31 @@ document.addEventListener("DOMContentLoaded", function() {
                 quickAddButton.click();
             }
         });
+    }
+
+    // Detail page flight type toggle for arrival/departure time label and auto-date sync
+    const detailFlightType = document.getElementById("{{ flight_form.flight_type.id_for_label }}");
+    const detailFlightDate = document.getElementById("{{ flight_form.flight_date.id_for_label }}");
+    const detailTimeLabel = document.getElementById("detail-flight-time-label");
+    const arrDateStr = "{{ reservation.arrival_date|date:'Y-m-d' }}";
+    const depDateStr = "{{ reservation.departure_date|date:'Y-m-d' }}";
+
+    if (detailFlightType) {
+        function updateDetailFlightFields() {
+            if (detailFlightType.value === 'departure') {
+                if (detailTimeLabel) detailTimeLabel.textContent = 'Departure Time';
+                if (detailFlightDate && (detailFlightDate.value === arrDateStr || !detailFlightDate.value) && depDateStr) {
+                    detailFlightDate.value = depDateStr;
+                }
+            } else {
+                if (detailTimeLabel) detailTimeLabel.textContent = 'Arrival Time';
+                if (detailFlightDate && (detailFlightDate.value === depDateStr || !detailFlightDate.value) && arrDateStr) {
+                    detailFlightDate.value = arrDateStr;
+                }
+            }
+        }
+        detailFlightType.addEventListener('change', updateDetailFlightFields);
+        updateDetailFlightFields();
     }
 });
 </script>

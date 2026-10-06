@@ -260,11 +260,21 @@ class WeeklyReportsTests(TestCase):
         # Update res_guest_week1 with physical info and assignments
         self.res_guest_week1.horse = horse
         self.res_guest_week1.saddle = saddle
-        self.res_guest_week1.height = "6'0\""
-        self.res_guest_week1.weight = "180 lbs"
+        self.res_guest_week1.client.height = "6'0\""
+        self.res_guest_week1.client.weight = "180 lbs"
+        self.res_guest_week1.client.save()
         self.res_guest_week1.riding_experience = ReservationGuest.RidingExperience.INTERMEDIATE
         self.res_guest_week1.signed_release = True
         self.res_guest_week1.save()
+
+        # res_guest_week2 has a distinct client without physical profile info
+        guest_w2_client = RanchClient.objects.create(
+            first_name="Sam",
+            last_name="Rider",
+            email="samrider@example.com",
+        )
+        self.res_guest_week2.client = guest_w2_client
+        self.res_guest_week2.save()
 
         self.reservation_week1.deposit_received = True
         self.reservation_week1.save()

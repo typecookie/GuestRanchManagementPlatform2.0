@@ -30,6 +30,22 @@ urlpatterns = [
     ),
 
     path(
+        "<int:pk>/flights/new/",
+        views.reservation_flight_create,
+        name="reservation_flight_create",
+    ),
+    path(
+        "flights/<int:pk>/edit/",
+        views.reservation_flight_update,
+        name="reservation_flight_update",
+    ),
+    path(
+        "flights/<int:pk>/delete/",
+        views.reservation_flight_delete,
+        name="reservation_flight_delete",
+    ),
+
+    path(
         "<int:pk>/guests/new/",
         views.reservation_guest_create,
         name="reservation_guest_create",
