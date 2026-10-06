@@ -4,7 +4,7 @@ from django import forms
 from django.urls import reverse_lazy
 from django.db.models.functions import Length
 
-from .models import OperatingSeason, Reservation, ReservationCabin, ReservationGuest
+from .models import OperatingSeason, Reservation, ReservationCabin, ReservationFlight, ReservationGuest
 from apps.horses.models import Horse, Saddle
 
 
@@ -53,6 +53,10 @@ class ReservationForm(forms.ModelForm):
             "adult_count",
             "child_count",
             "guest_count",
+            "is_driving",
+            "driving_notes",
+            "is_flying",
+            "flying_notes",
             "deposit_request_sent",
             "deposit_received",
             "notes",
@@ -89,6 +93,8 @@ class ReservationForm(forms.ModelForm):
             "departure_date": forms.DateInput(attrs={"type": "date"}),
             "check_in_time": forms.TimeInput(attrs={"type": "time"}),
             "check_out_time": forms.TimeInput(attrs={"type": "time"}),
+            "driving_notes": forms.Textarea(attrs={"rows": 3, "placeholder": "Driving notes, vehicle info, ETA..."}),
+            "flying_notes": forms.Textarea(attrs={"rows": 3, "placeholder": "Flying notes, shuttle details, airline notes..."}),
             "notes": forms.Textarea(attrs={"rows": 4}),
             "internal_notes": forms.Textarea(attrs={"rows": 4}),
         }
@@ -136,6 +142,53 @@ class ReservationCabinForm(forms.ModelForm):
         return cleaned_data
 
 
+class ReservationFlightForm(forms.ModelForm):
+    class Meta:
+        model = ReservationFlight
+        fields = [
+            "flight_type",
+            "airport",
+            "flight_number",
+            "flight_date",
+            "flight_time",
+            "notes",
+        ]
+        widgets = {
+            "flight_type": forms.Select(
+                attrs={
+                    "class": "form-select js-flight-type",
+                }
+            ),
+            "airport": forms.TextInput(
+                attrs={
+                    "placeholder": "e.g. Denver (DEN) or Casper (CPR)",
+                }
+            ),
+            "flight_number": forms.TextInput(
+                attrs={
+                    "placeholder": "e.g. UA 4521",
+                }
+            ),
+            "flight_date": forms.DateInput(
+                attrs={
+                    "type": "date",
+                    "class": "form-input js-flight-date",
+                }
+            ),
+            "flight_time": forms.TimeInput(attrs={"type": "time"}),
+            "notes": forms.Textarea(attrs={"rows": 2, "placeholder": "Optional notes, passengers, shuttle requests..."}),
+        }
+
+
+ReservationFlightFormSet = forms.inlineformset_factory(
+    Reservation,
+    ReservationFlight,
+    form=ReservationFlightForm,
+    extra=1,
+    can_delete=True,
+)
+
+
 class ReservationGuestForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         reservation = kwargs.pop('reservation', None)
@@ -152,8 +205,6 @@ class ReservationGuestForm(forms.ModelForm):
             "client",
             "cabin",
             "age_at_stay",
-            "height",
-            "weight",
             "riding_experience",
             "is_riding",
             "signed_release",

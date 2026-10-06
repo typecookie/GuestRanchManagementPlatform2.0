@@ -13,8 +13,8 @@ from apps.clients.forms import ClientForm
 from apps.clients.models import Client, TravelGroup, Household, TravelGroupMember, HouseholdMember
 from django.http import JsonResponse
 
-from .forms import OperatingSeasonForm, ReservationCabinForm, ReservationForm, ReservationGuestForm
-from .models import OperatingSeason, Reservation, ReservationCabin, ReservationGuest
+from .forms import OperatingSeasonForm, ReservationCabinForm, ReservationFlightForm, ReservationFlightFormSet, ReservationForm, ReservationGuestForm
+from .models import OperatingSeason, Reservation, ReservationCabin, ReservationFlight, ReservationGuest
 from .season_utils import (
     get_active_operating_seasons,
     get_active_season_for_date,
@@ -248,6 +248,35 @@ def reservation_detail(request, pk):
         )
         hhs = (hhs | group_hhs).distinct()
 
+    flights = reservation.flights.all().order_by("airport", "flight_type", "flight_date", "flight_time", "created_at")
+    arrival_flights = [f for f in flights if f.flight_type == ReservationFlight.FlightType.ARRIVAL]
+    departure_flights = [f for f in flights if f.flight_type == ReservationFlight.FlightType.DEPARTURE]
+
+    groups_dict = {}
+    for flight in flights:
+        airport_key = flight.airport.strip() if flight.airport else ""
+        display_name = airport_key if airport_key else "Unspecified Airport"
+        if airport_key not in groups_dict:
+            groups_dict[airport_key] = {
+                "airport": display_name,
+                "arrival_flights": [],
+                "departure_flights": [],
+                "all_flights": [],
+            }
+        groups_dict[airport_key]["all_flights"].append(flight)
+        if flight.flight_type == ReservationFlight.FlightType.ARRIVAL:
+            groups_dict[airport_key]["arrival_flights"].append(flight)
+        else:
+            groups_dict[airport_key]["departure_flights"].append(flight)
+
+    airport_flight_groups = list(groups_dict.values())
+
+    flight_form = ReservationFlightForm(
+        initial={
+            "flight_date": reservation.arrival_date,
+        }
+    )
+
     context = {
         "reservation": reservation,
         "cabin_assignments": cabin_assignments,
@@ -258,6 +287,11 @@ def reservation_detail(request, pk):
         "unassigned_guests": unassigned_guests,
         "travel_groups": tgs,
         "households": hhs,
+        "flights": flights,
+        "arrival_flights": arrival_flights,
+        "departure_flights": departure_flights,
+        "airport_flight_groups": airport_flight_groups,
+        "flight_form": flight_form,
     }
 
     return render(request, "reservations/reservation_detail.html", context)
@@ -282,9 +316,12 @@ def reservation_create(request):
 
     if request.method == "POST":
         form = ReservationForm(request.POST)
+        flight_formset = ReservationFlightFormSet(request.POST, prefix="flights")
 
-        if form.is_valid():
+        if form.is_valid() and flight_formset.is_valid():
             reservation = form.save()
+            flight_formset.instance = reservation
+            flight_formset.save()
 
             if selected_cabin:
                 cabin_assignment = ReservationCabin(
@@ -313,9 +350,11 @@ def reservation_create(request):
             return redirect("reservations:reservation_detail", pk=reservation.pk)
     else:
         form = ReservationForm(initial=initial)
+        flight_formset = ReservationFlightFormSet(prefix="flights")
 
     context = {
         "form": form,
+        "flight_formset": flight_formset,
         "form_title": "New Reservation",
         "form_subtitle": "Create a reservation for a guest stay, short stay, work crew, farrier, or cabin block.",
         "submit_label": "Create Reservation",
@@ -331,17 +370,21 @@ def reservation_update(request, pk):
 
     if request.method == "POST":
         form = ReservationForm(request.POST, instance=reservation)
+        flight_formset = ReservationFlightFormSet(request.POST, instance=reservation, prefix="flights")
 
-        if form.is_valid():
+        if form.is_valid() and flight_formset.is_valid():
             reservation = form.save()
+            flight_formset.save()
             messages.success(request, f"Reservation {reservation.reservation_name} was updated.")
             return redirect("reservations:reservation_detail", pk=reservation.pk)
     else:
         form = ReservationForm(instance=reservation)
+        flight_formset = ReservationFlightFormSet(instance=reservation, prefix="flights")
 
     context = {
         "reservation": reservation,
         "form": form,
+        "flight_formset": flight_formset,
         "form_title": f"Edit {reservation.reservation_name}",
         "form_subtitle": "Update reservation dates, status, contact information, and notes.",
         "submit_label": "Save Reservation",
@@ -384,6 +427,90 @@ def reservation_cabin_delete(request, pk):
     if request.method == "POST":
         cabin_assignment.delete()
         messages.success(request, "Cabin assignment was removed.")
+
+    return redirect("reservations:reservation_detail", pk=reservation.pk)
+
+
+@module_permission_required('Reservations', 'write')
+def reservation_flight_create(request, pk):
+    reservation = get_object_or_404(Reservation, pk=pk)
+
+    if request.method == "POST":
+        form = ReservationFlightForm(request.POST)
+
+        if form.is_valid():
+            flight = form.save(commit=False)
+            flight.reservation = reservation
+            if not flight.flight_date:
+                flight.flight_date = (
+                    reservation.arrival_date
+                    if flight.flight_type == ReservationFlight.FlightType.ARRIVAL
+                    else reservation.departure_date
+                )
+
+            try:
+                flight.full_clean()
+                flight.save()
+                messages.success(request, f"{flight.get_flight_type_display()} flight was added.")
+            except ValidationError as error:
+                for message in error.messages:
+                    messages.error(request, message)
+
+            return redirect("reservations:reservation_detail", pk=reservation.pk)
+
+        messages.error(request, "Please correct the flight form errors.")
+        for field, errors in form.errors.items():
+            for error in errors:
+                messages.error(request, f"{field.replace('_', ' ').title()}: {error}")
+
+    return redirect("reservations:reservation_detail", pk=reservation.pk)
+
+
+@module_permission_required('Reservations', 'write')
+def reservation_flight_update(request, pk):
+    flight = get_object_or_404(ReservationFlight.objects.select_related("reservation"), pk=pk)
+    reservation = flight.reservation
+
+    if request.method == "POST":
+        form = ReservationFlightForm(request.POST, instance=flight)
+
+        if form.is_valid():
+            try:
+                flight = form.save()
+                messages.success(request, f"{flight.get_flight_type_display()} flight was updated.")
+                return redirect("reservations:reservation_detail", pk=reservation.pk)
+            except ValidationError as error:
+                for message in error.messages:
+                    messages.error(request, message)
+        else:
+            messages.error(request, "Please correct the flight form errors.")
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f"{field.replace('_', ' ').title()}: {error}")
+    else:
+        form = ReservationFlightForm(instance=flight)
+
+    context = {
+        "reservation": reservation,
+        "flight": flight,
+        "form": form,
+        "form_title": f"Edit {flight.get_flight_type_display()} Flight",
+        "form_subtitle": f"Update flight details for {reservation.reservation_name}.",
+        "submit_label": "Save Flight",
+    }
+
+    return render(request, "reservations/reservation_flight_form.html", context)
+
+
+@module_permission_required('Reservations', 'delete')
+def reservation_flight_delete(request, pk):
+    flight = get_object_or_404(ReservationFlight.objects.select_related("reservation"), pk=pk)
+    reservation = flight.reservation
+
+    if request.method == "POST":
+        flight_desc = f"{flight.get_flight_type_display()} flight"
+        flight.delete()
+        messages.success(request, f"{flight_desc} was removed.")
 
     return redirect("reservations:reservation_detail", pk=reservation.pk)
 
@@ -583,8 +710,6 @@ def create_reservation_guest_from_client(reservation, client):
         defaults={
             "cabin": assigned_cabin,
             "age_at_stay": age_at_stay,
-            "height": client.height or "",
-            "weight": client.weight or "",
             "is_riding": is_riding,
             "riding_experience": client.riding_level,
             "allergies": client.medical_notes,

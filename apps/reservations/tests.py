@@ -6,8 +6,8 @@ from django.contrib.auth import get_user_model
 from django.contrib.admin.sites import site
 from apps.cabins.models import Cabin
 from apps.clients.models import Client, Household, HouseholdMember, TravelGroup, TravelGroupMember
-from apps.reservations.models import OperatingSeason, Reservation, ReservationGuest
-from apps.reservations.forms import OperatingSeasonForm
+from apps.reservations.models import OperatingSeason, Reservation, ReservationFlight, ReservationGuest
+from apps.reservations.forms import OperatingSeasonForm, ReservationFlightForm, ReservationForm
 from apps.reservations.season_utils import (
     get_default_season_dates,
     is_date_open,
@@ -517,3 +517,368 @@ class OperatingDatesViewsTests(TestCase):
 
     def test_admin_registration(self):
         self.assertIn(OperatingSeason, site._registry)
+        self.assertIn(ReservationFlight, site._registry)
+
+
+class ReservationTravelAndFlightTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username="ranchstaff",
+            password="password123",
+            email="staff@ranch.local",
+        )
+        self.client = TestClient()
+        self.client.force_login(self.user)
+
+        self.contact = Client.objects.create(
+            first_name="Jane",
+            last_name="Doe",
+            email="jane.doe@example.com",
+        )
+        self.reservation = Reservation.objects.create(
+            reservation_name="Doe Family Vacation",
+            arrival_date=date(2026, 7, 5),
+            departure_date=date(2026, 7, 12),
+            primary_contact=self.contact,
+            is_driving=True,
+            driving_notes="Arriving by SUV around 3pm",
+            is_flying=True,
+            flying_notes="Flying United, shuttle requested from CPR",
+        )
+
+    def test_reservation_travel_fields_model(self):
+        self.assertTrue(self.reservation.is_driving)
+        self.assertEqual(self.reservation.driving_notes, "Arriving by SUV around 3pm")
+        self.assertTrue(self.reservation.is_flying)
+        self.assertEqual(self.reservation.flying_notes, "Flying United, shuttle requested from CPR")
+
+    def test_reservation_flight_model(self):
+        flight_arr = ReservationFlight.objects.create(
+            reservation=self.reservation,
+            flight_type=ReservationFlight.FlightType.ARRIVAL,
+            airport="Casper (CPR)",
+            flight_number="UA 4521",
+            flight_date=date(2026, 7, 5),
+            flight_time="14:30:00",
+            notes="Need ranch shuttle pickup",
+        )
+        flight_dep = ReservationFlight.objects.create(
+            reservation=self.reservation,
+            flight_type=ReservationFlight.FlightType.DEPARTURE,
+            airport="Denver (DEN)",
+            flight_number="UA 1042",
+            flight_date=date(2026, 7, 12),
+            flight_time="11:15:00",
+            notes="Departing morning flight",
+        )
+
+        self.assertEqual(self.reservation.flights.count(), 2)
+        self.assertEqual(flight_arr.flight_type, "arrival")
+        self.assertEqual(flight_dep.flight_type, "departure")
+        self.assertIn("Arrival Flight #UA 4521", str(flight_arr))
+        self.assertIn("Departure Flight #UA 1042", str(flight_dep))
+
+    def test_reservation_flight_ordering_arranged_by_airport(self):
+        ReservationFlight.objects.create(
+            reservation=self.reservation,
+            flight_type=ReservationFlight.FlightType.DEPARTURE,
+            airport="Denver (DEN)",
+            flight_number="UA 200",
+            flight_date=date(2026, 7, 12),
+            flight_time="16:00:00",
+        )
+        ReservationFlight.objects.create(
+            reservation=self.reservation,
+            flight_type=ReservationFlight.FlightType.ARRIVAL,
+            airport="Casper (CPR)",
+            flight_number="UA 100",
+            flight_date=date(2026, 7, 5),
+            flight_time="10:00:00",
+        )
+        ReservationFlight.objects.create(
+            reservation=self.reservation,
+            flight_type=ReservationFlight.FlightType.ARRIVAL,
+            airport="Denver (DEN)",
+            flight_number="UA 150",
+            flight_date=date(2026, 7, 5),
+            flight_time="12:00:00",
+        )
+
+        flights = list(self.reservation.flights.all())
+        self.assertEqual(flights[0].airport, "Casper (CPR)")
+        self.assertEqual(flights[1].airport, "Denver (DEN)")
+        self.assertEqual(flights[1].flight_type, "arrival")
+        self.assertEqual(flights[2].airport, "Denver (DEN)")
+        self.assertEqual(flights[2].flight_type, "departure")
+
+    def test_reservation_create_with_flights_formset(self):
+        url = reverse("reservations:reservation_create")
+        post_data = {
+            "reservation_name": "Flight Test Reservation",
+            "reservation_type": Reservation.ReservationType.GUEST_STAY,
+            "status": Reservation.ReservationStatus.CONFIRMED,
+            "arrival_date": "2026-08-02",
+            "departure_date": "2026-08-09",
+            "check_in_time": "15:00",
+            "check_out_time": "10:00",
+            "adult_count": 2,
+            "child_count": 0,
+            "guest_count": 2,
+            "is_flying": True,
+            "flights-TOTAL_FORMS": "2",
+            "flights-INITIAL_FORMS": "0",
+            "flights-MIN_NUM_FORMS": "0",
+            "flights-MAX_NUM_FORMS": "1000",
+            "flights-0-flight_type": "arrival",
+            "flights-0-airport": "Casper (CPR)",
+            "flights-0-flight_number": "UA 123",
+            "flights-0-flight_date": "2026-08-02",
+            "flights-0-flight_time": "14:15",
+            "flights-0-notes": "Pick up 2 guests",
+            "flights-1-flight_type": "departure",
+            "flights-1-airport": "Casper (CPR)",
+            "flights-1-flight_number": "UA 456",
+            "flights-1-flight_date": "2026-08-09",
+            "flights-1-flight_time": "09:45",
+            "flights-1-notes": "Drop off at CPR",
+        }
+        res = self.client.post(url, post_data)
+        self.assertEqual(res.status_code, 302)
+        created_res = Reservation.objects.get(reservation_name="Flight Test Reservation")
+        self.assertEqual(created_res.flights.count(), 2)
+        arr_flight = created_res.flights.get(flight_type="arrival")
+        self.assertEqual(arr_flight.airport, "Casper (CPR)")
+        self.assertEqual(arr_flight.flight_number, "UA 123")
+
+    def test_reservation_form_travel_fields(self):
+        form_data = {
+            "reservation_name": "Smith Group",
+            "reservation_type": Reservation.ReservationType.GUEST_STAY,
+            "status": Reservation.ReservationStatus.CONFIRMED,
+            "arrival_date": "2026-08-02",
+            "departure_date": "2026-08-09",
+            "check_in_time": "15:00",
+            "check_out_time": "10:00",
+            "adult_count": 2,
+            "child_count": 1,
+            "guest_count": 3,
+            "is_driving": True,
+            "driving_notes": "Driving from Salt Lake City",
+            "is_flying": False,
+            "flying_notes": "",
+        }
+        form = ReservationForm(data=form_data)
+        self.assertTrue(form.is_valid(), form.errors)
+        saved_res = form.save()
+        self.assertTrue(saved_res.is_driving)
+        self.assertEqual(saved_res.driving_notes, "Driving from Salt Lake City")
+        self.assertFalse(saved_res.is_flying)
+
+    def test_reservation_flight_form(self):
+        flight_data = {
+            "flight_type": "arrival",
+            "airport": "Casper (CPR)",
+            "flight_number": "UA 500",
+            "flight_date": "2026-07-05",
+            "flight_time": "13:45",
+            "notes": "3 passengers",
+        }
+        form = ReservationFlightForm(data=flight_data)
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_reservation_detail_view_shows_travel_and_flights(self):
+        ReservationFlight.objects.create(
+            reservation=self.reservation,
+            flight_type=ReservationFlight.FlightType.ARRIVAL,
+            airport="Casper (CPR)",
+            flight_number="UA 4521",
+            flight_date=date(2026, 7, 5),
+            flight_time="14:30:00",
+        )
+        url = reverse("reservations:reservation_detail", args=[self.reservation.pk])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Travel &amp; Flights")
+        self.assertContains(response, "Driving")
+        self.assertContains(response, "Arriving by SUV around 3pm")
+        self.assertContains(response, "Flying")
+        self.assertContains(response, "Flying United, shuttle requested from CPR")
+        self.assertContains(response, "UA 4521")
+        self.assertContains(response, "Casper (CPR)")
+
+    def test_reservation_flight_create_view(self):
+        url = reverse("reservations:reservation_flight_create", args=[self.reservation.pk])
+        post_data = {
+            "flight_type": "arrival",
+            "airport": "Denver (DEN)",
+            "flight_number": "UA 999",
+            "flight_date": "2026-07-05",
+            "flight_time": "12:00",
+            "notes": "Arriving noon",
+        }
+        response = self.client.post(url, post_data)
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            ReservationFlight.objects.filter(
+                reservation=self.reservation,
+                flight_number="UA 999",
+                airport="Denver (DEN)",
+            ).exists()
+        )
+
+    def test_reservation_flight_update_view(self):
+        flight = ReservationFlight.objects.create(
+            reservation=self.reservation,
+            flight_type=ReservationFlight.FlightType.ARRIVAL,
+            airport="Sheridan (SHR)",
+            flight_number="UA 100",
+            flight_date=date(2026, 7, 5),
+            flight_time="15:00:00",
+        )
+        url = reverse("reservations:reservation_flight_update", args=[flight.pk])
+        get_res = self.client.get(url)
+        self.assertEqual(get_res.status_code, 200)
+        self.assertContains(get_res, "Edit Arrival Flight")
+
+        post_data = {
+            "flight_type": "departure",
+            "airport": "Billings (BIL)",
+            "flight_number": "DL 888",
+            "flight_date": "2026-07-12",
+            "flight_time": "09:30",
+            "notes": "Updated to Billings departure",
+        }
+        post_res = self.client.post(url, post_data)
+        self.assertEqual(post_res.status_code, 302)
+        flight.refresh_from_db()
+        self.assertEqual(flight.flight_type, "departure")
+        self.assertEqual(flight.airport, "Billings (BIL)")
+        self.assertEqual(flight.flight_number, "DL 888")
+
+    def test_reservation_flight_delete_view(self):
+        flight = ReservationFlight.objects.create(
+            reservation=self.reservation,
+            flight_type=ReservationFlight.FlightType.ARRIVAL,
+            airport="Casper (CPR)",
+            flight_number="UA 4521",
+        )
+        url = reverse("reservations:reservation_flight_delete", args=[flight.pk])
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(ReservationFlight.objects.filter(pk=flight.pk).exists())
+
+    def test_reservation_flight_auto_date_default_on_create(self):
+        url = reverse("reservations:reservation_flight_create", args=[self.reservation.pk])
+        # Arrival flight without explicit flight_date should default to reservation.arrival_date
+        post_arr = {
+            "flight_type": "arrival",
+            "airport": "Casper (CPR)",
+            "flight_number": "UA 101",
+            "flight_date": "",
+            "flight_time": "14:00",
+        }
+        res_arr = self.client.post(url, post_arr)
+        self.assertEqual(res_arr.status_code, 302)
+        arr_flight = ReservationFlight.objects.get(flight_number="UA 101")
+        self.assertEqual(arr_flight.flight_date, self.reservation.arrival_date)
+
+        # Departure flight without explicit flight_date should default to reservation.departure_date
+        post_dep = {
+            "flight_type": "departure",
+            "airport": "Casper (CPR)",
+            "flight_number": "UA 102",
+            "flight_date": "",
+            "flight_time": "10:00",
+        }
+        res_dep = self.client.post(url, post_dep)
+        self.assertEqual(res_dep.status_code, 302)
+        dep_flight = ReservationFlight.objects.get(flight_number="UA 102")
+        self.assertEqual(dep_flight.flight_date, self.reservation.departure_date)
+
+    def test_reservation_detail_flight_visibility(self):
+        # When is_flying is False and no flights exist
+        res_no_flying = Reservation.objects.create(
+            reservation_name="Non Flying Reservation",
+            reservation_type=Reservation.ReservationType.GUEST_STAY,
+            status=Reservation.ReservationStatus.CONFIRMED,
+            arrival_date=date(2026, 8, 2),
+            departure_date=date(2026, 8, 9),
+            is_flying=False,
+            is_driving=True,
+        )
+        url = reverse("reservations:reservation_detail", args=[res_no_flying.pk])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Flight information is hidden because Flying is not selected")
+        self.assertNotContains(response, "Scheduled Flights (Arranged by Airport)")
+
+        # When is_flying is True
+        self.reservation.is_flying = True
+        self.reservation.save()
+        res_flying = self.client.get(reverse("reservations:reservation_detail", args=[self.reservation.pk]))
+        self.assertEqual(res_flying.status_code, 200)
+        self.assertContains(res_flying, "Scheduled Flights (Arranged by Airport)")
+        self.assertContains(res_flying, "Add Flight")
+
+    def test_reservation_guest_height_and_weight_references_client_profile(self):
+        client = Client.objects.create(
+            first_name="Jane",
+            last_name="Doe",
+            height="5'7\"",
+            weight="145 lbs",
+        )
+        guest = ReservationGuest.objects.create(
+            reservation=self.reservation,
+            client=client,
+            age_at_stay=28,
+        )
+
+        # Height and weight properties on ReservationGuest reflect the Client profile
+        self.assertEqual(guest.height, "5'7\"")
+        self.assertEqual(guest.weight, "145 lbs")
+        self.assertEqual(guest.effective_height, "5'7\"")
+        self.assertEqual(guest.effective_weight, "145 lbs")
+
+        # Updating client profile dynamically updates guest properties without separate stay data
+        client.height = "5'8\""
+        client.weight = "140 lbs"
+        client.save()
+
+        # Re-fetch guest from db
+        guest_refreshed = ReservationGuest.objects.select_related("client").get(pk=guest.pk)
+        self.assertEqual(guest_refreshed.height, "5'8\"")
+        self.assertEqual(guest_refreshed.weight, "140 lbs")
+
+    def test_reservation_guest_form_and_views_without_height_weight(self):
+        client = Client.objects.create(
+            first_name="Bob",
+            last_name="Smith",
+            height="6'1\"",
+            weight="195 lbs",
+        )
+        url = reverse("reservations:reservation_guest_create", args=[self.reservation.pk])
+        post_data = {
+            "client": client.pk,
+            "age_at_stay": 35,
+            "riding_experience": "intermediate",
+            "is_riding": "on",
+        }
+        response = self.client.post(url, post_data)
+        self.assertEqual(response.status_code, 302)
+
+        guest = ReservationGuest.objects.get(reservation=self.reservation, client=client)
+        self.assertEqual(guest.height, "6'1\"")
+        self.assertEqual(guest.weight, "195 lbs")
+
+        # Verify guest update view works cleanly
+        update_url = reverse("reservations:reservation_guest_update", args=[guest.pk])
+        get_update = self.client.get(update_url)
+        self.assertEqual(get_update.status_code, 200)
+        self.assertNotContains(get_update, 'name="height"')
+        self.assertNotContains(get_update, 'name="weight"')
+
+        # Verify reservation detail displays client's height and weight
+        detail_res = self.client.get(reverse("reservations:reservation_detail", args=[self.reservation.pk]))
+        self.assertEqual(detail_res.status_code, 200)
+        self.assertContains(detail_res, "6&#x27;1&quot;")
+        self.assertContains(detail_res, "195 lbs")
