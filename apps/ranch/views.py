@@ -809,7 +809,7 @@ def build_booking_alerts(period_start, period_end=None):
                 cabin_reservations_map.setdefault(g.cabin, set()).add(res)
 
         for ca in res.cabin_assignments.all():
-            if ca.arrival_date < week_end and ca.departure_date > week_start:
+            if ca.arrival_date < period_end and ca.departure_date > period_start:
                 cabin_reservations_map.setdefault(ca.cabin, set()).add(res)
 
                 # Check cabin assignment date bounds
