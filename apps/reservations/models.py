@@ -226,12 +226,6 @@ class ReservationGuest(models.Model):
 
     age_at_stay = models.PositiveIntegerField(null=True, blank=True)
 
-    riding_experience = models.CharField(
-        max_length=30,
-        choices=RidingExperience.choices,
-        default=RidingExperience.UNKNOWN,
-    )
-
     allergies = models.TextField(blank=True)
     food_requests = models.TextField(blank=True)
     medical_notes = models.TextField(blank=True)
@@ -255,7 +249,6 @@ class ReservationGuest(models.Model):
             models.Index(fields=["reservation"]),
             models.Index(fields=["client"]),
             models.Index(fields=["cabin"]),
-            models.Index(fields=["riding_experience"]),
         ]
 
     def __str__(self):
@@ -263,9 +256,6 @@ class ReservationGuest(models.Model):
 
     def save(self, *args, **kwargs):
         if self.client_id:
-            # Auto-populate riding experience from client profile if unknown
-            if (not self.riding_experience or self.riding_experience == self.RidingExperience.UNKNOWN) and self.client.riding_level and self.client.riding_level != 'unknown':
-                self.riding_experience = self.client.riding_level
             # If client is marked as non-rider in client profile and record is new, default is_riding to False
             if not self.pk and (not self.client.is_rider or self.client.riding_level == self.RidingExperience.NON_RIDER):
                 self.is_riding = False
@@ -292,12 +282,21 @@ class ReservationGuest(models.Model):
         return self.weight
 
     @property
-    def effective_riding_experience(self):
-        if self.riding_experience and self.riding_experience != self.RidingExperience.UNKNOWN:
-            return self.riding_experience
-        if self.client_id and self.client.riding_level and self.client.riding_level != 'unknown':
+    def riding_experience(self):
+        if self.client_id and self.client.riding_level:
             return self.client.riding_level
         return self.RidingExperience.UNKNOWN
+
+    @property
+    def effective_riding_experience(self):
+        return self.riding_experience
+
+    def get_riding_experience_display(self):
+        val = self.riding_experience
+        for choice_val, choice_label in self.RidingExperience.choices:
+            if choice_val == val:
+                return str(choice_label)
+        return val.replace("_", " ").title() if val else ""
 
     @property
     def years_count(self):

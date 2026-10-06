@@ -205,7 +205,6 @@ class ReservationGuestForm(forms.ModelForm):
             "client",
             "cabin",
             "age_at_stay",
-            "riding_experience",
             "is_riding",
             "signed_release",
             "allergies",

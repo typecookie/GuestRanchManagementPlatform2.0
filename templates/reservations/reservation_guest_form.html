@@ -56,14 +56,6 @@
                 {% endfor %}
             </div>
 
-            <div class="form-field">
-                <label for="{{ form.riding_experience.id_for_label }}">Riding Experience</label>
-                {{ form.riding_experience }}
-                {% for error in form.riding_experience.errors %}
-                    <span class="form-error">{{ error }}</span>
-                {% endfor %}
-            </div>
-
             <div class="form-field checkbox-field">
                 <label>
                     {{ form.is_riding }}

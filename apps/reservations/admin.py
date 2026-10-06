@@ -62,7 +62,6 @@ class ReservationGuestInline(admin.TabularInline):
         "client",
         "cabin",
         "age_at_stay",
-        "riding_experience",
         "is_riding",
         "allergies",
         "food_requests",
@@ -192,12 +191,11 @@ class ReservationGuestAdmin(admin.ModelAdmin):
         "age_at_stay",
         "display_height",
         "display_weight",
-        "riding_experience",
+        "display_riding_experience",
         "is_riding",
     ]
     list_filter = [
         "cabin",
-        "riding_experience",
         "is_riding",
     ]
     search_fields = [
@@ -225,3 +223,7 @@ class ReservationGuestAdmin(admin.ModelAdmin):
     @admin.display(description="Weight")
     def display_weight(self, obj):
         return obj.weight
+
+    @admin.display(description="Riding Experience")
+    def display_riding_experience(self, obj):
+        return obj.get_riding_experience_display()

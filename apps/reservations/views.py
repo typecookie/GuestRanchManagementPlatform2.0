@@ -711,7 +711,6 @@ def create_reservation_guest_from_client(reservation, client):
             "cabin": assigned_cabin,
             "age_at_stay": age_at_stay,
             "is_riding": is_riding,
-            "riding_experience": client.riding_level,
             "allergies": client.medical_notes,
             "food_requests": client.dietary_notes,
             "medical_notes": client.medical_notes,

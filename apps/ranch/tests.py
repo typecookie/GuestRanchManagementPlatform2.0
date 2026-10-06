@@ -262,8 +262,8 @@ class WeeklyReportsTests(TestCase):
         self.res_guest_week1.saddle = saddle
         self.res_guest_week1.client.height = "6'0\""
         self.res_guest_week1.client.weight = "180 lbs"
+        self.res_guest_week1.client.riding_level = RanchClient.RidingLevel.INTERMEDIATE
         self.res_guest_week1.client.save()
-        self.res_guest_week1.riding_experience = ReservationGuest.RidingExperience.INTERMEDIATE
         self.res_guest_week1.signed_release = True
         self.res_guest_week1.save()
 

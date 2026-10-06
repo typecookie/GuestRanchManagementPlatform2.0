@@ -826,6 +826,7 @@ class ReservationTravelAndFlightTests(TestCase):
             last_name="Doe",
             height="5'7\"",
             weight="145 lbs",
+            riding_level="intermediate",
         )
         guest = ReservationGuest.objects.create(
             reservation=self.reservation,
@@ -833,21 +834,26 @@ class ReservationTravelAndFlightTests(TestCase):
             age_at_stay=28,
         )
 
-        # Height and weight properties on ReservationGuest reflect the Client profile
+        # Height, weight, and riding experience properties on ReservationGuest reflect the Client profile
         self.assertEqual(guest.height, "5'7\"")
         self.assertEqual(guest.weight, "145 lbs")
         self.assertEqual(guest.effective_height, "5'7\"")
         self.assertEqual(guest.effective_weight, "145 lbs")
+        self.assertEqual(guest.riding_experience, "intermediate")
+        self.assertEqual(guest.get_riding_experience_display(), "Intermediate")
 
         # Updating client profile dynamically updates guest properties without separate stay data
         client.height = "5'8\""
         client.weight = "140 lbs"
+        client.riding_level = "advanced"
         client.save()
 
         # Re-fetch guest from db
         guest_refreshed = ReservationGuest.objects.select_related("client").get(pk=guest.pk)
         self.assertEqual(guest_refreshed.height, "5'8\"")
         self.assertEqual(guest_refreshed.weight, "140 lbs")
+        self.assertEqual(guest_refreshed.riding_experience, "advanced")
+        self.assertEqual(guest_refreshed.get_riding_experience_display(), "Advanced")
 
     def test_reservation_guest_form_and_views_without_height_weight(self):
         client = Client.objects.create(
@@ -855,12 +861,12 @@ class ReservationTravelAndFlightTests(TestCase):
             last_name="Smith",
             height="6'1\"",
             weight="195 lbs",
+            riding_level="beginner",
         )
         url = reverse("reservations:reservation_guest_create", args=[self.reservation.pk])
         post_data = {
             "client": client.pk,
             "age_at_stay": 35,
-            "riding_experience": "intermediate",
             "is_riding": "on",
         }
         response = self.client.post(url, post_data)
@@ -869,6 +875,7 @@ class ReservationTravelAndFlightTests(TestCase):
         guest = ReservationGuest.objects.get(reservation=self.reservation, client=client)
         self.assertEqual(guest.height, "6'1\"")
         self.assertEqual(guest.weight, "195 lbs")
+        self.assertEqual(guest.riding_experience, "beginner")
 
         # Verify guest update view works cleanly
         update_url = reverse("reservations:reservation_guest_update", args=[guest.pk])
@@ -876,9 +883,11 @@ class ReservationTravelAndFlightTests(TestCase):
         self.assertEqual(get_update.status_code, 200)
         self.assertNotContains(get_update, 'name="height"')
         self.assertNotContains(get_update, 'name="weight"')
+        self.assertNotContains(get_update, 'name="riding_experience"')
 
-        # Verify reservation detail displays client's height and weight
+        # Verify reservation detail displays client's height, weight, and experience
         detail_res = self.client.get(reverse("reservations:reservation_detail", args=[self.reservation.pk]))
         self.assertEqual(detail_res.status_code, 200)
         self.assertContains(detail_res, "6&#x27;1&quot;")
         self.assertContains(detail_res, "195 lbs")
+        self.assertContains(detail_res, "Beginner")
