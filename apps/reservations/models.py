@@ -77,11 +77,6 @@ class Reservation(models.Model):
     notes = models.TextField(blank=True)
     internal_notes = models.TextField(blank=True)
 
-    is_driving = models.BooleanField(default=False)
-    driving_notes = models.TextField(blank=True)
-    is_flying = models.BooleanField(default=False)
-    flying_notes = models.TextField(blank=True)
-
     deposit_request_sent = models.BooleanField(default=False)
     deposit_received = models.BooleanField(default=False)
 
@@ -225,6 +220,16 @@ class ReservationGuest(models.Model):
     )
 
     age_at_stay = models.PositiveIntegerField(null=True, blank=True)
+    height = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Example: 5'8\" or 68 inches",
+    )
+    weight = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Example: 150 lbs",
+    )
 
     riding_experience = models.CharField(
         max_length=30,
@@ -263,6 +268,12 @@ class ReservationGuest(models.Model):
 
     def save(self, *args, **kwargs):
         if self.client_id:
+            # Auto-populate height from client profile if not explicitly set on guest card
+            if not self.height and self.client.height:
+                self.height = self.client.height
+            # Auto-populate weight from client profile if not explicitly set on guest card
+            if not self.weight and self.client.weight:
+                self.weight = self.client.weight
             # Auto-populate riding experience from client profile if unknown
             if (not self.riding_experience or self.riding_experience == self.RidingExperience.UNKNOWN) and self.client.riding_level and self.client.riding_level != 'unknown':
                 self.riding_experience = self.client.riding_level
@@ -272,24 +283,20 @@ class ReservationGuest(models.Model):
         super().save(*args, **kwargs)
 
     @property
-    def height(self):
+    def effective_height(self):
+        if self.height and str(self.height).strip():
+            return self.height
         if self.client_id and self.client.height:
             return self.client.height
         return ""
 
     @property
-    def weight(self):
+    def effective_weight(self):
+        if self.weight and str(self.weight).strip():
+            return self.weight
         if self.client_id and self.client.weight:
             return self.client.weight
         return ""
-
-    @property
-    def effective_height(self):
-        return self.height
-
-    @property
-    def effective_weight(self):
-        return self.weight
 
     @property
     def effective_riding_experience(self):
@@ -357,65 +364,6 @@ class ReservationGuest(models.Model):
     def years_display(self):
         from apps.clients.models import format_years_ordinal
         return format_years_ordinal(self.years_count)
-
-
-class ReservationFlight(models.Model):
-    class FlightType(models.TextChoices):
-        ARRIVAL = "arrival", "Arrival"
-        DEPARTURE = "departure", "Departure"
-
-    reservation = models.ForeignKey(
-        Reservation,
-        on_delete=models.CASCADE,
-        related_name="flights",
-    )
-    flight_type = models.CharField(
-        max_length=20,
-        choices=FlightType.choices,
-        default=FlightType.ARRIVAL,
-    )
-    airport = models.CharField(
-        max_length=150,
-        blank=True,
-        help_text="Airport name or code, e.g. Casper (CPR), Denver (DEN)",
-    )
-    flight_number = models.CharField(
-        max_length=50,
-        blank=True,
-        help_text="Airline and flight number, e.g. UA 4521",
-    )
-    flight_date = models.DateField(
-        null=True,
-        blank=True,
-        help_text="Flight date",
-    )
-    flight_time = models.TimeField(
-        null=True,
-        blank=True,
-        help_text="Arrival or departure time",
-    )
-    notes = models.TextField(
-        blank=True,
-        help_text="Optional flight notes (e.g. connections, shuttle requests, passenger names)",
-    )
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ["airport", "flight_type", "flight_date", "flight_time", "created_at"]
-        indexes = [
-            models.Index(fields=["reservation"]),
-            models.Index(fields=["airport"]),
-            models.Index(fields=["flight_type"]),
-            models.Index(fields=["flight_date"]),
-        ]
-
-    def __str__(self):
-        type_str = self.get_flight_type_display()
-        num_str = f" #{self.flight_number}" if self.flight_number else ""
-        airport_str = f" at {self.airport}" if self.airport else ""
-        return f"{type_str} Flight{num_str}{airport_str} ({self.reservation})"
 
 
 class OperatingSeason(models.Model):

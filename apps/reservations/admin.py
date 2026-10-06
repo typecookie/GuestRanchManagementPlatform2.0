@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import OperatingSeason, Reservation, ReservationCabin, ReservationFlight, ReservationGuest
+from .models import OperatingSeason, Reservation, ReservationCabin, ReservationGuest
 
 
 @admin.register(OperatingSeason)
@@ -30,19 +30,6 @@ class OperatingSeasonAdmin(admin.ModelAdmin):
     ]
 
 
-class ReservationFlightInline(admin.TabularInline):
-    model = ReservationFlight
-    extra = 1
-    fields = [
-        "flight_type",
-        "airport",
-        "flight_number",
-        "flight_date",
-        "flight_time",
-        "notes",
-    ]
-
-
 class ReservationCabinInline(admin.TabularInline):
     model = ReservationCabin
     extra = 1
@@ -62,6 +49,8 @@ class ReservationGuestInline(admin.TabularInline):
         "client",
         "cabin",
         "age_at_stay",
+        "height",
+        "weight",
         "riding_experience",
         "is_riding",
         "allergies",
@@ -85,8 +74,6 @@ class ReservationAdmin(admin.ModelAdmin):
     list_filter = [
         "reservation_type",
         "status",
-        "is_driving",
-        "is_flying",
         "arrival_date",
         "departure_date",
     ]
@@ -97,8 +84,6 @@ class ReservationAdmin(admin.ModelAdmin):
         "primary_contact__last_name",
         "household__name",
         "travel_group__name",
-        "driving_notes",
-        "flying_notes",
         "notes",
         "internal_notes",
     ]
@@ -113,41 +98,8 @@ class ReservationAdmin(admin.ModelAdmin):
         "reservation_name",
     ]
     inlines = [
-        ReservationFlightInline,
         ReservationCabinInline,
         ReservationGuestInline,
-    ]
-
-
-@admin.register(ReservationFlight)
-class ReservationFlightAdmin(admin.ModelAdmin):
-    list_display = [
-        "reservation",
-        "airport",
-        "flight_type",
-        "flight_number",
-        "flight_date",
-        "flight_time",
-    ]
-    list_filter = [
-        "airport",
-        "flight_type",
-        "flight_date",
-    ]
-    search_fields = [
-        "reservation__reservation_name",
-        "airport",
-        "flight_number",
-        "notes",
-    ]
-    autocomplete_fields = [
-        "reservation",
-    ]
-    ordering = [
-        "airport",
-        "flight_type",
-        "flight_date",
-        "flight_time",
     ]
 
 
@@ -190,8 +142,8 @@ class ReservationGuestAdmin(admin.ModelAdmin):
         "client",
         "cabin",
         "age_at_stay",
-        "display_height",
-        "display_weight",
+        "height",
+        "weight",
         "riding_experience",
         "is_riding",
     ]
@@ -217,11 +169,3 @@ class ReservationGuestAdmin(admin.ModelAdmin):
         "client",
         "cabin",
     ]
-
-    @admin.display(description="Height")
-    def display_height(self, obj):
-        return obj.height
-
-    @admin.display(description="Weight")
-    def display_weight(self, obj):
-        return obj.weight
