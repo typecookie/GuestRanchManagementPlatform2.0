@@ -524,6 +524,10 @@ def reservation_guest_create_new_client(request, pk):
 
         if form.is_valid():
             client = form.save()
+            if reservation.travel_group_id:
+                TravelGroupMember.objects.get_or_create(travel_group_id=reservation.travel_group_id, client=client)
+            if reservation.household_id:
+                HouseholdMember.objects.get_or_create(household_id=reservation.household_id, client=client)
             create_reservation_guest_from_client(reservation, client)
             messages.success(
                 request,
@@ -606,21 +610,29 @@ def quick_add_reservation_item(request, pk):
 
         if travel_group_id:
             TravelGroupMember.objects.get_or_create(travel_group_id=travel_group_id, client=client)
+        elif reservation.travel_group_id:
+            TravelGroupMember.objects.get_or_create(travel_group_id=reservation.travel_group_id, client=client)
+
         if household_id:
             HouseholdMember.objects.get_or_create(household_id=household_id, client=client)
+        elif reservation.household_id:
+            HouseholdMember.objects.get_or_create(household_id=reservation.household_id, client=client)
 
         create_reservation_guest_from_client(reservation, client)
         
         return JsonResponse({
             'id': client.pk,
             'name': client.full_name,
-            'type': 'client'
+            'type': 'client',
+            'reload': True
         })
 
     elif item_type == 'household':
         household = Household.objects.create(name=name)
         if travel_group_id:
             TravelGroupMember.objects.get_or_create(travel_group_id=travel_group_id, household=household)
+        elif reservation.travel_group_id:
+            TravelGroupMember.objects.get_or_create(travel_group_id=reservation.travel_group_id, household=household)
         
         reservation.household = household
         reservation.save(update_fields=['household'])
@@ -628,7 +640,8 @@ def quick_add_reservation_item(request, pk):
         return JsonResponse({
             'id': household.pk,
             'name': household.name,
-            'type': 'household'
+            'type': 'household',
+            'reload': True
         })
 
     elif item_type == 'travel_group':
@@ -639,7 +652,8 @@ def quick_add_reservation_item(request, pk):
         return JsonResponse({
             'id': travel_group.pk,
             'name': travel_group.name,
-            'type': 'travel_group'
+            'type': 'travel_group',
+            'reload': True
         })
 
     return JsonResponse({'error': 'Invalid item type'}, status=400)

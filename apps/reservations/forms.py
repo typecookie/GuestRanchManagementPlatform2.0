@@ -194,10 +194,15 @@ class ReservationGuestForm(forms.ModelForm):
         reservation = kwargs.pop('reservation', None)
         super().__init__(*args, **kwargs)
         if reservation:
+            self.fields['client'].widget.attrs['data-context-value-reservation'] = reservation.pk
             if reservation.travel_group_id:
                 self.fields['client'].widget.attrs['data-context-value-travel-group'] = reservation.travel_group_id
             if reservation.household_id:
                 self.fields['client'].widget.attrs['data-context-value-household'] = reservation.household_id
+            self.fields['client'].widget.attrs['data-quick-add-url'] = reverse_lazy(
+                'reservations:quick_add_reservation_item',
+                args=[reservation.pk],
+            )
 
     class Meta:
         model = ReservationGuest

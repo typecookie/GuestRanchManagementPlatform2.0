@@ -891,3 +891,63 @@ class ReservationTravelAndFlightTests(TestCase):
         self.assertContains(detail_res, "6&#x27;1&quot;")
         self.assertContains(detail_res, "195 lbs")
         self.assertContains(detail_res, "Beginner")
+
+    def test_quick_add_client_adds_to_reservation_and_group(self):
+        from apps.clients.models import Household, TravelGroup, HouseholdMember, TravelGroupMember
+        hh = Household.objects.create(name="Johnson Household")
+        tg = TravelGroup.objects.create(name="Johnson Family Reunion")
+        self.reservation.household = hh
+        self.reservation.travel_group = tg
+        self.reservation.save()
+
+        quick_add_url = reverse("reservations:quick_add_reservation_item", args=[self.reservation.pk])
+        resp = self.client.post(
+            quick_add_url,
+            {
+                "type": "client",
+                "name": "Alice Johnson",
+                "travel_group_id": tg.pk,
+                "household_id": hh.pk,
+            },
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data.get("reload"))
+        client_id = data.get("id")
+
+        # Client created
+        client = Client.objects.get(pk=client_id)
+        self.assertEqual(client.first_name, "Alice")
+        self.assertEqual(client.last_name, "Johnson")
+
+        # Added to TravelGroup and Household
+        self.assertTrue(TravelGroupMember.objects.filter(travel_group=tg, client=client).exists())
+        self.assertTrue(HouseholdMember.objects.filter(household=hh, client=client).exists())
+
+        # Added to Reservation as a Guest
+        self.assertTrue(ReservationGuest.objects.filter(reservation=self.reservation, client=client).exists())
+
+    def test_clients_quick_add_with_reservation_id(self):
+        from apps.clients.models import Household, TravelGroup, HouseholdMember, TravelGroupMember
+        hh = Household.objects.create(name="Miller Household")
+        self.reservation.household = hh
+        self.reservation.save()
+
+        clients_quick_add_url = reverse("clients:quick_add_client")
+        resp = self.client.post(
+            clients_quick_add_url,
+            {
+                "name": "Tom Miller",
+                "reservation_id": self.reservation.pk,
+            },
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data.get("reload"))
+        client = Client.objects.get(pk=data.get("id"))
+        self.assertEqual(client.first_name, "Tom")
+        self.assertEqual(client.last_name, "Miller")
+
+        # Automatically linked to reservation household and reservation guests
+        self.assertTrue(HouseholdMember.objects.filter(household=hh, client=client).exists())
+        self.assertTrue(ReservationGuest.objects.filter(reservation=self.reservation, client=client).exists())

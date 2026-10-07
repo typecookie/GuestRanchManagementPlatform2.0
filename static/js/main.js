@@ -142,6 +142,10 @@ function buildSearchableSelect(select) {
 
                             // Dispatch change event
                             select.dispatchEvent(new Event("change", { bubbles: true }));
+
+                            if (data.reload) {
+                                window.location.reload();
+                            }
                         } else if (data.error) {
                             alert(data.error);
                         }

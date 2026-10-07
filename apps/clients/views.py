@@ -602,6 +602,7 @@ def quick_add_client(request):
     name = request.POST.get('name', '').strip()
     travel_group_id = request.POST.get('travel_group_id', '').strip()
     household_id = request.POST.get('household_id', '').strip()
+    reservation_id = request.POST.get('reservation_id', '').strip()
     
     if not name:
         return JsonResponse({'error': 'Name is required'}, status=400)
@@ -625,9 +626,21 @@ def quick_add_client(request):
         if hh:
             HouseholdMember.objects.get_or_create(household=hh, client=client)
             
+    if reservation_id:
+        from apps.reservations.models import Reservation
+        from apps.reservations.views import create_reservation_guest_from_client
+        reservation = Reservation.objects.filter(pk=reservation_id).first()
+        if reservation:
+            if not travel_group_id and reservation.travel_group_id:
+                TravelGroupMember.objects.get_or_create(travel_group=reservation.travel_group, client=client)
+            if not household_id and reservation.household_id:
+                HouseholdMember.objects.get_or_create(household=reservation.household, client=client)
+            create_reservation_guest_from_client(reservation, client)
+
     return JsonResponse({
         'id': client.pk,
-        'name': client.full_name
+        'name': client.full_name,
+        'reload': bool(reservation_id)
     })
 
 
