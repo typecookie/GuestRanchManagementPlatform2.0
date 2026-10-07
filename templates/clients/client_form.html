@@ -95,6 +95,16 @@
             {% for error in form.date_of_birth.errors %}
                 <span class="form-error">{{ error }}</span>
             {% endfor %}
+            <span class="form-help">Enter date of birth if known (auto-calculates age).</span>
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.age.id_for_label }}">Age</label>
+            {{ form.age }}
+            {% for error in form.age.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+            <span class="form-help">Calculated from Date of Birth or entered directly when DOB is unknown.</span>
         </div>
 
         <div class="form-field">
@@ -241,4 +251,42 @@
         <button type="submit" class="button button-primary">{{ submit_label }}</button>
     </div>
 </form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const dobInput = document.getElementById('{{ form.date_of_birth.id_for_label }}');
+    const ageInput = document.getElementById('{{ form.age.id_for_label }}');
+
+    function calculateAge(dobStr) {
+        if (!dobStr) return null;
+        const parts = dobStr.split('-');
+        if (parts.length !== 3) return null;
+        const birthDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        if (isNaN(birthDate.getTime())) return null;
+
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+        }
+        return age >= 0 ? age : null;
+    }
+
+    if (dobInput && ageInput) {
+        dobInput.addEventListener('change', function() {
+            const calculated = calculateAge(this.value);
+            if (calculated !== null) {
+                ageInput.value = calculated;
+            }
+        });
+        dobInput.addEventListener('input', function() {
+            const calculated = calculateAge(this.value);
+            if (calculated !== null) {
+                ageInput.value = calculated;
+            }
+        });
+    }
+});
+</script>
 {% endblock %}

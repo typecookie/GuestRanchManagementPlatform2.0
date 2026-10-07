@@ -575,6 +575,7 @@
                                     <th>Guest</th>
                                     <th>Cabin</th>
                                     <th>Age</th>
+                                    <th>Sex</th>
                                     <th>Height</th>
                                     <th>Weight</th>
                                     <th>Riding</th>
@@ -605,8 +606,18 @@
                                         </td>
 
                                         <td>
-                                            {% if guest.age_at_stay %}
-                                                {{ guest.age_at_stay }}
+                                            {% if guest.effective_age_at_stay %}
+                                                {{ guest.effective_age_at_stay }}
+                                            {% else %}
+                                                <span class="table-muted">—</span>
+                                            {% endif %}
+                                        </td>
+
+                                        <td>
+                                            {% if guest.sex %}
+                                                {{ guest.get_sex_display }}
+                                            {% elif guest.client.sex %}
+                                                {{ guest.client.get_sex_display }}
                                             {% else %}
                                                 <span class="table-muted">—</span>
                                             {% endif %}
@@ -687,7 +698,7 @@
 
                                     {% if guest.allergies or guest.food_requests or guest.medical_notes or guest.notes %}
                                         <tr>
-                                            <td colspan="9">
+                                            <td colspan="11">
                                                 <div class="guest-note-summary">
                                                     {% if guest.allergies %}
                                                         <p><strong>Allergies:</strong> {{ guest.allergies }}</p>
@@ -746,8 +757,8 @@
                                     <strong>{{ guest.client.display_name }}</strong>
 
                                     <span>
-                                        {% if guest.age_at_stay %}
-                                            Age {{ guest.age_at_stay }}
+                                        {% if guest.effective_age_at_stay %}
+                                            Age {{ guest.effective_age_at_stay }}
                                         {% else %}
                                             Age unknown
                                         {% endif %}

@@ -157,6 +157,7 @@
                                 <tr>
                                     <th>Guest Name</th>
                                     <th>Age</th>
+                                    <th>Sex</th>
                                     <th>Height</th>
                                     <th>Weight</th>
                                     <th>Experience</th>
@@ -184,7 +185,16 @@
                                                 </div>
                                             {% endif %}
                                         </td>
-                                        <td>{{ guest.age_at_stay|default:"-" }}</td>
+                                        <td>{{ guest.effective_age_at_stay|default:guest.age_at_stay|default:"-" }}</td>
+                                        <td>
+                                            {% if guest.sex %}
+                                                {{ guest.get_sex_display }}
+                                            {% elif guest.client.sex %}
+                                                {{ guest.client.get_sex_display }}
+                                            {% else %}
+                                                <span class="text-danger font-weight-bold">Missing</span>
+                                            {% endif %}
+                                        </td>
                                         <td>
                                             {% if guest.height %}
                                                 {{ guest.height }}

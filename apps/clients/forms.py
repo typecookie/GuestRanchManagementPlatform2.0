@@ -8,6 +8,7 @@ from .models import (
     HouseholdMember,
     TravelGroup,
     TravelGroupMember,
+    calculate_age_at_date,
 )
 
 
@@ -23,6 +24,7 @@ class ClientForm(forms.ModelForm):
             "phone",
             "alternate_phone",
             "date_of_birth",
+            "age",
             "sex",
             "client_type",
             "is_rider",
@@ -38,7 +40,8 @@ class ClientForm(forms.ModelForm):
             "is_active",
         ]
         widgets = {
-            "date_of_birth": forms.DateInput(attrs={"type": "date"}),
+            "date_of_birth": forms.DateInput(attrs={"type": "date", "class": "form-input js-client-dob"}),
+            "age": forms.NumberInput(attrs={"class": "form-control js-client-age", "min": 0, "max": 130, "placeholder": "e.g. 35"}),
             "sex": forms.Select(attrs={"class": "form-select"}),
             "height": forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g. 5'8\" or 68 in"}),
             "weight": forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g. 150 lbs"}),
@@ -49,6 +52,14 @@ class ClientForm(forms.ModelForm):
             "medical_notes": forms.Textarea(attrs={"rows": 4}),
             "general_notes": forms.Textarea(attrs={"rows": 4}),
         }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        dob = cleaned_data.get("date_of_birth")
+        age = cleaned_data.get("age")
+        if dob and age is None:
+            cleaned_data["age"] = calculate_age_at_date(dob)
+        return cleaned_data
 
 
 class HouseholdForm(forms.ModelForm):

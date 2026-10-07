@@ -35,6 +35,7 @@ class ClientAdmin(admin.ModelAdmin):
     list_display = [
         "full_name",
         "preferred_name",
+        "display_age",
         "sex",
         "client_type",
         "is_rider",
@@ -71,7 +72,7 @@ class ClientAdmin(admin.ModelAdmin):
                 "fields": [
                     ("first_name", "middle_name", "last_name"),
                     "preferred_name",
-                    ("date_of_birth", "sex"),
+                    ("date_of_birth", "age", "sex"),
                     "client_type",
                     "years_return",
                     "is_active",
@@ -112,6 +113,14 @@ class ClientAdmin(admin.ModelAdmin):
     ]
     ordering = ["last_name", "first_name"]
     inlines = [ClientNoteInline]
+
+    @admin.display(description="Age")
+    def display_age(self, obj):
+        if obj.effective_age is not None:
+            if obj.date_of_birth:
+                return f"{obj.effective_age} (DOB)"
+            return str(obj.effective_age)
+        return "-"
 
 
 @admin.register(Household)

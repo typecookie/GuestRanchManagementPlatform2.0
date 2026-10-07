@@ -1,6 +1,26 @@
+from datetime import date
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+
+
+def calculate_age_at_date(date_of_birth, target_date=None):
+    if not date_of_birth:
+        return None
+    if target_date is None:
+        target_date = date.today()
+
+    age = target_date.year - date_of_birth.year
+    has_had_birthday = (
+        target_date.month,
+        target_date.day,
+    ) >= (
+        date_of_birth.month,
+        date_of_birth.day,
+    )
+    if not has_had_birthday:
+        age -= 1
+    return age
 
 
 def format_years_ordinal(num):
@@ -44,6 +64,12 @@ class Client(models.Model):
     alternate_phone = models.CharField(max_length=30, blank=True)
 
     date_of_birth = models.DateField(null=True, blank=True)
+    age = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Age",
+        help_text="Age in years if date of birth is unknown or approximate.",
+    )
     sex = models.CharField(
         max_length=20,
         choices=Sex.choices,
@@ -119,6 +145,21 @@ class Client(models.Model):
 
     def __str__(self):
         return self.full_name
+
+    def save(self, *args, **kwargs):
+        if self.date_of_birth:
+            self.age = calculate_age_at_date(self.date_of_birth)
+        super().save(*args, **kwargs)
+
+    @property
+    def calculated_age(self):
+        if self.date_of_birth:
+            return calculate_age_at_date(self.date_of_birth)
+        return self.age
+
+    @property
+    def effective_age(self):
+        return self.calculated_age
 
     @property
     def full_name(self):

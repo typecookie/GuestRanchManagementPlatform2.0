@@ -246,9 +246,11 @@ def build_weekly_horse_saddle_task(week_start, num_weeks=4):
                     missing_fields.append("Height")
                 if not effective_w or not str(effective_w).strip():
                     missing_fields.append("Weight")
+                if not (g.client and g.client.sex):
+                    missing_fields.append("Sex")
                 if not effective_exp or effective_exp == ReservationGuest.RidingExperience.UNKNOWN:
                     missing_fields.append("Experience")
-                if g.age_at_stay is None and not (g.client and g.client.date_of_birth):
+                if g.age_at_stay is None and not (g.client and (g.client.date_of_birth or g.client.effective_age is not None)):
                     missing_fields.append("Age")
 
                 if g.horse_id:
@@ -482,9 +484,11 @@ def build_monthly_horse_saddle_task(target_date=None, num_months=4, season=None)
                     missing_fields.append("Height")
                 if not effective_w or not str(effective_w).strip():
                     missing_fields.append("Weight")
+                if not (g.client and g.client.sex):
+                    missing_fields.append("Sex")
                 if not effective_exp or effective_exp == ReservationGuest.RidingExperience.UNKNOWN:
                     missing_fields.append("Experience")
-                if g.age_at_stay is None and not (g.client and g.client.date_of_birth):
+                if g.age_at_stay is None and not (g.client and (g.client.date_of_birth or g.client.effective_age is not None)):
                     missing_fields.append("Age")
 
                 if g.horse_id:

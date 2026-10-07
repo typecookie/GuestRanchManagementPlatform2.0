@@ -608,3 +608,73 @@ class ClientRiderProfileTests(TestCase):
         resp_list_male = self.client.get(list_url, {"sex": "male"})
         self.assertEqual(resp_list_male.status_code, 200)
         self.assertNotContains(resp_list_male, "Clara Clayton")
+
+    def test_client_age_calculation_and_fallback(self):
+        # 1. Client with Date of Birth auto-calculates age
+        today = date.today()
+        dob = date(today.year - 30, today.month, today.day)
+        client_with_dob = RanchClient.objects.create(
+            first_name="Alice",
+            last_name="Smith",
+            date_of_birth=dob,
+        )
+        self.assertEqual(client_with_dob.age, 30)
+        self.assertEqual(client_with_dob.effective_age, 30)
+        self.assertEqual(client_with_dob.calculated_age, 30)
+
+        # 2. Client without DOB but with explicit age
+        client_with_age_only = RanchClient.objects.create(
+            first_name="Bob",
+            last_name="Jones",
+            age=45,
+        )
+        self.assertIsNone(client_with_age_only.date_of_birth)
+        self.assertEqual(client_with_age_only.age, 45)
+        self.assertEqual(client_with_age_only.effective_age, 45)
+        self.assertEqual(client_with_age_only.calculated_age, 45)
+
+        # 3. Reservation guest uses client.effective_age when DOB is missing
+        res = Reservation.objects.create(
+            reservation_name="Jones Ranch Trip",
+            arrival_date=date(2026, 7, 10),
+            departure_date=date(2026, 7, 17),
+        )
+        guest = ReservationGuest.objects.create(
+            reservation=res,
+            client=client_with_age_only,
+        )
+        self.assertEqual(guest.age_at_stay, 45)
+        self.assertEqual(guest.effective_age, 45)
+        self.assertEqual(guest.effective_age_at_stay, 45)
+
+        # 4. Form submission with age only
+        create_url = reverse("clients:client_create")
+        post_data = {
+            "first_name": "Charlie",
+            "last_name": "Brown",
+            "email": "charlie@example.com",
+            "age": 12,
+            "client_type": RanchClient.ClientType.CHILD,
+            "is_rider": True,
+            "riding_level": RanchClient.RidingLevel.BEGINNER,
+            "is_active": True,
+        }
+        resp = self.client.post(create_url, post_data)
+        self.assertEqual(resp.status_code, 302)
+
+        client_created = RanchClient.objects.get(email="charlie@example.com")
+        self.assertIsNone(client_created.date_of_birth)
+        self.assertEqual(client_created.age, 12)
+        self.assertEqual(client_created.effective_age, 12)
+
+        # 5. Detail view display
+        detail_resp = self.client.get(reverse("clients:client_detail", args=[client_created.pk]))
+        self.assertEqual(detail_resp.status_code, 200)
+        self.assertContains(detail_resp, "12")
+        self.assertContains(detail_resp, "Direct Entry")
+
+        # Detail view for client with DOB
+        detail_resp_dob = self.client.get(reverse("clients:client_detail", args=[client_with_dob.pk]))
+        self.assertEqual(detail_resp_dob.status_code, 200)
+        self.assertContains(detail_resp_dob, "30")
+        self.assertContains(detail_resp_dob, "Calculated from DOB")

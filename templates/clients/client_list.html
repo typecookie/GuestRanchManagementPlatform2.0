@@ -142,7 +142,12 @@ Manage individual guest records, contact information, riding levels, preferences
                                 {% endif %}
                             </td>
 
-                            <td>{{ client.get_client_type_display }}</td>
+                            <td>
+                                <div>{{ client.get_client_type_display }}</div>
+                                {% if client.effective_age is not None %}
+                                    <div class="text-muted small">Age {{ client.effective_age }}</div>
+                                {% endif %}
+                            </td>
 
                             <td>
                                 <div>{{ client.get_riding_level_display }}</div>

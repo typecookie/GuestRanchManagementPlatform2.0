@@ -220,10 +220,15 @@ class WeeklyReportsTests(TestCase):
         self.assertIn("10th year", content)
 
     def test_weekly_horse_assignment_report(self):
+        self.res_guest_week1.client.sex = RanchClient.Sex.MALE
+        self.res_guest_week1.client.save()
+
         url = reverse("ranch:weekly_horse_assignment_report")
         response = self.client.get(f"{url}?week=2026-08-30")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Brad Holzworth")
+        self.assertContains(response, "<th>Sex</th>")
+        self.assertContains(response, "Male")
         self.assertContains(response, "week=2026-08-23")
         self.assertContains(response, "week=2026-09-06")
 

@@ -664,6 +664,8 @@ def quick_add_client(request):
     
     name = request.POST.get('name', '').strip()
     sex = request.POST.get('sex', '').strip()
+    age_str = request.POST.get('age', '').strip()
+    dob_str = request.POST.get('date_of_birth', '').strip()
     travel_group_id = request.POST.get('travel_group_id', '').strip()
     household_id = request.POST.get('household_id', '').strip()
     reservation_id = request.POST.get('reservation_id', '').strip()
@@ -677,11 +679,25 @@ def quick_add_client(request):
     else:
         first_name = parts[0]
         last_name = "-"
+
+    age_val = None
+    if age_str.isdigit():
+        age_val = int(age_str)
+
+    dob_val = None
+    if dob_str:
+        try:
+            from datetime import datetime
+            dob_val = datetime.strptime(dob_str, "%Y-%m-%d").date()
+        except ValueError:
+            dob_val = None
         
     client = Client.objects.create(
         first_name=first_name,
         last_name=last_name,
         sex=sex if sex in dict(Client.Sex.choices) else "",
+        date_of_birth=dob_val,
+        age=age_val,
     )
     
     if travel_group_id:
@@ -1300,6 +1316,8 @@ def group_builder(request):
             "display_name": c.display_name,
             "email": c.email,
             "phone": c.phone,
+            "date_of_birth": c.date_of_birth.strftime("%Y-%m-%d") if c.date_of_birth else "",
+            "age": c.effective_age,
             "sex": c.get_sex_display(),
             "sex_raw": c.sex,
             "client_type": c.get_client_type_display(),

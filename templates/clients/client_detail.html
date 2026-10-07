@@ -85,6 +85,22 @@ View contact details, preferences, household connections, travel groups, and not
                 </div>
 
                 <div class="detail-row">
+                    <div class="detail-label">Age</div>
+                    <div class="detail-value">
+                        {% if client.effective_age is not None %}
+                            <strong>{{ client.effective_age }}</strong>
+                            {% if client.date_of_birth %}
+                                <span class="text-muted" style="font-size: 0.85rem;">(Calculated from DOB)</span>
+                            {% else %}
+                                <span class="text-muted" style="font-size: 0.85rem;">(Direct Entry)</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="text-muted">Not provided</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="detail-row">
                     <div class="detail-label">Sex</div>
                     <div class="detail-value">
                         {% if client.sex %}

@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 from apps.cabins.models import Cabin
-from apps.clients.models import Client, Household, TravelGroup
+from apps.clients.models import Client, Household, TravelGroup, calculate_age_at_date
 
 
 class Reservation(models.Model):
@@ -259,7 +259,26 @@ class ReservationGuest(models.Model):
             # If client is marked as non-rider in client profile and record is new, default is_riding to False
             if not self.pk and (not self.client.is_rider or self.client.riding_level == self.RidingExperience.NON_RIDER):
                 self.is_riding = False
+            if self.age_at_stay is None:
+                if self.client.date_of_birth and self.reservation_id and self.reservation.arrival_date:
+                    self.age_at_stay = calculate_age_at_date(self.client.date_of_birth, self.reservation.arrival_date)
+                elif self.client.effective_age is not None:
+                    self.age_at_stay = self.client.effective_age
         super().save(*args, **kwargs)
+
+    @property
+    def effective_age(self):
+        if self.age_at_stay is not None:
+            return self.age_at_stay
+        if self.client_id:
+            if self.client.date_of_birth and self.reservation_id and self.reservation.arrival_date:
+                return calculate_age_at_date(self.client.date_of_birth, self.reservation.arrival_date)
+            return self.client.effective_age
+        return None
+
+    @property
+    def effective_age_at_stay(self):
+        return self.effective_age
 
     @property
     def height(self):

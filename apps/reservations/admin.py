@@ -189,6 +189,7 @@ class ReservationGuestAdmin(admin.ModelAdmin):
         "client",
         "cabin",
         "age_at_stay",
+        "display_sex",
         "display_height",
         "display_weight",
         "display_riding_experience",
@@ -215,6 +216,10 @@ class ReservationGuestAdmin(admin.ModelAdmin):
         "client",
         "cabin",
     ]
+
+    @admin.display(description="Sex")
+    def display_sex(self, obj):
+        return obj.get_sex_display()
 
     @admin.display(description="Height")
     def display_height(self, obj):

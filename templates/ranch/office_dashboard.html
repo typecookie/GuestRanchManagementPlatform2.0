@@ -425,8 +425,13 @@ Weekly office dashboard for guest assignments, reservation cleanup, and reports.
                                                             </td>
                                                             <td>
                                                                 <strong>{{ guest.client.full_name }}</strong>
-                                                                {% if guest.age_at_stay %}
-                                                                    <span class="text-muted small">(Age {{ guest.age_at_stay }})</span>
+                                                                {% if guest.effective_age_at_stay %}
+                                                                    <span class="text-muted small">(Age {{ guest.effective_age_at_stay }})</span>
+                                                                {% endif %}
+                                                                {% if guest.sex %}
+                                                                    <span class="text-muted small">· {{ guest.get_sex_display }}</span>
+                                                                {% elif guest.client.sex %}
+                                                                    <span class="text-muted small">· {{ guest.client.get_sex_display }}</span>
                                                                 {% endif %}
                                                             </td>
                                                             <td>
@@ -571,8 +576,13 @@ Weekly office dashboard for guest assignments, reservation cleanup, and reports.
                                                             </td>
                                                             <td>
                                                                 <strong>{{ guest.client.full_name }}</strong>
-                                                                {% if guest.age_at_stay %}
-                                                                    <span class="text-muted small">(Age {{ guest.age_at_stay }})</span>
+                                                                {% if guest.effective_age_at_stay %}
+                                                                    <span class="text-muted small">(Age {{ guest.effective_age_at_stay }})</span>
+                                                                {% endif %}
+                                                                {% if guest.sex %}
+                                                                    <span class="text-muted small">· {{ guest.get_sex_display }}</span>
+                                                                {% elif guest.client.sex %}
+                                                                    <span class="text-muted small">· {{ guest.client.get_sex_display }}</span>
                                                                 {% endif %}
                                                             </td>
                                                             <td>

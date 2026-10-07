@@ -562,11 +562,14 @@ def reservation_guest_create(request, pk):
             if not guest.cabin:
                 guest.cabin = get_single_assigned_cabin(reservation)
 
-            if guest.client and guest.client.date_of_birth and not guest.age_at_stay:
-                guest.age_at_stay = calculate_age_at_date(
-                    guest.client.date_of_birth,
-                    reservation.arrival_date,
-                )
+            if guest.client and not guest.age_at_stay:
+                if guest.client.date_of_birth:
+                    guest.age_at_stay = calculate_age_at_date(
+                        guest.client.date_of_birth,
+                        reservation.arrival_date,
+                    )
+                elif guest.client.effective_age is not None:
+                    guest.age_at_stay = guest.client.effective_age
 
             try:
                 guest.full_clean()
@@ -673,11 +676,14 @@ def reservation_guest_update(request, pk):
             if not guest.cabin:
                 guest.cabin = get_single_assigned_cabin(reservation)
 
-            if guest.client and guest.client.date_of_birth and not guest.age_at_stay:
-                guest.age_at_stay = calculate_age_at_date(
-                    guest.client.date_of_birth,
-                    reservation.arrival_date,
-                )
+            if guest.client and not guest.age_at_stay:
+                if guest.client.date_of_birth:
+                    guest.age_at_stay = calculate_age_at_date(
+                        guest.client.date_of_birth,
+                        reservation.arrival_date,
+                    )
+                elif guest.client.effective_age is not None:
+                    guest.age_at_stay = guest.client.effective_age
 
             guest.save()
             messages.success(request, f"Guest information for {guest.client.display_name} was updated.")
@@ -711,10 +717,15 @@ def reservation_guest_delete(request, pk):
 
 
 def create_reservation_guest_from_client(reservation, client):
-    age_at_stay = calculate_age_at_date(
-        client.date_of_birth,
-        reservation.arrival_date,
-    )
+    age_at_stay = None
+    if client.date_of_birth:
+        age_at_stay = calculate_age_at_date(
+            client.date_of_birth,
+            reservation.arrival_date,
+        )
+    elif client.effective_age is not None:
+        age_at_stay = client.effective_age
+
     assigned_cabin = get_single_assigned_cabin(reservation)
     is_riding = bool(client.is_rider and client.riding_level != 'non_rider')
 
