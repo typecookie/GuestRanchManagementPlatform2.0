@@ -141,6 +141,63 @@ def client_update(request, pk):
     return render(request, "clients/client_form.html", context)
 
 
+@module_permission_required('Clients', 'delete')
+def client_delete(request, pk):
+    client = get_object_or_404(Client, pk=pk)
+
+    can_delete = client.can_delete
+    stay_count = client.reservation_guest_records.count()
+    reservation_count = client.reservations_as_primary_contact.count()
+
+    if request.method == "POST":
+        action = request.POST.get("action", "delete")
+
+        # If explicitly archiving OR if deletion would break data, archive the client
+        if action == "archive" or not can_delete:
+            client.archive()
+            if action == "delete" and not can_delete:
+                messages.warning(
+                    request,
+                    f"Client '{client.display_name}' has linked reservation history or stay records and cannot be permanently deleted. The client has been archived instead to protect historical records.",
+                )
+            else:
+                messages.success(
+                    request,
+                    f"Client '{client.display_name}' has been archived.",
+                )
+            return redirect("clients:client_list")
+        else:
+            client_name = client.display_name
+            client.delete()
+            messages.success(
+                request,
+                f"Client '{client_name}' was permanently deleted.",
+            )
+            return redirect("clients:client_list")
+
+    context = {
+        "client": client,
+        "can_delete": can_delete,
+        "stay_count": stay_count,
+        "reservation_count": reservation_count,
+    }
+    return render(request, "clients/client_confirm_delete.html", context)
+
+
+@module_permission_required('Clients', 'write')
+def client_toggle_archive(request, pk):
+    client = get_object_or_404(Client, pk=pk)
+    if request.method == "POST":
+        if client.is_active:
+            client.archive()
+            messages.success(request, f"Client '{client.display_name}' has been archived.")
+        else:
+            client.unarchive()
+            messages.success(request, f"Client '{client.display_name}' has been restored to active status.")
+
+    return redirect("clients:client_detail", pk=client.pk)
+
+
 @module_permission_required('Clients', 'write')
 def client_note_create(request, pk):
     client = get_object_or_404(Client, pk=pk)

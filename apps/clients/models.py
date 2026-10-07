@@ -149,6 +149,30 @@ class Client(models.Model):
         count = self.effective_years_count
         return format_years_ordinal(count) if count is not None else "1st year"
 
+    @property
+    def can_delete(self):
+        """
+        Returns True if the client can be deleted without breaking linked reservation history
+        or removing primary contact pointers from reservations.
+        """
+        if self.reservation_guest_records.exists():
+            return False
+        if self.reservations_as_primary_contact.exists():
+            return False
+        return True
+
+    @property
+    def is_archived(self):
+        return not self.is_active
+
+    def archive(self):
+        self.is_active = False
+        self.save(update_fields=["is_active", "updated_at"])
+
+    def unarchive(self):
+        self.is_active = True
+        self.save(update_fields=["is_active", "updated_at"])
+
 
 class Household(models.Model):
     name = models.CharField(max_length=150)

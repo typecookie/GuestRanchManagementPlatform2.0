@@ -16,6 +16,8 @@ urlpatterns = [
     path("people/new/", views.client_create, name="client_create"),
     path("people/<int:pk>/", views.client_detail, name="client_detail"),
     path("people/<int:pk>/edit/", views.client_update, name="client_update"),
+    path("people/<int:pk>/delete/", views.client_delete, name="client_delete"),
+    path("people/<int:pk>/toggle-archive/", views.client_toggle_archive, name="client_toggle_archive"),
     path("people/<int:pk>/notes/new/", views.client_note_create, name="client_note_create"),
 
     path("households/", views.household_list, name="household_list"),

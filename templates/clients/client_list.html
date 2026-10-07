@@ -24,6 +24,7 @@ Manage individual guest records, contact information, riding levels, preferences
 
 {% block content %}
 {% can_do user "Clients" "write" as can_write %}
+{% can_do user "Clients" "delete" as can_delete %}
 <div class="stat-grid">
     <div class="stat-card">
         <span>Total Clients</span>
@@ -36,7 +37,7 @@ Manage individual guest records, contact information, riding levels, preferences
     </div>
 
     <div class="stat-card">
-        <span>Inactive Clients</span>
+        <span>Archived Clients</span>
         <strong>{{ inactive_clients }}</strong>
     </div>
 
@@ -59,8 +60,8 @@ Manage individual guest records, contact information, riding levels, preferences
 
             <select name="status" class="form-select">
                 <option value="">All statuses</option>
-                <option value="active" {% if status_filter == "active" %}selected{% endif %}>Active</option>
-                <option value="inactive" {% if status_filter == "inactive" %}selected{% endif %}>Inactive</option>
+                <option value="active" {% if status_filter == "active" %}selected{% endif %}>Active Only</option>
+                <option value="inactive" {% if status_filter == "inactive" %}selected{% endif %}>Archived Only</option>
             </select>
 
             <select name="client_type" class="form-select">
@@ -171,7 +172,7 @@ Manage individual guest records, contact information, riding levels, preferences
                                 {% if client.is_active %}
                                     <span class="badge badge-success">Active</span>
                                 {% else %}
-                                    <span class="badge badge-neutral">Inactive</span>
+                                    <span class="badge badge-warning">Archived</span>
                                 {% endif %}
                             </td>
 
@@ -180,6 +181,9 @@ Manage individual guest records, contact information, riding levels, preferences
                                     <a href="{% url 'clients:client_detail' client.pk %}" class="button button-small button-secondary">View</a>
                                     {% if can_write %}
                                     <a href="{% url 'clients:client_update' client.pk %}" class="button button-small button-primary">Edit</a>
+                                    {% endif %}
+                                    {% if can_delete %}
+                                    <a href="{% url 'clients:client_delete' client.pk %}" class="button button-small button-danger">Delete</a>
                                     {% endif %}
                                 </div>
                             </td>

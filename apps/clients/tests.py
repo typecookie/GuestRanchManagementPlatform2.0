@@ -410,3 +410,115 @@ class ClientRiderProfileTests(TestCase):
         self.assertTrue(guest.is_riding)
         self.assertEqual(guest.effective_height, "6'0\"")
         self.assertEqual(guest.effective_weight, "190 lbs")
+
+    def test_client_delete_safe_without_reservations(self):
+        # Client without reservations can be permanently deleted
+        orphan_client = RanchClient.objects.create(
+            first_name="Orphan",
+            last_name="Guest",
+            email="orphan@example.com",
+        )
+        hh = Household.objects.create(name="Orphan Family")
+        HouseholdMember.objects.create(household=hh, client=orphan_client)
+
+        self.assertTrue(orphan_client.can_delete)
+
+        # GET confirm delete page
+        del_url = reverse("clients:client_delete", args=[orphan_client.pk])
+        resp = self.client.get(del_url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Safe to Delete")
+        self.assertContains(resp, "Permanently Delete Client")
+
+        # POST delete
+        post_resp = self.client.post(del_url, {"action": "delete"})
+        self.assertRedirects(post_resp, reverse("clients:client_list"))
+        self.assertFalse(RanchClient.objects.filter(pk=orphan_client.pk).exists())
+        self.assertFalse(HouseholdMember.objects.filter(client=orphan_client).exists())
+
+    def test_client_delete_blocked_and_archives_when_linked_to_reservation_guest(self):
+        # Client with reservation history cannot be deleted and is archived instead
+        stay_client = RanchClient.objects.create(
+            first_name="Stay",
+            last_name="Guest",
+            email="stay@example.com",
+            is_active=True,
+        )
+        res = Reservation.objects.create(
+            reservation_name="Summer Stay 2026",
+            arrival_date=date(2026, 7, 5),
+            departure_date=date(2026, 7, 12),
+        )
+        guest = ReservationGuest.objects.create(
+            reservation=res,
+            client=stay_client,
+        )
+
+        self.assertFalse(stay_client.can_delete)
+
+        # GET confirm delete page
+        del_url = reverse("clients:client_delete", args=[stay_client.pk])
+        resp = self.client.get(del_url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Data Integrity Notice")
+        self.assertContains(resp, "Archive Client")
+
+        # POST delete attempt -> automatically archives instead of deleting
+        post_resp = self.client.post(del_url, {"action": "delete"})
+        self.assertRedirects(post_resp, reverse("clients:client_list"))
+
+        stay_client.refresh_from_db()
+        self.assertTrue(RanchClient.objects.filter(pk=stay_client.pk).exists())
+        self.assertFalse(stay_client.is_active)
+        self.assertTrue(ReservationGuest.objects.filter(pk=guest.pk).exists())
+
+    def test_client_delete_blocked_when_primary_contact_on_reservation(self):
+        contact_client = RanchClient.objects.create(
+            first_name="Leader",
+            last_name="Primary",
+            email="leader@example.com",
+            is_active=True,
+        )
+        res = Reservation.objects.create(
+            reservation_name="Leader Reunion",
+            primary_contact=contact_client,
+            arrival_date=date(2026, 8, 1),
+            departure_date=date(2026, 8, 8),
+        )
+
+        self.assertFalse(contact_client.can_delete)
+
+        del_url = reverse("clients:client_delete", args=[contact_client.pk])
+        post_resp = self.client.post(del_url, {"action": "delete"})
+        self.assertRedirects(post_resp, reverse("clients:client_list"))
+
+        contact_client.refresh_from_db()
+        self.assertFalse(contact_client.is_active)
+        res.refresh_from_db()
+        self.assertEqual(res.primary_contact, contact_client)
+
+    def test_client_toggle_archive_and_restore(self):
+        client = RanchClient.objects.create(
+            first_name="Active",
+            last_name="Person",
+            is_active=True,
+        )
+        toggle_url = reverse("clients:client_toggle_archive", args=[client.pk])
+
+        # Archive client
+        resp = self.client.post(toggle_url)
+        self.assertRedirects(resp, reverse("clients:client_detail", args=[client.pk]))
+        client.refresh_from_db()
+        self.assertFalse(client.is_active)
+
+        # Detail view shows archived badge and restore button
+        detail_resp = self.client.get(reverse("clients:client_detail", args=[client.pk]))
+        self.assertEqual(detail_resp.status_code, 200)
+        self.assertContains(detail_resp, "Archived")
+        self.assertContains(detail_resp, "Restore Client")
+
+        # Restore client
+        resp2 = self.client.post(toggle_url)
+        self.assertRedirects(resp2, reverse("clients:client_detail", args=[client.pk]))
+        client.refresh_from_db()
+        self.assertTrue(client.is_active)

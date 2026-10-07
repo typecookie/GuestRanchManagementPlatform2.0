@@ -1,5 +1,6 @@
 
 {% extends "base.html" %}
+{% load group_perms %}
 
 {% block title %}{{ client.display_name }} | Clients{% endblock %}
 
@@ -12,8 +13,23 @@ View contact details, preferences, household connections, travel groups, and not
 {% endblock %}
 
 {% block page_actions %}
+{% can_do user "Clients" "write" as can_write %}
+{% can_do user "Clients" "delete" as can_delete %}
 <a href="{% url 'clients:client_list' %}" class="button button-secondary">Back to People</a>
+{% if can_write %}
 <a href="{% url 'clients:client_update' client.pk %}" class="button button-primary">Edit Client</a>
+<form method="post" action="{% url 'clients:client_toggle_archive' client.pk %}" style="display: inline;">
+    {% csrf_token %}
+    {% if client.is_active %}
+        <button type="submit" class="button button-secondary" title="Archive client">Archive Client</button>
+    {% else %}
+        <button type="submit" class="button button-success" title="Restore client to active status">Restore Client</button>
+    {% endif %}
+</form>
+{% endif %}
+{% if can_delete %}
+<a href="{% url 'clients:client_delete' client.pk %}" class="button button-danger">Delete / Archive</a>
+{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -74,7 +90,7 @@ View contact details, preferences, household connections, travel groups, and not
                         {% if client.is_active %}
                             <span class="badge badge-success">Active</span>
                         {% else %}
-                            <span class="badge badge-neutral">Inactive</span>
+                            <span class="badge badge-warning">Archived</span>
                         {% endif %}
                     </div>
                 </div>
