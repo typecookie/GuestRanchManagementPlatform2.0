@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}Delete or Archive Client | Clients | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Contact Book{% endblock %}
+
+{% block page_title %}{% if can_delete %}Delete Client{% else %}Archive Client{% endif %}: {{ client.display_name }}{% endblock %}
+
+{% block page_subtitle %}
+{% if can_delete %}
+Permanently remove this client or archive them from active contact lists.
+{% else %}
+Archive this client to protect historical reservation records and assignment logs.
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="form-card" style="max-width: 680px; margin: 0 auto;">
+    {% if can_delete %}
+        <div style="margin-bottom: 20px;">
+            <p style="font-size: 1.05rem; margin-bottom: 12px;">
+                Are you sure you want to permanently delete <strong>{{ client.display_name }}</strong>?
+            </p>
+            <div class="badge badge-success" style="display: inline-block; margin-bottom: 12px; padding: 6px 12px; font-size: 0.85rem;">
+                ✓ Safe to Delete: No Linked Reservation Records
+            </div>
+            <p class="help-text" style="color: var(--color-muted); line-height: 1.5;">
+                This client has no reservation stays or primary contact dependencies. Permanent deletion will remove their profile, internal notes, and group memberships. You may also archive the client if you prefer to retain their contact info for future reference.
+            </p>
+        </div>
+
+        <form method="post" style="margin-top: 24px;">
+            {% csrf_token %}
+            <div class="form-actions" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+                <button type="submit" name="action" value="delete" class="button button-danger">
+                    Permanently Delete Client
+                </button>
+                <button type="submit" name="action" value="archive" class="button button-secondary">
+                    Archive Instead
+                </button>
+                <a href="{% url 'clients:client_detail' client.pk %}" class="button button-neutral">
+                    Cancel
+                </a>
+            </div>
+        </form>
+    {% else %}
+        <div style="margin-bottom: 20px;">
+            <div style="background-color: #fff9db; border-left: 4px solid #f59f00; padding: 16px; border-radius: 4px; margin-bottom: 16px;">
+                <h3 style="margin-top: 0; margin-bottom: 8px; color: #d9480f; font-size: 1.1rem;">
+                    ⚠️ Data Integrity Notice: Client Has Linked History
+                </h3>
+                <p style="margin-bottom: 8px; font-size: 0.95rem; color: #495057;">
+                    <strong>{{ client.display_name }}</strong> cannot be permanently deleted because they have associated historical data:
+                </p>
+                <ul style="margin: 0 0 12px 20px; font-size: 0.9rem; color: #495057;">
+                    {% if stay_count %}
+                        <li><strong>{{ stay_count }}</strong> reservation guest stay record(s) with horse &amp; saddle logs</li>
+                    {% endif %}
+                    {% if reservation_count %}
+                        <li>Primary contact for <strong>{{ reservation_count }}</strong> reservation(s)</li>
+                    {% endif %}
+                </ul>
+                <p style="margin: 0; font-size: 0.9rem; color: #495057;">
+                    Deleting this client directly would destroy historical stay rosters and reports. To preserve database integrity, this client will be <strong>archived (deactivated)</strong> instead.
+                </p>
+            </div>
+
+            <p class="help-text" style="color: var(--color-muted); line-height: 1.5;">
+                Archived clients are hidden from standard active searches and guest pickers, but their past reservation history, horse assignments, and notes remain intact. You can restore archived clients at any time.
+            </p>
+        </div>
+
+        <form method="post" style="margin-top: 24px;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="archive">
+            <div class="form-actions" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+                <button type="submit" class="button button-warning">
+                    Archive Client
+                </button>
+                <a href="{% url 'clients:client_detail' client.pk %}" class="button button-neutral">
+                    Cancel
+                </a>
+            </div>
+        </form>
+    {% endif %}
+</div>
+{% endblock %}
