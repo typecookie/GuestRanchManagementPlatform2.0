@@ -85,6 +85,17 @@ View contact details, preferences, household connections, travel groups, and not
                 </div>
 
                 <div class="detail-row">
+                    <div class="detail-label">Sex</div>
+                    <div class="detail-value">
+                        {% if client.sex %}
+                            {{ client.get_sex_display }}
+                        {% else %}
+                            <span class="text-muted">Not provided</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="detail-row">
                     <div class="detail-label">Status</div>
                     <div class="detail-value">
                         {% if client.is_active %}

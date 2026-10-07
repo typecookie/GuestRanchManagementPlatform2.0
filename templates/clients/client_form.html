@@ -98,6 +98,14 @@
         </div>
 
         <div class="form-field">
+            <label for="{{ form.sex.id_for_label }}">Sex</label>
+            {{ form.sex }}
+            {% for error in form.sex.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-field">
             <label for="{{ form.client_type.id_for_label }}">Client Type</label>
             {{ form.client_type }}
             {% for error in form.client_type.errors %}

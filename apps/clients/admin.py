@@ -35,6 +35,7 @@ class ClientAdmin(admin.ModelAdmin):
     list_display = [
         "full_name",
         "preferred_name",
+        "sex",
         "client_type",
         "is_rider",
         "riding_level",
@@ -47,6 +48,7 @@ class ClientAdmin(admin.ModelAdmin):
     list_filter = [
         "is_rider",
         "riding_level",
+        "sex",
         "client_type",
         "is_active",
     ]
@@ -69,7 +71,7 @@ class ClientAdmin(admin.ModelAdmin):
                 "fields": [
                     ("first_name", "middle_name", "last_name"),
                     "preferred_name",
-                    "date_of_birth",
+                    ("date_of_birth", "sex"),
                     "client_type",
                     "years_return",
                     "is_active",

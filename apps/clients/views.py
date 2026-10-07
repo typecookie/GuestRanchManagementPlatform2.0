@@ -25,6 +25,7 @@ from apps.cabins.models import Cabin
 def client_list(request):
     search_query = request.GET.get("q", "").strip()
     status_filter = request.GET.get("status", "").strip()
+    sex_filter = request.GET.get("sex", "").strip()
     client_type_filter = request.GET.get("client_type", "").strip()
     riding_level_filter = request.GET.get("riding_level", "").strip()
 
@@ -46,6 +47,9 @@ def client_list(request):
     elif status_filter == "inactive":
         clients = clients.filter(is_active=False)
 
+    if sex_filter:
+        clients = clients.filter(sex=sex_filter)
+
     if client_type_filter:
         clients = clients.filter(client_type=client_type_filter)
 
@@ -56,12 +60,14 @@ def client_list(request):
         "clients": clients,
         "search_query": search_query,
         "status_filter": status_filter,
+        "sex_filter": sex_filter,
         "client_type_filter": client_type_filter,
         "riding_level_filter": riding_level_filter,
         "total_clients": Client.objects.count(),
         "active_clients": Client.objects.filter(is_active=True).count(),
         "inactive_clients": Client.objects.filter(is_active=False).count(),
         "search_result_count": clients.count(),
+        "sex_choices": Client.Sex.choices,
         "client_type_choices": Client.ClientType.choices,
         "riding_level_choices": Client.RidingLevel.choices,
     }
@@ -657,6 +663,7 @@ def quick_add_client(request):
         return JsonResponse({'error': 'POST method required'}, status=405)
     
     name = request.POST.get('name', '').strip()
+    sex = request.POST.get('sex', '').strip()
     travel_group_id = request.POST.get('travel_group_id', '').strip()
     household_id = request.POST.get('household_id', '').strip()
     reservation_id = request.POST.get('reservation_id', '').strip()
@@ -671,7 +678,11 @@ def quick_add_client(request):
         first_name = parts[0]
         last_name = "-"
         
-    client = Client.objects.create(first_name=first_name, last_name=last_name)
+    client = Client.objects.create(
+        first_name=first_name,
+        last_name=last_name,
+        sex=sex if sex in dict(Client.Sex.choices) else "",
+    )
     
     if travel_group_id:
         tg = TravelGroup.objects.filter(pk=travel_group_id).first()
@@ -1289,6 +1300,8 @@ def group_builder(request):
             "display_name": c.display_name,
             "email": c.email,
             "phone": c.phone,
+            "sex": c.get_sex_display(),
+            "sex_raw": c.sex,
             "client_type": c.get_client_type_display(),
             "client_type_raw": c.client_type,
             "riding_level": c.get_riding_level_display(),

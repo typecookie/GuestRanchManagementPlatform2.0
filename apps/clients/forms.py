@@ -23,6 +23,7 @@ class ClientForm(forms.ModelForm):
             "phone",
             "alternate_phone",
             "date_of_birth",
+            "sex",
             "client_type",
             "is_rider",
             "riding_level",
@@ -38,6 +39,7 @@ class ClientForm(forms.ModelForm):
         ]
         widgets = {
             "date_of_birth": forms.DateInput(attrs={"type": "date"}),
+            "sex": forms.Select(attrs={"class": "form-select"}),
             "height": forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g. 5'8\" or 68 in"}),
             "weight": forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g. 150 lbs"}),
             "saddle_preference": forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g. 15\" Western, Youth, etc."}),

@@ -14,6 +14,11 @@ def format_years_ordinal(num):
 
 
 class Client(models.Model):
+    class Sex(models.TextChoices):
+        MALE = "male", "Male"
+        FEMALE = "female", "Female"
+        OTHER = "other", "Other"
+
     class ClientType(models.TextChoices):
         UNKNOWN = "unknown", "Unknown"
         ADULT = "adult", "Adult"
@@ -39,6 +44,13 @@ class Client(models.Model):
     alternate_phone = models.CharField(max_length=30, blank=True)
 
     date_of_birth = models.DateField(null=True, blank=True)
+    sex = models.CharField(
+        max_length=20,
+        choices=Sex.choices,
+        blank=True,
+        default="",
+        verbose_name="Sex",
+    )
 
     client_type = models.CharField(
         max_length=20,

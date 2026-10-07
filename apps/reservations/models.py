@@ -299,6 +299,21 @@ class ReservationGuest(models.Model):
         return val.replace("_", " ").title() if val else ""
 
     @property
+    def sex(self):
+        if self.client_id and self.client.sex:
+            return self.client.sex
+        return ""
+
+    @property
+    def effective_sex(self):
+        return self.sex
+
+    def get_sex_display(self):
+        if self.client_id and self.client:
+            return self.client.get_sex_display()
+        return ""
+
+    @property
     def years_count(self):
         # 1. Direct Client explicit years_return
         if self.client_id and self.client.years_return is not None:

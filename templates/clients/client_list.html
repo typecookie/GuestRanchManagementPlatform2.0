@@ -64,6 +64,15 @@ Manage individual guest records, contact information, riding levels, preferences
                 <option value="inactive" {% if status_filter == "inactive" %}selected{% endif %}>Archived Only</option>
             </select>
 
+            <select name="sex" class="form-select">
+                <option value="">All sexes</option>
+                {% for value, label in sex_choices %}
+                    <option value="{{ value }}" {% if sex_filter == value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                {% endfor %}
+            </select>
+
             <select name="client_type" class="form-select">
                 <option value="">All client types</option>
                 {% for value, label in client_type_choices %}
@@ -84,7 +93,7 @@ Manage individual guest records, contact information, riding levels, preferences
 
             <button type="submit" class="button button-secondary">Search</button>
 
-            {% if search_query or status_filter or client_type_filter or riding_level_filter %}
+            {% if search_query or status_filter or sex_filter or client_type_filter or riding_level_filter %}
                 <a href="{% url 'clients:client_list' %}" class="button button-secondary">Clear</a>
             {% endif %}
         </form>
@@ -198,7 +207,7 @@ Manage individual guest records, contact information, riding levels, preferences
         <div class="empty-state-content">
             <div class="empty-state-icon">👥</div>
 
-            {% if search_query or status_filter or client_type_filter or riding_level_filter %}
+            {% if search_query or status_filter or sex_filter or client_type_filter or riding_level_filter %}
                 <h2>No clients found</h2>
                 <p>
                     No client records matched your current search or filters.

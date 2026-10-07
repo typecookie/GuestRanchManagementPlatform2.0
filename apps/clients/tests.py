@@ -522,3 +522,89 @@ class ClientRiderProfileTests(TestCase):
         self.assertRedirects(resp2, reverse("clients:client_detail", args=[client.pk]))
         client.refresh_from_db()
         self.assertTrue(client.is_active)
+
+    def test_client_sex_choices_and_stay_referencing(self):
+        # 1. Test male client
+        male_client = RanchClient.objects.create(
+            first_name="John",
+            last_name="Wayne",
+            sex=RanchClient.Sex.MALE,
+        )
+        self.assertEqual(male_client.sex, "male")
+        self.assertEqual(male_client.get_sex_display(), "Male")
+
+        # 2. Test female client
+        female_client = RanchClient.objects.create(
+            first_name="Annie",
+            last_name="Oakley",
+            sex=RanchClient.Sex.FEMALE,
+        )
+        self.assertEqual(female_client.sex, "female")
+        self.assertEqual(female_client.get_sex_display(), "Female")
+
+        # 3. Test other client
+        other_client = RanchClient.objects.create(
+            first_name="Alex",
+            last_name="Taylor",
+            sex=RanchClient.Sex.OTHER,
+        )
+        self.assertEqual(other_client.sex, "other")
+        self.assertEqual(other_client.get_sex_display(), "Other")
+
+        # 4. Test stay record property referencing
+        res = Reservation.objects.create(
+            reservation_name="Western Heritage Stay",
+            arrival_date=date(2026, 6, 1),
+            departure_date=date(2026, 6, 8),
+        )
+        guest_female = ReservationGuest.objects.create(
+            reservation=res,
+            client=female_client,
+        )
+        self.assertEqual(guest_female.sex, "female")
+        self.assertEqual(guest_female.effective_sex, "female")
+        self.assertEqual(guest_female.get_sex_display(), "Female")
+
+    def test_client_form_and_views_with_sex(self):
+        # Create client via form with sex=female
+        create_url = reverse("clients:client_create")
+        post_data = {
+            "first_name": "Clara",
+            "last_name": "Clayton",
+            "email": "clara@example.com",
+            "phone": "555-1234",
+            "date_of_birth": "1990-05-15",
+            "sex": "female",
+            "client_type": RanchClient.ClientType.ADULT,
+            "is_rider": True,
+            "riding_level": RanchClient.RidingLevel.BEGINNER,
+            "is_active": True,
+        }
+        resp = self.client.post(create_url, post_data)
+        self.assertEqual(resp.status_code, 302)
+
+        client = RanchClient.objects.get(email="clara@example.com")
+        self.assertEqual(client.sex, "female")
+
+        # Check detail view displays sex
+        detail_resp = self.client.get(reverse("clients:client_detail", args=[client.pk]))
+        self.assertEqual(detail_resp.status_code, 200)
+        self.assertContains(detail_resp, "Female")
+
+        # Update client sex to other
+        edit_url = reverse("clients:client_update", args=[client.pk])
+        post_data["sex"] = "other"
+        resp_update = self.client.post(edit_url, post_data)
+        self.assertEqual(resp_update.status_code, 302)
+        client.refresh_from_db()
+        self.assertEqual(client.sex, "other")
+
+        # Test client list filtering by sex
+        list_url = reverse("clients:client_list")
+        resp_list = self.client.get(list_url, {"sex": "other"})
+        self.assertEqual(resp_list.status_code, 200)
+        self.assertContains(resp_list, "Clara")
+
+        resp_list_male = self.client.get(list_url, {"sex": "male"})
+        self.assertEqual(resp_list_male.status_code, 200)
+        self.assertNotContains(resp_list_male, "Clara Clayton")
