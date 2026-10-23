@@ -790,23 +790,77 @@ def season_staffing_plan(request, season_id):
         action = request.POST.get('action')
 
         if action == 'save_targets':
+            deleted_placeholder_count = 0
             for target in targets:
                 input_key = f"target_{target.pk}"
                 if input_key in request.POST:
                     try:
                         val = int(request.POST[input_key])
                         if val >= 0:
+                            old_count = target.target_count
                             target.target_count = val
                             target.save()
+
+                            title = target.position_title
+                            if val == 0:
+                                # When target headcount is set to 0, fully delete all unconfirmed placeholders for this position
+                                count_deleted, _ = StaffSchedule.objects.filter(
+                                    season=season,
+                                    position__iexact=title,
+                                    is_placeholder=True,
+                                    status=StaffSchedule.Status.UNCONFIRMED
+                                ).delete()
+                                deleted_placeholder_count += count_deleted
+                            elif val < old_count:
+                                # Clean up excess unconfirmed placeholders if target was lowered
+                                existing_count = StaffSchedule.objects.filter(season=season, position__iexact=title).count()
+                                if existing_count > val:
+                                    excess = existing_count - val
+                                    placeholders = StaffSchedule.objects.filter(
+                                        season=season,
+                                        position__iexact=title,
+                                        is_placeholder=True,
+                                        status=StaffSchedule.Status.UNCONFIRMED
+                                    ).order_by('-id')[:excess]
+                                    p_ids = list(placeholders.values_list('id', flat=True))
+                                    if p_ids:
+                                        count_deleted, _ = StaffSchedule.objects.filter(id__in=p_ids).delete()
+                                        deleted_placeholder_count += count_deleted
                     except ValueError:
                         pass
             
             auto_fill = request.POST.get('auto_fill_after_save') == '1'
             if auto_fill:
                 count = auto_fill_schedule_from_season_targets(season)
-                messages.success(request, f"Saved target headcounts and auto-filled {count} missing positions into the Staffing Schedule.")
+                msg = f"Saved target headcounts and auto-filled {count} missing positions into the Staffing Schedule."
+                if deleted_placeholder_count > 0:
+                    msg += f" Removed {deleted_placeholder_count} unconfirmed placeholder(s) for zeroed/reduced targets."
+                messages.success(request, msg)
             else:
-                messages.success(request, f"Staffing targets for {season.name} saved successfully.")
+                msg = f"Staffing targets for {season.name} saved successfully."
+                if deleted_placeholder_count > 0:
+                    msg += f" Removed {deleted_placeholder_count} unconfirmed placeholder(s) for zeroed/reduced targets."
+                messages.success(request, msg)
+            return redirect('employees:season_staffing_plan', season_id=season.pk)
+
+        elif action == 'delete_target':
+            target_id = request.POST.get('target_id')
+            target = get_object_or_404(SeasonPositionTarget, pk=target_id, season=season)
+            title = target.position_title
+            
+            # Fully delete unconfirmed placeholder schedule entries for this position
+            deleted_placeholders, _ = StaffSchedule.objects.filter(
+                season=season,
+                position__iexact=title,
+                is_placeholder=True,
+                status=StaffSchedule.Status.UNCONFIRMED
+            ).delete()
+            
+            target.delete()
+            msg = f"Deleted position target '{title}'"
+            if deleted_placeholders:
+                msg += f" and removed {deleted_placeholders} unconfirmed placeholder(s) from the Staffing Schedule"
+            messages.success(request, msg + ".")
             return redirect('employees:season_staffing_plan', season_id=season.pk)
 
         elif action == 'auto_fill':
@@ -852,6 +906,7 @@ def season_staffing_plan(request, season_id):
     total_confirmed = 0
     total_placeholders = 0
     total_tentative = 0
+    total_needed = 0
 
     target_map = {t.position.pk if t.position else f"c_{t.custom_position_title.lower()}": t for t in targets}
 
@@ -872,11 +927,16 @@ def season_staffing_plan(request, season_id):
             placeholders = target_obj.get_placeholder_count()
             tentative = target_obj.get_tentative_count()
 
+            needed = max(0, target_obj.target_count - confirmed)
+            extra_confirmed = max(0, confirmed - target_obj.target_count)
+            is_met = (confirmed >= target_obj.target_count and target_obj.target_count > 0) or (target_obj.target_count == 0 and confirmed == 0)
+
             total_planned += target_obj.target_count
             total_scheduled += scheduled
             total_confirmed += confirmed
             total_placeholders += placeholders
             total_tentative += tentative
+            total_needed += needed
 
             dept_rows.append({
                 'target': target_obj,
@@ -888,7 +948,10 @@ def season_staffing_plan(request, season_id):
                 'confirmed_count': confirmed,
                 'placeholder_count': placeholders,
                 'tentative_count': tentative,
-                'difference': target_obj.target_count - scheduled,
+                'needed_count': needed,
+                'extra_confirmed': extra_confirmed,
+                'is_met': is_met,
+                'difference': target_obj.target_count - confirmed,
             })
 
         dept_plans.append({
@@ -897,6 +960,9 @@ def season_staffing_plan(request, season_id):
             'planned_total': sum(r['target_count'] for r in dept_rows),
             'scheduled_total': sum(r['scheduled_count'] for r in dept_rows),
             'confirmed_total': sum(r['confirmed_count'] for r in dept_rows),
+            'tentative_total': sum(r['tentative_count'] for r in dept_rows),
+            'placeholder_total': sum(r['placeholder_count'] for r in dept_rows),
+            'needed_total': sum(r['needed_count'] for r in dept_rows),
         })
 
     # Unassigned or custom targets not in master positions
@@ -908,11 +974,16 @@ def season_staffing_plan(request, season_id):
         placeholders = ct.get_placeholder_count()
         tentative = ct.get_tentative_count()
 
+        needed = max(0, ct.target_count - confirmed)
+        extra_confirmed = max(0, confirmed - ct.target_count)
+        is_met = (confirmed >= ct.target_count and ct.target_count > 0) or (ct.target_count == 0 and confirmed == 0)
+
         total_planned += ct.target_count
         total_scheduled += scheduled
         total_confirmed += confirmed
         total_placeholders += placeholders
         total_tentative += tentative
+        total_needed += needed
 
         custom_rows.append({
             'target': ct,
@@ -924,7 +995,10 @@ def season_staffing_plan(request, season_id):
             'confirmed_count': confirmed,
             'placeholder_count': placeholders,
             'tentative_count': tentative,
-            'difference': ct.target_count - scheduled,
+            'needed_count': needed,
+            'extra_confirmed': extra_confirmed,
+            'is_met': is_met,
+            'difference': ct.target_count - confirmed,
         })
 
     all_seasons = OperatingSeason.objects.all().order_by('-start_date')
@@ -940,6 +1014,7 @@ def season_staffing_plan(request, season_id):
         'total_confirmed': total_confirmed,
         'total_placeholders': total_placeholders,
         'total_tentative': total_tentative,
+        'total_needed': total_needed,
     })
 
 

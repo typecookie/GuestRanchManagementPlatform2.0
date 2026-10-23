@@ -784,6 +784,76 @@ class DepartmentPositionTests(TestCase):
         wrangler_schedules = StaffSchedule.objects.filter(season=self.season, position='Wrangler')
         self.assertEqual(wrangler_schedules.count(), 10)
 
+    def test_season_staffing_plan_headcount_breakdown_and_placeholder_not_target_met(self):
+        ensure_default_departments_and_positions()
+        sync_season_targets_from_schedule(self.season)
+
+        employee = Employee.objects.create(
+            first_name='John',
+            last_name='Wrangler',
+            current_position='Wrangler'
+        )
+
+        # Target for Wrangler is 10.
+        # Add 1 Confirmed employee, 1 Tentative staff, and 2 placeholders.
+        wrangler_target = SeasonPositionTarget.objects.get(season=self.season, position__title='Wrangler')
+        wrangler_target.target_count = 10
+        wrangler_target.save()
+
+        # 1 Confirmed
+        StaffSchedule.objects.create(
+            season=self.season,
+            position='Wrangler',
+            employee=employee,
+            is_placeholder=False,
+            status=StaffSchedule.Status.CONFIRMED,
+            start_date=self.season.start_date,
+            end_date=self.season.end_date
+        )
+        # 1 Tentative
+        StaffSchedule.objects.create(
+            season=self.season,
+            position='Wrangler',
+            placeholder_name='Tentative Wrangler Candidate',
+            is_placeholder=False,
+            status=StaffSchedule.Status.TENTATIVE,
+            start_date=self.season.start_date,
+            end_date=self.season.end_date
+        )
+        # 2 Placeholders (total scheduled = 4, target = 10)
+        for i in range(2):
+            StaffSchedule.objects.create(
+                season=self.season,
+                position='Wrangler',
+                placeholder_name=f'Placeholder Wrangler #{i+1}',
+                is_placeholder=True,
+                status=StaffSchedule.Status.UNCONFIRMED,
+                start_date=self.season.start_date,
+                end_date=self.season.end_date
+            )
+
+        url = reverse('employees:season_staffing_plan', kwargs={'season_id': self.season.pk})
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+
+        # Verify breakdown rendered: 1 Confirmed, 1 Tentative, 2 Placeholders
+        self.assertContains(resp, "1 Confirmed")
+        self.assertContains(resp, "1 Tentative")
+        self.assertContains(resp, "2 Placeholders")
+        # Placeholders must NOT mark target met: 1 confirmed out of 10 target means Need 9
+        self.assertContains(resp, "Need 9")
+
+        # Now auto-fill remaining slots so total scheduled = 10 (1 confirmed, 1 tentative, 8 placeholders)
+        resp_fill = self.client.post(url, {'action': 'auto_fill'})
+        self.assertEqual(resp_fill.status_code, 302)
+
+        resp2 = self.client.get(url)
+        self.assertEqual(resp2.status_code, 200)
+        # Even with 10 slots on the schedule, placeholders are NOT target met!
+        # It still requires 9 confirmed employees to fill the target quota
+        self.assertContains(resp2, "Need 9")
+        self.assertContains(resp2, "8 placeholders pending")
+
     def test_season_staffing_plan_save_and_add_custom_position(self):
         ensure_default_departments_and_positions()
         sync_season_targets_from_schedule(self.season)
@@ -824,6 +894,79 @@ class DepartmentPositionTests(TestCase):
         ).first()
         self.assertIsNotNone(custom_target)
         self.assertEqual(custom_target.target_count, 2)
+
+    def test_season_staffing_plan_set_target_zero_deletes_placeholders(self):
+        ensure_default_departments_and_positions()
+        sync_season_targets_from_schedule(self.season)
+
+        # Auto-fill so placeholders exist
+        auto_fill_schedule_from_season_targets(self.season)
+        self.assertEqual(StaffSchedule.objects.filter(season=self.season, position='Wrangler').count(), 10)
+
+        url = reverse('employees:season_staffing_plan', kwargs={'season_id': self.season.pk})
+        target_wrangler = SeasonPositionTarget.objects.get(season=self.season, position__title='Wrangler')
+
+        # Set target to 0
+        resp = self.client.post(url, {
+            'action': 'save_targets',
+            f'target_{target_wrangler.pk}': '0',
+        })
+        self.assertEqual(resp.status_code, 302)
+
+        target_wrangler.refresh_from_db()
+        self.assertEqual(target_wrangler.target_count, 0)
+
+        # Placeholders for Wrangler must be fully deleted
+        wrangler_schedules = StaffSchedule.objects.filter(season=self.season, position='Wrangler')
+        self.assertEqual(wrangler_schedules.count(), 0)
+
+    def test_season_staffing_plan_reduce_target_cleans_excess_placeholders(self):
+        ensure_default_departments_and_positions()
+        sync_season_targets_from_schedule(self.season)
+
+        # Auto-fill so 10 placeholders exist for Wrangler
+        auto_fill_schedule_from_season_targets(self.season)
+        self.assertEqual(StaffSchedule.objects.filter(season=self.season, position='Wrangler').count(), 10)
+
+        url = reverse('employees:season_staffing_plan', kwargs={'season_id': self.season.pk})
+        target_wrangler = SeasonPositionTarget.objects.get(season=self.season, position__title='Wrangler')
+
+        # Reduce target from 10 to 4
+        resp = self.client.post(url, {
+            'action': 'save_targets',
+            f'target_{target_wrangler.pk}': '4',
+        })
+        self.assertEqual(resp.status_code, 302)
+
+        target_wrangler.refresh_from_db()
+        self.assertEqual(target_wrangler.target_count, 4)
+
+        # Excess 6 placeholders deleted, exactly 4 remain
+        wrangler_schedules = StaffSchedule.objects.filter(season=self.season, position='Wrangler')
+        self.assertEqual(wrangler_schedules.count(), 4)
+
+    def test_season_staffing_plan_delete_target_action(self):
+        ensure_default_departments_and_positions()
+        barn = Department.objects.get(name='Barn')
+        custom_target = SeasonPositionTarget.objects.create(
+            season=self.season,
+            department=barn,
+            custom_position_title='Summer Trail Guide',
+            target_count=2
+        )
+        auto_fill_schedule_from_season_targets(self.season)
+        self.assertEqual(StaffSchedule.objects.filter(season=self.season, position='Summer Trail Guide').count(), 2)
+
+        url = reverse('employees:season_staffing_plan', kwargs={'season_id': self.season.pk})
+        resp = self.client.post(url, {
+            'action': 'delete_target',
+            'target_id': custom_target.pk,
+        })
+        self.assertEqual(resp.status_code, 302)
+
+        # Target and placeholders must be completely deleted
+        self.assertFalse(SeasonPositionTarget.objects.filter(pk=custom_target.pk).exists())
+        self.assertEqual(StaffSchedule.objects.filter(season=self.season, position='Summer Trail Guide').count(), 0)
 
     def test_operating_dates_view_staffing_integration(self):
         ensure_default_departments_and_positions()

@@ -65,9 +65,9 @@ Set planned position headcounts for {{ season.name }} ({{ season.start_date|date
 </div>
 
 <!-- Key Stat Cards -->
-<div class="stat-grid" style="margin-bottom: 2rem;">
+<div class="stat-grid" style="margin-bottom: 2rem; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));">
     <div class="stat-card">
-        <span>Total Planned Headcount</span>
+        <span>Planned Headcount</span>
         <strong style="color: var(--color-primary, #1d4ed8);">{{ total_planned }}</strong>
         <div style="font-size: 0.8rem; color: var(--color-muted, #64748b);">positions needed</div>
     </div>
@@ -77,14 +77,24 @@ Set planned position headcounts for {{ season.name }} ({{ season.start_date|date
         <div style="font-size: 0.8rem; color: var(--color-muted, #64748b);">on staffing board</div>
     </div>
     <div class="stat-card">
-        <span>Confirmed Employees</span>
+        <span>Confirmed Staff</span>
         <strong style="color: #059669;">{{ total_confirmed }}</strong>
-        <div style="font-size: 0.8rem; color: var(--color-muted, #64748b);">assigned profiles</div>
+        <div style="font-size: 0.8rem; color: var(--color-muted, #64748b);">assigned &amp; confirmed</div>
+    </div>
+    <div class="stat-card">
+        <span>Tentative Staff</span>
+        <strong style="color: #7c3aed;">{{ total_tentative }}</strong>
+        <div style="font-size: 0.8rem; color: var(--color-muted, #64748b);">tentative assignments</div>
     </div>
     <div class="stat-card">
         <span>Unconfirmed Placeholders</span>
         <strong style="color: #d97706;">{{ total_placeholders }}</strong>
-        <div style="font-size: 0.8rem; color: var(--color-muted, #64748b);">pending hires</div>
+        <div style="font-size: 0.8rem; color: var(--color-muted, #64748b);">pending hires / open</div>
+    </div>
+    <div class="stat-card">
+        <span>Needed to Fill</span>
+        <strong style="color: {% if total_needed > 0 %}#dc2626{% else %}#059669{% endif %};">{{ total_needed }}</strong>
+        <div style="font-size: 0.8rem; color: var(--color-muted, #64748b);">unfilled target quota</div>
     </div>
 </div>
 
@@ -92,6 +102,7 @@ Set planned position headcounts for {{ season.name }} ({{ season.start_date|date
 <form method="post" id="targets-form">
     {% csrf_token %}
     <input type="hidden" name="action" value="save_targets">
+    <input type="hidden" name="target_id" id="delete_target_id" value="">
 
     <div style="display: flex; flex-direction: column; gap: 2rem;">
         {% for plan in dept_plans %}
@@ -107,10 +118,21 @@ Set planned position headcounts for {{ season.name }} ({{ season.start_date|date
                         {% endif %}
                     </div>
 
-                    <div style="font-size: 0.85rem; color: var(--color-muted, #64748b); display: flex; gap: 14px;">
+                    <div style="font-size: 0.85rem; color: var(--color-muted, #64748b); display: flex; gap: 14px; flex-wrap: wrap;">
                         <span>Target: <strong style="color: var(--color-text, #1e293b);">{{ plan.planned_total }}</strong></span>
                         <span>Scheduled: <strong style="color: var(--color-text, #1e293b);">{{ plan.scheduled_total }}</strong></span>
-                        <span>Confirmed: <strong style="color: #059669;">{{ plan.confirmed_total }}</strong></span>
+                        <span style="color: #059669;">Confirmed: <strong>{{ plan.confirmed_total }}</strong></span>
+                        {% if plan.tentative_total %}
+                            <span style="color: #7c3aed;">Tentative: <strong>{{ plan.tentative_total }}</strong></span>
+                        {% endif %}
+                        {% if plan.placeholder_total %}
+                            <span style="color: #d97706;">Placeholders: <strong>{{ plan.placeholder_total }}</strong></span>
+                        {% endif %}
+                        {% if plan.needed_total > 0 %}
+                            <span style="color: #dc2626; font-weight: 700;">Need to Fill: {{ plan.needed_total }}</span>
+                        {% else %}
+                            <span style="color: #059669; font-weight: 700;">✓ Quota Met</span>
+                        {% endif %}
                     </div>
                 </div>
 
@@ -119,11 +141,11 @@ Set planned position headcounts for {{ season.name }} ({{ season.start_date|date
                     <table class="data-table" style="margin: 0;">
                         <thead>
                             <tr>
-                                <th style="width: 30%;">Position Title</th>
-                                <th style="width: 18%;">Role Type</th>
-                                <th style="width: 18%; text-align: center;">Target Headcount</th>
-                                <th style="width: 18%; text-align: center;">Currently Scheduled</th>
-                                <th style="width: 16%; text-align: center;">Status / Diff</th>
+                                <th style="width: 28%;">Position Title</th>
+                                <th style="width: 16%;">Role Type</th>
+                                <th style="width: 16%; text-align: center;">Target Headcount</th>
+                                <th style="width: 22%; text-align: center;">Currently Scheduled</th>
+                                <th style="width: 18%; text-align: center;">Status / Diff</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -152,39 +174,102 @@ Set planned position headcounts for {{ season.name }} ({{ season.start_date|date
                                     </td>
                                     <td style="text-align: center;">
                                         {% if can_write %}
-                                            <input 
-                                                type="number" 
-                                                name="target_{{ r.target.pk }}" 
-                                                value="{{ r.target_count }}" 
-                                                min="0" 
-                                                class="form-control" 
-                                                style="width: 85px; display: inline-block; text-align: center; font-weight: 700; font-size: 0.95rem;"
-                                            >
+                                            <div style="display: inline-flex; align-items: center; gap: 4px; justify-content: center;">
+                                                <input 
+                                                    type="number" 
+                                                    name="target_{{ r.target.pk }}" 
+                                                    value="{{ r.target_count }}" 
+                                                    min="0" 
+                                                    class="form-control" 
+                                                    style="width: 80px; display: inline-block; text-align: center; font-weight: 700; font-size: 0.95rem;"
+                                                >
+                                                <button 
+                                                    type="button" 
+                                                    onclick="this.previousElementSibling.value = 0;" 
+                                                    class="button button-outline" 
+                                                    style="padding: 2px 7px; font-size: 0.72rem; line-height: 1.2; border-radius: 4px; color: #dc2626; border-color: #fca5a5;" 
+                                                    title="Zero / clear target headcount (will remove unconfirmed placeholders on save)"
+                                                >
+                                                    ✕ 0
+                                                </button>
+                                            </div>
                                         {% else %}
                                             <strong style="font-size: 1rem;">{{ r.target_count }}</strong>
                                         {% endif %}
                                     </td>
                                     <td style="text-align: center;">
-                                        <div style="font-weight: 700; font-size: 0.95rem;">
-                                            {{ r.scheduled_count }}
+                                        <div style="font-weight: 700; font-size: 0.95rem; margin-bottom: 2px;">
+                                            {{ r.scheduled_count }} scheduled
                                         </div>
-                                        <div style="font-size: 0.75rem; color: var(--color-muted, #64748b);">
-                                            {{ r.confirmed_count }} confirmed, {{ r.placeholder_count }} placeholder
+                                        <div style="display: flex; flex-direction: column; gap: 2px; align-items: center; font-size: 0.78rem;">
+                                            <span style="color: #059669; font-weight: 600;">
+                                                ✓ {{ r.confirmed_count }} Confirmed
+                                            </span>
+                                            {% if r.tentative_count %}
+                                                <span style="color: #7c3aed; font-weight: 600;">
+                                                    ⏳ {{ r.tentative_count }} Tentative
+                                                </span>
+                                            {% else %}
+                                                <span style="color: #94a3b8; font-size: 0.72rem;">
+                                                    0 Tentative
+                                                </span>
+                                            {% endif %}
+                                            {% if r.placeholder_count %}
+                                                <span style="color: #d97706; font-weight: 600;">
+                                                    📋 {{ r.placeholder_count }} Placeholder{% if r.placeholder_count > 1 %}s{% endif %}
+                                                </span>
+                                            {% else %}
+                                                <span style="color: #94a3b8; font-size: 0.72rem;">
+                                                    0 Placeholders
+                                                </span>
+                                            {% endif %}
                                         </div>
                                     </td>
                                     <td style="text-align: center;">
-                                        {% if r.difference > 0 %}
-                                            <span class="badge" style="background: #fef3c7; color: #b45309; border: 1px solid #fde68a; font-size: 0.75rem;" title="Needs {{ r.difference }} more staff to reach target">
-                                                ⚠ Need {{ r.difference }}
-                                            </span>
-                                        {% elif r.difference == 0 %}
-                                            <span class="badge" style="background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; font-size: 0.75rem;">
-                                                ✓ Target Met ({{ r.scheduled_count }})
-                                            </span>
+                                        {% if r.target_count == 0 %}
+                                            {% if r.confirmed_count > 0 %}
+                                                <span class="badge" style="background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; font-size: 0.75rem;">
+                                                    +{{ r.confirmed_count }} Unplanned
+                                                </span>
+                                            {% elif r.scheduled_count > 0 %}
+                                                <span class="badge" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; font-size: 0.75rem;">
+                                                    {{ r.scheduled_count }} on Schedule
+                                                </span>
+                                            {% else %}
+                                                <span class="badge" style="background: #f8fafc; color: #94a3b8; border: 1px solid #e2e8f0; font-size: 0.75rem;">
+                                                    No Target (0)
+                                                </span>
+                                            {% endif %}
+                                        {% elif r.is_met %}
+                                            {% if r.extra_confirmed > 0 %}
+                                                <span class="badge" style="background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; font-size: 0.75rem;" title="{{ r.confirmed_count }} confirmed staff assigned for target of {{ r.target_count }}">
+                                                    ✓ Met (+{{ r.extra_confirmed }} Extra)
+                                                </span>
+                                                <div style="font-size: 0.72rem; color: #059669; margin-top: 3px; font-weight: 600;">
+                                                    {{ r.confirmed_count }} of {{ r.target_count }} Confirmed
+                                                </div>
+                                            {% else %}
+                                                <span class="badge" style="background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; font-size: 0.75rem;" title="Target of {{ r.target_count }} is fully met by confirmed staff">
+                                                    ✓ Target Met ({{ r.confirmed_count }}/{{ r.target_count }})
+                                                </span>
+                                                <div style="font-size: 0.72rem; color: #059669; margin-top: 3px; font-weight: 600;">
+                                                    All {{ r.confirmed_count }} Confirmed
+                                                </div>
+                                            {% endif %}
                                         {% else %}
-                                            <span class="badge" style="background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; font-size: 0.75rem;">
-                                                +{{ r.scheduled_count|add:"-1" }} Extra
+                                            <!-- Target is NOT met because placeholders do NOT count as filled -->
+                                            <span class="badge" style="background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; font-size: 0.75rem; font-weight: 700;" title="Needs {{ r.needed_count }} more confirmed staff to reach target of {{ r.target_count }}">
+                                                ⚠ Need {{ r.needed_count }}
                                             </span>
+                                            <div style="font-size: 0.72rem; color: #475569; margin-top: 3px; line-height: 1.3;">
+                                                <div><strong>{{ r.confirmed_count }}/{{ r.target_count }}</strong> confirmed</div>
+                                                {% if r.placeholder_count > 0 %}
+                                                    <div style="color: #b45309; font-size: 0.7rem;">({{ r.placeholder_count }} placeholder{{ r.placeholder_count|pluralize }} pending)</div>
+                                                {% endif %}
+                                                {% if r.tentative_count > 0 %}
+                                                    <div style="color: #7c3aed; font-size: 0.7rem;">({{ r.tentative_count }} tentative)</div>
+                                                {% endif %}
+                                            </div>
                                         {% endif %}
                                     </td>
                                 </tr>
@@ -213,11 +298,12 @@ Set planned position headcounts for {{ season.name }} ({{ season.start_date|date
                     <table class="data-table" style="margin: 0;">
                         <thead>
                             <tr>
-                                <th style="width: 30%;">Position Title</th>
-                                <th style="width: 18%;">Department</th>
-                                <th style="width: 18%; text-align: center;">Target Headcount</th>
-                                <th style="width: 18%; text-align: center;">Currently Scheduled</th>
-                                <th style="width: 16%; text-align: center;">Status</th>
+                                <th style="width: 26%;">Position Title</th>
+                                <th style="width: 14%;">Department</th>
+                                <th style="width: 16%; text-align: center;">Target Headcount</th>
+                                <th style="width: 20%; text-align: center;">Currently Scheduled</th>
+                                <th style="width: 14%; text-align: center;">Status / Diff</th>
+                                <th style="width: 10%; text-align: center;">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -233,30 +319,103 @@ Set planned position headcounts for {{ season.name }} ({{ season.start_date|date
                                     </td>
                                     <td style="text-align: center;">
                                         {% if can_write %}
-                                            <input 
-                                                type="number" 
-                                                name="target_{{ r.target.pk }}" 
-                                                value="{{ r.target_count }}" 
-                                                min="0" 
-                                                class="form-control" 
-                                                style="width: 85px; display: inline-block; text-align: center; font-weight: 700;"
-                                            >
+                                            <div style="display: inline-flex; align-items: center; gap: 4px; justify-content: center;">
+                                                <input 
+                                                    type="number" 
+                                                    name="target_{{ r.target.pk }}" 
+                                                    value="{{ r.target_count }}" 
+                                                    min="0" 
+                                                    class="form-control" 
+                                                    style="width: 80px; display: inline-block; text-align: center; font-weight: 700; font-size: 0.95rem;"
+                                                >
+                                                <button 
+                                                    type="button" 
+                                                    onclick="this.previousElementSibling.value = 0;" 
+                                                    class="button button-outline" 
+                                                    style="padding: 2px 7px; font-size: 0.72rem; line-height: 1.2; border-radius: 4px; color: #dc2626; border-color: #fca5a5;" 
+                                                    title="Zero / clear target headcount (will remove unconfirmed placeholders on save)"
+                                                >
+                                                    ✕ 0
+                                                </button>
+                                            </div>
                                         {% else %}
                                             <strong>{{ r.target_count }}</strong>
                                         {% endif %}
                                     </td>
                                     <td style="text-align: center;">
-                                        <strong>{{ r.scheduled_count }}</strong>
+                                        <div style="font-weight: 700; font-size: 0.95rem; margin-bottom: 2px;">
+                                            {{ r.scheduled_count }} scheduled
+                                        </div>
+                                        <div style="display: flex; flex-direction: column; gap: 2px; align-items: center; font-size: 0.78rem;">
+                                            <span style="color: #059669; font-weight: 600;">
+                                                ✓ {{ r.confirmed_count }} Confirmed
+                                            </span>
+                                            {% if r.tentative_count %}
+                                                <span style="color: #7c3aed; font-weight: 600;">
+                                                    ⏳ {{ r.tentative_count }} Tentative
+                                                </span>
+                                            {% else %}
+                                                <span style="color: #94a3b8; font-size: 0.72rem;">
+                                                    0 Tentative
+                                                </span>
+                                            {% endif %}
+                                            {% if r.placeholder_count %}
+                                                <span style="color: #d97706; font-weight: 600;">
+                                                    📋 {{ r.placeholder_count }} Placeholder{% if r.placeholder_count > 1 %}s{% endif %}
+                                                </span>
+                                            {% else %}
+                                                <span style="color: #94a3b8; font-size: 0.72rem;">
+                                                    0 Placeholders
+                                                </span>
+                                            {% endif %}
+                                        </div>
                                     </td>
                                     <td style="text-align: center;">
-                                        {% if r.difference > 0 %}
-                                            <span class="badge" style="background: #fef3c7; color: #b45309; border: 1px solid #fde68a;">
-                                                Need {{ r.difference }}
-                                            </span>
+                                        {% if r.target_count == 0 %}
+                                            {% if r.confirmed_count > 0 %}
+                                                <span class="badge" style="background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; font-size: 0.75rem;">
+                                                    +{{ r.confirmed_count }} Unplanned
+                                                </span>
+                                            {% elif r.scheduled_count > 0 %}
+                                                <span class="badge" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; font-size: 0.75rem;">
+                                                    {{ r.scheduled_count }} on Schedule
+                                                </span>
+                                            {% else %}
+                                                <span class="badge" style="background: #f8fafc; color: #94a3b8; border: 1px solid #e2e8f0; font-size: 0.75rem;">
+                                                    No Target (0)
+                                                </span>
+                                            {% endif %}
+                                        {% elif r.is_met %}
+                                            {% if r.extra_confirmed > 0 %}
+                                                <span class="badge" style="background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; font-size: 0.75rem;">
+                                                    ✓ Met (+{{ r.extra_confirmed }} Extra)
+                                                </span>
+                                            {% else %}
+                                                <span class="badge" style="background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; font-size: 0.75rem;">
+                                                    ✓ Target Met ({{ r.confirmed_count }}/{{ r.target_count }})
+                                                </span>
+                                            {% endif %}
                                         {% else %}
-                                            <span class="badge" style="background: #d1fae5; color: #065f46;">
-                                                ✓ Met
+                                            <span class="badge" style="background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; font-size: 0.75rem; font-weight: 700;">
+                                                ⚠ Need {{ r.needed_count }}
                                             </span>
+                                        {% endif %}
+                                    </td>
+                                    <td style="text-align: center;">
+                                        {% if can_write %}
+                                            <button 
+                                                type="submit" 
+                                                name="action" 
+                                                value="delete_target" 
+                                                onclick="document.getElementById('delete_target_id').value='{{ r.target.pk }}'; return confirm('Are you sure you want to delete the target for \'{{ r.title|escapejs }}\'? Any unconfirmed placeholder assignments will be removed from the schedule.');" 
+                                                class="button button-danger button-sm" 
+                                                style="padding: 3px 8px; font-size: 0.75rem;" 
+                                                title="Delete this custom position target and clear unconfirmed placeholders"
+                                            >
+                                                🗑 Delete
+                                            </button>
+                                        {% else %}
+                                            <span style="color: var(--color-muted, #94a3b8); font-size: 0.8rem;">-</span>
                                         {% endif %}
                                     </td>
                                 </tr>

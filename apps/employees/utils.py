@@ -217,6 +217,13 @@ def auto_fill_schedule_from_season_targets(season):
         title = target.position_title
         target_count = target.target_count
         if target_count <= 0:
+            # Delete any unconfirmed placeholders for zero-target positions
+            StaffSchedule.objects.filter(
+                season=season,
+                position__iexact=title,
+                is_placeholder=True,
+                status=StaffSchedule.Status.UNCONFIRMED
+            ).delete()
             continue
 
         existing_qs = StaffSchedule.objects.filter(season=season, position__iexact=title)
@@ -242,6 +249,18 @@ def auto_fill_schedule_from_season_targets(season):
                     notes=f"Auto-generated placeholder for {season.name} position target"
                 )
                 created_count += 1
+        elif existing_count > target_count:
+            # Clean up excess unconfirmed placeholders if target was lowered
+            excess = existing_count - target_count
+            placeholders = StaffSchedule.objects.filter(
+                season=season,
+                position__iexact=title,
+                is_placeholder=True,
+                status=StaffSchedule.Status.UNCONFIRMED
+            ).order_by('-id')[:excess]
+            p_ids = list(placeholders.values_list('id', flat=True))
+            if p_ids:
+                StaffSchedule.objects.filter(id__in=p_ids).delete()
 
     return created_count
 
