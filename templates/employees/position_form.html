@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} | Positions{% endblock %}
+
+{% block eyebrow %}
+<a href="{% url 'employees:department_position_list' %}">Departments & Positions</a> / {{ title }}
+{% endblock %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block page_subtitle %}
+Define position titles, leadership role designations, and baseline target headcounts for seasonal planning.
+{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'employees:department_position_list' %}" class="button button-secondary">Cancel</a>
+{% endblock %}
+
+{% block content %}
+<form method="post" class="form-card" style="max-width: 700px;">
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+        <div class="form-alert">
+            {{ form.non_field_errors }}
+        </div>
+    {% endif %}
+
+    <div class="form-grid">
+        <div class="form-field">
+            <label for="{{ form.department.id_for_label }}">Department <span style="color: var(--color-danger, #dc2626);">*</span></label>
+            {{ form.department }}
+            {% for error in form.department.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+            <span class="form-help">The ranch operational department (e.g. Barn, Kitchen, Housekeeping)</span>
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.title.id_for_label }}">Position Title <span style="color: var(--color-danger, #dc2626);">*</span></label>
+            {{ form.title }}
+            {% for error in form.title.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+            <span class="form-help">e.g. Head Wrangler, Wrangler, Corral Boss, Head Chef</span>
+        </div>
+
+        <div class="form-field form-grid-full checkbox-field" style="background: var(--bg-surface-secondary, #f8fafc); padding: 12px 14px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0);">
+            <label style="font-weight: 700; color: var(--color-text, #1e293b); display: flex; align-items: center; gap: 8px;">
+                {{ form.is_head }}
+                ⭐ Department Head / Boss / Supervisory Role
+            </label>
+            {% for error in form.is_head.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+            <span class="form-help" style="margin-left: 28px;">Check this if this position is a head of department (e.g. Head Wrangler, Corral Boss, Barn Boss, Head Chef, Head Housekeeper, Head Bartender).</span>
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.default_target_count.id_for_label }}">Standard Season Target Headcount</label>
+            {{ form.default_target_count }}
+            {% for error in form.default_target_count.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+            <span class="form-help">Default number of staff needed per season (e.g. 10 for Wrangler, 1 for Head Wrangler)</span>
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.display_order.id_for_label }}">Display Order within Dept</label>
+            {{ form.display_order }}
+            {% for error in form.display_order.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+            <span class="form-help">Sorting order (e.g. 10, 20, 30)</span>
+        </div>
+
+        <div class="form-field form-grid-full">
+            <label for="{{ form.description.id_for_label }}">Role Description & Responsibilities</label>
+            {{ form.description }}
+            {% for error in form.description.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="form-actions" style="margin-top: 1.5rem; display: flex; gap: 1rem;">
+        <button type="submit" class="button button-primary">Save Position</button>
+        <a href="{% url 'employees:department_position_list' %}" class="button button-secondary">Cancel</a>
+    </div>
+</form>
+{% endblock %}

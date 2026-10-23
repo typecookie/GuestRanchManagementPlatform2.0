@@ -103,7 +103,7 @@
                         {% if perms.employees.view_employee %}
                         <a
                             href="{% url 'employees:employee_list' %}?dept=admin"
-                            class="subnav-link {% if request.resolver_match.namespace == 'employees' and 'staff' not in request.resolver_match.url_name and 'interview' not in request.resolver_match.url_name %}is-active{% endif %}"
+                            class="subnav-link {% if request.resolver_match.namespace == 'employees' and 'staff' not in request.resolver_match.url_name and 'interview' not in request.resolver_match.url_name and 'position' not in request.resolver_match.url_name and 'department' not in request.resolver_match.url_name %}is-active{% endif %}"
                         >
                             Employees
                         </a>
@@ -112,6 +112,12 @@
                             class="subnav-link {% if 'staff' in request.resolver_match.url_name %}is-active{% endif %}"
                         >
                             Staffing Schedule
+                        </a>
+                        <a
+                            href="{% url 'employees:department_position_list' %}?dept=admin"
+                            class="subnav-link {% if 'position' in request.resolver_match.url_name or 'department' in request.resolver_match.url_name %}is-active{% endif %}"
+                        >
+                            Departments & Positions
                         </a>
                         <a
                             href="{% url 'employees:interview_list' %}?dept=admin"

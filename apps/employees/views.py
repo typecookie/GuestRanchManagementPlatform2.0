@@ -4,9 +4,16 @@ from django.contrib import messages
 from django.http import JsonResponse
 from datetime import date, timedelta
 from apps.groups.decorators import module_permission_required
-from .models import Employee, PositionHistory, Interview, StaffSchedule
-from .forms import EmployeeForm, PositionHistoryForm, InterviewForm, StaffScheduleForm, StaffScheduleLinkEmployeeForm
-from .utils import get_unique_positions
+from .models import Employee, PositionHistory, Interview, StaffSchedule, Department, Position, SeasonPositionTarget
+from .forms import (
+    EmployeeForm, PositionHistoryForm, InterviewForm,
+    StaffScheduleForm, StaffScheduleLinkEmployeeForm,
+    DepartmentForm, PositionForm, SeasonPositionTargetForm
+)
+from .utils import (
+    get_unique_positions, ensure_default_departments_and_positions,
+    sync_season_targets_from_schedule, auto_fill_schedule_from_season_targets
+)
 from apps.reservations.models import OperatingSeason
 from apps.reservations.season_utils import get_categorized_seasons, get_default_season_dates
 from django.db.models import Q
@@ -306,6 +313,7 @@ def api_positions(request):
 @login_required
 @module_permission_required('Employees', 'read')
 def staffing_schedule(request):
+    ensure_default_departments_and_positions()
     today = date.today()
     categorized_seasons = get_categorized_seasons(today)
     default_season = categorized_seasons.get("default_season")
@@ -324,6 +332,9 @@ def staffing_schedule(request):
         season_start = selected_season.start_date
         season_end = selected_season.end_date
         season_name = selected_season.name
+        # Ensure season targets are synced
+        if not selected_season.position_targets.exists():
+            sync_season_targets_from_schedule(selected_season)
     else:
         season_start, season_end = get_default_season_dates(today.year)
         season_name = f"Season {today.year}"
@@ -377,7 +388,7 @@ def staffing_schedule(request):
             })
 
     # Query staffing schedule items
-    schedules_qs = StaffSchedule.objects.select_related('employee', 'season')
+    schedules_qs = StaffSchedule.objects.select_related('employee', 'season', 'department')
     if selected_season:
         schedules_qs = schedules_qs.filter(
             Q(season=selected_season) |
@@ -393,7 +404,15 @@ def staffing_schedule(request):
             Q(placeholder_name__icontains=search_query) |
             Q(employee__first_name__icontains=search_query) |
             Q(employee__last_name__icontains=search_query) |
+            Q(department__name__icontains=search_query) |
             Q(notes__icontains=search_query)
+        )
+
+    department_filter = request.GET.get('department', '').strip()
+    if department_filter:
+        schedules_qs = schedules_qs.filter(
+            Q(department__name__iexact=department_filter) |
+            Q(department__code__iexact=department_filter)
         )
 
     position_filter = request.GET.get('position', '').strip()
@@ -408,9 +427,10 @@ def staffing_schedule(request):
     elif status_filter in ['placeholder', 'unconfirmed']:
         schedules_qs = schedules_qs.filter(Q(is_placeholder=True) | Q(status=StaffSchedule.Status.UNCONFIRMED))
 
-    schedules_qs = schedules_qs.order_by('position', 'start_date', 'employee__last_name', 'placeholder_name')
+    schedules_qs = schedules_qs.order_by('department__display_order', 'position', 'start_date', 'employee__last_name', 'placeholder_name')
 
     all_positions = get_unique_positions()
+    all_departments = Department.objects.all().order_by('display_order', 'name')
 
     schedule_rows = []
     confirmed_count = 0
@@ -450,6 +470,8 @@ def staffing_schedule(request):
                 'week_index': week['index'],
             })
 
+        dept_name = item.department.name if item.department else 'General'
+
         schedule_rows.append({
             'schedule': item,
             'status': item.status,
@@ -458,6 +480,7 @@ def staffing_schedule(request):
             'is_confirmed': (item.status == StaffSchedule.Status.CONFIRMED and not item.is_placeholder),
             'staff_name': item.staff_name,
             'position': item.position,
+            'department_name': dept_name,
             'start_date': item.start_date,
             'end_date': item.end_date,
             'duration_days': item.duration_days,
@@ -468,6 +491,10 @@ def staffing_schedule(request):
             'starts_before': item.start_date < timeline_start,
             'ends_after': item.end_date > timeline_end,
         })
+
+    target_count_total = 0
+    if selected_season:
+        target_count_total = sum(t.target_count for t in selected_season.position_targets.all())
 
     return render(request, 'employees/staffing_schedule.html', {
         'selected_season': selected_season,
@@ -486,9 +513,12 @@ def staffing_schedule(request):
         'confirmed_count': confirmed_count,
         'tentative_count': tentative_count,
         'placeholder_count': placeholder_count,
+        'target_count_total': target_count_total,
         'positions_count': len(positions_seen),
         'all_positions': all_positions,
+        'all_departments': all_departments,
         'search_query': search_query,
+        'department_filter': department_filter,
         'position_filter': position_filter,
         'status_filter': status_filter,
     })
@@ -507,6 +537,10 @@ def staff_schedule_create(request):
         initial['season'] = selected_season
         initial['start_date'] = selected_season.start_date
         initial['end_date'] = selected_season.end_date
+
+    dept_id = request.GET.get('department')
+    if dept_id and dept_id.isdigit():
+        initial['department'] = Department.objects.filter(pk=int(dept_id)).first()
 
     if request.method == 'POST':
         form = StaffScheduleForm(request.POST)
@@ -602,3 +636,338 @@ def staff_schedule_link_employee(request, pk):
         'form': form,
         'schedule': schedule,
     })
+
+
+# ==============================================================================
+# DEPARTMENTS & POSITIONS MANAGEMENT
+# ==============================================================================
+
+@login_required
+@module_permission_required('Employees', 'read')
+def department_position_list(request):
+    ensure_default_departments_and_positions()
+    departments = Department.objects.prefetch_related('positions').order_by('display_order', 'name')
+    all_seasons = OperatingSeason.objects.all().order_by('-start_date')
+    
+    return render(request, 'employees/department_position_list.html', {
+        'departments': departments,
+        'all_seasons': all_seasons,
+        'total_positions': Position.objects.count(),
+        'total_departments': departments.count(),
+    })
+
+
+@login_required
+@module_permission_required('Employees', 'write')
+def department_create(request):
+    if request.method == 'POST':
+        form = DepartmentForm(request.POST)
+        if form.is_valid():
+            dept = form.save()
+            messages.success(request, f"Department '{dept.name}' was created successfully.")
+            return redirect('employees:department_position_list')
+    else:
+        form = DepartmentForm()
+
+    return render(request, 'employees/department_form.html', {
+        'form': form,
+        'title': 'Add New Department',
+    })
+
+
+@login_required
+@module_permission_required('Employees', 'write')
+def department_update(request, pk):
+    dept = get_object_or_404(Department, pk=pk)
+    if request.method == 'POST':
+        form = DepartmentForm(request.POST, instance=dept)
+        if form.is_valid():
+            dept = form.save()
+            messages.success(request, f"Department '{dept.name}' was updated successfully.")
+            return redirect('employees:department_position_list')
+    else:
+        form = DepartmentForm(instance=dept)
+
+    return render(request, 'employees/department_form.html', {
+        'form': form,
+        'department': dept,
+        'title': f"Edit Department: {dept.name}",
+    })
+
+
+@login_required
+@module_permission_required('Employees', 'delete')
+def department_delete(request, pk):
+    dept = get_object_or_404(Department, pk=pk)
+    name = dept.name
+    if request.method == 'POST':
+        dept.delete()
+        messages.success(request, f"Department '{name}' was deleted.")
+        return redirect('employees:department_position_list')
+
+    return render(request, 'employees/department_confirm_delete.html', {
+        'department': dept,
+    })
+
+
+@login_required
+@module_permission_required('Employees', 'write')
+def position_create(request):
+    initial = {}
+    dept_id = request.GET.get('department')
+    if dept_id and dept_id.isdigit():
+        initial['department'] = get_object_or_404(Department, pk=int(dept_id))
+
+    if request.method == 'POST':
+        form = PositionForm(request.POST)
+        if form.is_valid():
+            pos = form.save()
+            messages.success(request, f"Position '{pos.title}' added to {pos.department.name} department.")
+            return redirect('employees:department_position_list')
+    else:
+        form = PositionForm(initial=initial)
+
+    return render(request, 'employees/position_form.html', {
+        'form': form,
+        'title': 'Add New Position',
+    })
+
+
+@login_required
+@module_permission_required('Employees', 'write')
+def position_update(request, pk):
+    pos = get_object_or_404(Position, pk=pk)
+    if request.method == 'POST':
+        form = PositionForm(request.POST, instance=pos)
+        if form.is_valid():
+            pos = form.save()
+            messages.success(request, f"Position '{pos.title}' updated successfully.")
+            return redirect('employees:department_position_list')
+    else:
+        form = PositionForm(instance=pos)
+
+    return render(request, 'employees/position_form.html', {
+        'form': form,
+        'position': pos,
+        'title': f"Edit Position: {pos.title}",
+    })
+
+
+@login_required
+@module_permission_required('Employees', 'delete')
+def position_delete(request, pk):
+    pos = get_object_or_404(Position, pk=pk)
+    title = pos.title
+    dept_name = pos.department.name
+    if request.method == 'POST':
+        pos.delete()
+        messages.success(request, f"Position '{title}' ({dept_name}) was deleted.")
+        return redirect('employees:department_position_list')
+
+    return render(request, 'employees/position_confirm_delete.html', {
+        'position': pos,
+    })
+
+
+# ==============================================================================
+# OPERATING DATES / SEASON STAFFING TARGETS & AUTO-FILL
+# ==============================================================================
+
+@login_required
+@module_permission_required('Employees', 'read')
+def season_staffing_plan(request, season_id):
+    season = get_object_or_404(OperatingSeason, pk=season_id)
+    ensure_default_departments_and_positions()
+    
+    # Sync targets if none exist or when requested
+    if not season.position_targets.exists():
+        sync_season_targets_from_schedule(season)
+
+    departments = Department.objects.prefetch_related('positions').order_by('display_order', 'name')
+    targets = season.position_targets.select_related('department', 'position').order_by('department__display_order', 'position__display_order', 'id')
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'save_targets':
+            for target in targets:
+                input_key = f"target_{target.pk}"
+                if input_key in request.POST:
+                    try:
+                        val = int(request.POST[input_key])
+                        if val >= 0:
+                            target.target_count = val
+                            target.save()
+                    except ValueError:
+                        pass
+            
+            auto_fill = request.POST.get('auto_fill_after_save') == '1'
+            if auto_fill:
+                count = auto_fill_schedule_from_season_targets(season)
+                messages.success(request, f"Saved target headcounts and auto-filled {count} missing positions into the Staffing Schedule.")
+            else:
+                messages.success(request, f"Staffing targets for {season.name} saved successfully.")
+            return redirect('employees:season_staffing_plan', season_id=season.pk)
+
+        elif action == 'auto_fill':
+            count = auto_fill_schedule_from_season_targets(season)
+            messages.success(request, f"Auto-filled {count} missing positions into the Staffing Schedule for {season.name}.")
+            return redirect('employees:season_staffing_plan', season_id=season.pk)
+
+        elif action == 'sync_from_schedule':
+            sync_season_targets_from_schedule(season)
+            messages.success(request, f"Synchronized position target headcounts from current Staffing Schedule.")
+            return redirect('employees:season_staffing_plan', season_id=season.pk)
+
+        elif action == 'add_custom_position':
+            dept_id = request.POST.get('department_id')
+            pos_title = request.POST.get('position_title', '').strip()
+            target_count = int(request.POST.get('target_count', 1) or 1)
+            create_master = request.POST.get('create_master') == '1'
+
+            if pos_title:
+                dept = Department.objects.filter(pk=dept_id).first() if dept_id else None
+                master_pos = None
+                if create_master and dept:
+                    master_pos, _ = Position.objects.get_or_create(
+                        department=dept,
+                        title=pos_title,
+                        defaults={'default_target_count': target_count}
+                    )
+                
+                SeasonPositionTarget.objects.create(
+                    season=season,
+                    department=dept,
+                    position=master_pos,
+                    custom_position_title=pos_title if not master_pos else '',
+                    target_count=target_count
+                )
+                messages.success(request, f"Added position target '{pos_title}' to {season.name}.")
+            return redirect('employees:season_staffing_plan', season_id=season.pk)
+
+    # Prepare structured department target data for rendering
+    dept_plans = []
+    total_planned = 0
+    total_scheduled = 0
+    total_confirmed = 0
+    total_placeholders = 0
+    total_tentative = 0
+
+    target_map = {t.position.pk if t.position else f"c_{t.custom_position_title.lower()}": t for t in targets}
+
+    for dept in departments:
+        dept_rows = []
+        for pos in dept.positions.all():
+            target_obj = target_map.get(pos.pk)
+            if not target_obj:
+                target_obj = SeasonPositionTarget.objects.create(
+                    season=season,
+                    department=dept,
+                    position=pos,
+                    target_count=pos.default_target_count
+                )
+            
+            scheduled = target_obj.get_scheduled_count()
+            confirmed = target_obj.get_confirmed_count()
+            placeholders = target_obj.get_placeholder_count()
+            tentative = target_obj.get_tentative_count()
+
+            total_planned += target_obj.target_count
+            total_scheduled += scheduled
+            total_confirmed += confirmed
+            total_placeholders += placeholders
+            total_tentative += tentative
+
+            dept_rows.append({
+                'target': target_obj,
+                'position': pos,
+                'title': pos.title,
+                'is_head': pos.is_head,
+                'target_count': target_obj.target_count,
+                'scheduled_count': scheduled,
+                'confirmed_count': confirmed,
+                'placeholder_count': placeholders,
+                'tentative_count': tentative,
+                'difference': target_obj.target_count - scheduled,
+            })
+
+        dept_plans.append({
+            'department': dept,
+            'rows': dept_rows,
+            'planned_total': sum(r['target_count'] for r in dept_rows),
+            'scheduled_total': sum(r['scheduled_count'] for r in dept_rows),
+            'confirmed_total': sum(r['confirmed_count'] for r in dept_rows),
+        })
+
+    # Unassigned or custom targets not in master positions
+    custom_targets = targets.filter(position__isnull=True)
+    custom_rows = []
+    for ct in custom_targets:
+        scheduled = ct.get_scheduled_count()
+        confirmed = ct.get_confirmed_count()
+        placeholders = ct.get_placeholder_count()
+        tentative = ct.get_tentative_count()
+
+        total_planned += ct.target_count
+        total_scheduled += scheduled
+        total_confirmed += confirmed
+        total_placeholders += placeholders
+        total_tentative += tentative
+
+        custom_rows.append({
+            'target': ct,
+            'position': None,
+            'title': ct.custom_position_title,
+            'is_head': False,
+            'target_count': ct.target_count,
+            'scheduled_count': scheduled,
+            'confirmed_count': confirmed,
+            'placeholder_count': placeholders,
+            'tentative_count': tentative,
+            'difference': ct.target_count - scheduled,
+        })
+
+    all_seasons = OperatingSeason.objects.all().order_by('-start_date')
+
+    return render(request, 'employees/season_staffing_plan.html', {
+        'season': season,
+        'all_seasons': all_seasons,
+        'departments': departments,
+        'dept_plans': dept_plans,
+        'custom_rows': custom_rows,
+        'total_planned': total_planned,
+        'total_scheduled': total_scheduled,
+        'total_confirmed': total_confirmed,
+        'total_placeholders': total_placeholders,
+        'total_tentative': total_tentative,
+    })
+
+
+@login_required
+@module_permission_required('Employees', 'write')
+def season_staffing_auto_fill(request, season_id):
+    season = get_object_or_404(OperatingSeason, pk=season_id)
+    count = auto_fill_schedule_from_season_targets(season)
+    messages.success(request, f"Auto-filled {count} missing position placeholders for '{season.name}' into the Staffing Schedule.")
+    
+    redirect_target = request.GET.get('from')
+    if redirect_target == 'operating_dates':
+        return redirect('reservations:operating_dates_list')
+    elif redirect_target == 'schedule':
+        return redirect(f"{redirect('employees:staffing_schedule').url}?season={season.pk}")
+    return redirect('employees:season_staffing_plan', season_id=season.pk)
+
+
+@login_required
+@module_permission_required('Employees', 'write')
+def season_staffing_sync(request, season_id):
+    season = get_object_or_404(OperatingSeason, pk=season_id)
+    sync_season_targets_from_schedule(season)
+    messages.success(request, f"Synchronized staffing targets for '{season.name}' from current schedule records.")
+    
+    redirect_target = request.GET.get('from')
+    if redirect_target == 'operating_dates':
+        return redirect('reservations:operating_dates_list')
+    elif redirect_target == 'schedule':
+        return redirect(f"{redirect('employees:staffing_schedule').url}?season={season.pk}")
+    return redirect('employees:season_staffing_plan', season_id=season.pk)

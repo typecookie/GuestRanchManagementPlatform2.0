@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% load group_perms %}
+
+{% block title %}Departments & Positions | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Staffing & Organization{% endblock %}
+
+{% block page_title %}Ranch Departments & Positions{% endblock %}
+
+{% block page_subtitle %}
+Manage ranch operational departments, job positions, leadership roles, and standard season staffing targets.
+{% endblock %}
+
+{% block page_actions %}
+{% can_do user "Employees" "write" as can_write %}
+<a href="{% url 'employees:staffing_schedule' %}" class="button button-secondary">Staffing Schedule</a>
+<a href="{% url 'reservations:operating_dates_list' %}" class="button button-secondary">Operating Dates</a>
+{% if can_write %}
+<a href="{% url 'employees:department_create' %}" class="button button-secondary">+ Add Department</a>
+<a href="{% url 'employees:position_create' %}" class="button button-primary">+ Add Position</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<!-- Metric Cards -->
+<div class="stat-grid" style="margin-bottom: 2rem;">
+    <div class="stat-card">
+        <span>Total Departments</span>
+        <strong>{{ total_departments }}</strong>
+    </div>
+    <div class="stat-card">
+        <span>Configured Positions</span>
+        <strong>{{ total_positions }}</strong>
+    </div>
+    <div class="stat-card">
+        <span>Operating Seasons</span>
+        <strong>{{ all_seasons|length }}</strong>
+    </div>
+    <div class="stat-card">
+        <span>Quick Action</span>
+        <div style="margin-top: 4px;">
+            {% if all_seasons %}
+                <a href="{% url 'employees:season_staffing_plan' all_seasons.0.pk %}" class="button button-small button-primary" style="font-size: 0.82rem;">
+                    {{ all_seasons.0.name }} Headcount Plan
+                </a>
+            {% else %}
+                <span class="text-muted" style="font-size: 0.85rem;">No active seasons</span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% can_do user "Employees" "write" as can_write %}
+{% can_do user "Employees" "delete" as can_delete %}
+
+<div style="display: flex; flex-direction: column; gap: 1.75rem;">
+    {% for dept in departments %}
+        <div class="table-card" style="border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+            <!-- Department Header Banner -->
+            <div style="background: var(--bg-surface-secondary, #f8fafc); border-bottom: 1px solid var(--border-color, #e2e8f0); padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--color-text, #1e293b);">
+                        {{ dept.name }} Department
+                    </h3>
+                    {% if dept.code %}
+                        <span class="badge" style="background: #e2e8f0; color: #475569; font-size: 0.72rem; text-transform: uppercase;">
+                            {{ dept.code }}
+                        </span>
+                    {% endif %}
+                    {% if dept.is_default %}
+                        <span class="badge badge-info" style="font-size: 0.72rem;">Default Ranch Dept</span>
+                    {% endif %}
+                    <span style="font-size: 0.82rem; color: var(--color-muted, #64748b);">
+                        ({{ dept.positions.count }} position{{ dept.positions.count|pluralize }})
+                    </span>
+                </div>
+
+                <div class="table-actions" style="display: flex; gap: 6px; align-items: center;">
+                    {% if can_write %}
+                        <a href="{% url 'employees:position_create' %}?department={{ dept.pk }}" class="button button-small button-secondary" title="Add Position to {{ dept.name }}">
+                            + Add Position
+                        </a>
+                        <a href="{% url 'employees:department_update' dept.pk %}" class="button button-small button-secondary">
+                            Edit Dept
+                        </a>
+                    {% endif %}
+                    {% if can_delete and not dept.is_default and dept.positions.count == 0 %}
+                        <a href="{% url 'employees:department_delete' dept.pk %}" class="button button-small button-danger">
+                            Delete
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if dept.description %}
+                <div style="padding: 10px 18px; background: #ffffff; border-bottom: 1px solid var(--border-color, #f1f5f9); font-size: 0.88rem; color: var(--color-muted, #64748b);">
+                    {{ dept.description }}
+                </div>
+            {% endif %}
+
+            <!-- Department Positions Table -->
+            <div class="table-responsive">
+                <table class="data-table" style="margin: 0;">
+                    <thead>
+                        <tr>
+                            <th style="width: 32%;">Position Title</th>
+                            <th style="width: 20%;">Role Type</th>
+                            <th style="width: 18%;">Standard Season Target</th>
+                            <th style="width: 12%;">Order</th>
+                            <th style="width: 18%; text-align: right;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pos in dept.positions.all %}
+                            <tr>
+                                <td>
+                                    <div style="font-weight: 700; color: var(--color-text, #0f172a);">
+                                        {{ pos.title }}
+                                    </div>
+                                    {% if pos.description %}
+                                        <div style="font-size: 0.8rem; color: var(--color-muted, #64748b); margin-top: 2px;">
+                                            {{ pos.description|truncatechars:65 }}
+                                        </div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if pos.is_head %}
+                                        <span class="badge" style="background: #fef3c7; color: #92400e; border: 1px solid #fde68a; font-weight: 700; font-size: 0.75rem;">
+                                            ⭐ Department Head / Boss
+                                        </span>
+                                    {% else %}
+                                        <span class="badge" style="background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; font-size: 0.75rem;">
+                                            Staff Role
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <strong style="color: var(--color-primary, #1d4ed8); font-size: 0.95rem;">
+                                        {{ pos.default_target_count }}
+                                    </strong>
+                                    <span style="font-size: 0.8rem; color: var(--color-muted, #64748b);">
+                                        staff per season
+                                    </span>
+                                </td>
+                                <td>
+                                    <span style="font-size: 0.82rem; color: var(--color-muted, #64748b);">
+                                        #{{ pos.display_order }}
+                                    </span>
+                                </td>
+                                <td style="text-align: right;">
+                                    <div class="table-actions" style="display: flex; gap: 4px; justify-content: flex-end;">
+                                        {% if can_write %}
+                                            <a href="{% url 'employees:position_update' pos.pk %}" class="button button-small button-secondary">
+                                                Edit
+                                            </a>
+                                        {% endif %}
+                                        {% if can_delete %}
+                                            <a href="{% url 'employees:position_delete' pos.pk %}" class="button button-small button-danger">
+                                                Delete
+                                            </a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted" style="padding: 1.5rem;">
+                                    No positions defined under {{ dept.name }} yet.
+                                    {% if can_write %}
+                                        <a href="{% url 'employees:position_create' %}?department={{ dept.pk }}" style="margin-left: 6px; font-weight: 600;">
+                                            + Add First Position
+                                        </a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% empty %}
+        <div class="empty-state">
+            <p>No departments configured yet.</p>
+        </div>
+    {% endfor %}
+</div>
+
+<!-- Explanatory Guide Card -->
+<div class="form-card" style="margin-top: 2rem; background: var(--color-panel, #f8fafc); border: 1px solid var(--border-color, #e2e8f0);">
+    <h3 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 1.1rem; color: var(--color-text, #1e293b);">
+        How Departments, Positions & Operating Dates Work Together
+    </h3>
+    <ul style="margin: 0; padding-left: 1.25rem; color: var(--color-muted, #64748b); line-height: 1.6; font-size: 0.92rem;">
+        <li><strong>Standard Departments:</strong> Barn, Kitchen, Housekeeping, Maintenance, Fishing, Office, and Bar represent the core ranch operations. You can add extra custom departments at any time.</li>
+        <li><strong>Leadership Roles:</strong> Roles marked as Department Head / Boss (such as Head Wrangler, Corral Boss, Barn Boss in the Barn, or Head Chef in the Kitchen) indicate supervisory and key leadership positions.</li>
+        <li><strong>Operating Season Staffing Headcounts:</strong> In the Operating Dates section, you can set the exact target headcount (e.g. 10 Wranglers, 2 Wrangler/Packers, 1 Barn Boss) for any season.</li>
+        <li><strong>Auto-Fill Sync:</strong> When saving or updating operating season targets, you can click <strong>"Auto-Fill Schedule"</strong> to automatically generate placeholder positions for the season. Similarly, any existing schedule entries will automatically sync back into the season targets.</li>
+    </ul>
+</div>
+{% endblock %}

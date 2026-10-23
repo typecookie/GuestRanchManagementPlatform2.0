@@ -1,6 +1,74 @@
 from django import forms
-from .models import Employee, PositionHistory, Interview, StaffSchedule
+from .models import Employee, PositionHistory, Interview, StaffSchedule, Department, Position, SeasonPositionTarget
 from apps.reservations.models import OperatingSeason
+
+class DepartmentForm(forms.ModelForm):
+    class Meta:
+        model = Department
+        fields = ['name', 'code', 'description', 'display_order']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. Barn, Kitchen, Housekeeping'}),
+            'code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. barn, kitchen (optional short key)'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Department purpose and scope...'}),
+            'display_order': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
+        }
+
+
+class PositionForm(forms.ModelForm):
+    class Meta:
+        model = Position
+        fields = ['department', 'title', 'is_head', 'default_target_count', 'display_order', 'description']
+        widgets = {
+            'department': forms.Select(attrs={'class': 'form-select'}),
+            'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. Head Wrangler, Wrangler, Sous Chef'}),
+            'is_head': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'default_target_count': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
+            'display_order': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Role description or duties...'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['department'].queryset = Department.objects.all().order_by('display_order', 'name')
+        self.fields['department'].empty_label = "-- Select Department --"
+
+
+class SeasonPositionTargetForm(forms.ModelForm):
+    class Meta:
+        model = SeasonPositionTarget
+        fields = ['department', 'position', 'custom_position_title', 'target_count', 'notes']
+        widgets = {
+            'department': forms.Select(attrs={'class': 'form-select'}),
+            'position': forms.Select(attrs={'class': 'form-select'}),
+            'custom_position_title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. Trail Guide / Wrangler'}),
+            'target_count': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': 'Optional requirement details'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['department'].queryset = Department.objects.all().order_by('display_order', 'name')
+        self.fields['department'].empty_label = "-- Select Department (Optional) --"
+        self.fields['department'].required = False
+
+        self.fields['position'].queryset = Position.objects.select_related('department').order_by('department__display_order', 'display_order', 'title')
+        self.fields['position'].empty_label = "-- Select Master Position (Optional) --"
+        self.fields['position'].required = False
+
+    def clean(self):
+        cleaned_data = super().clean()
+        position = cleaned_data.get('position')
+        custom_title = cleaned_data.get('custom_position_title')
+        department = cleaned_data.get('department')
+
+        if not position and not (custom_title and custom_title.strip()):
+            raise forms.ValidationError("Please select a master position or specify a custom position title.")
+
+        if position and not department:
+            cleaned_data['department'] = position.department
+
+        return cleaned_data
+
 
 class EmployeeForm(forms.ModelForm):
     class Meta:
@@ -78,6 +146,7 @@ class StaffScheduleForm(forms.ModelForm):
         model = StaffSchedule
         fields = [
             'season',
+            'department',
             'position',
             'employee',
             'placeholder_name',
@@ -89,6 +158,7 @@ class StaffScheduleForm(forms.ModelForm):
         ]
         widgets = {
             'season': forms.Select(attrs={'class': 'form-select'}),
+            'department': forms.Select(attrs={'class': 'form-select'}),
             'position': forms.TextInput(attrs={'class': 'form-control', 'list': 'positions-datalist', 'placeholder': 'e.g. Wrangler, Lead Chef, Housekeeping'}),
             'employee': forms.Select(attrs={'class': 'form-select'}),
             'placeholder_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. Placeholder Wrangler #1 or Candidate Name'}),
@@ -105,6 +175,10 @@ class StaffScheduleForm(forms.ModelForm):
         self.fields['season'].empty_label = "-- Select Operating Season (Optional) --"
         self.fields['season'].required = False
         
+        self.fields['department'].queryset = Department.objects.all().order_by('display_order', 'name')
+        self.fields['department'].empty_label = "-- Select Department (Optional / Auto-resolved) --"
+        self.fields['department'].required = False
+
         self.fields['employee'].queryset = Employee.objects.all().order_by('last_name', 'first_name')
         self.fields['employee'].required = False
         self.fields['employee'].empty_label = "-- None (Placeholder / Unconfirmed Person) --"

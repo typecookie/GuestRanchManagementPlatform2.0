@@ -11,6 +11,8 @@ Set the opening and closing dates when the guest ranch is in operation. These da
 {% endblock %}
 
 {% block page_actions %}
+<a href="{% url 'employees:department_position_list' %}" class="button button-secondary">Departments & Positions</a>
+<a href="{% url 'employees:staffing_schedule' %}" class="button button-secondary">Staffing Schedule</a>
 <a href="{% url 'reservations:reservation_grid' %}" class="button button-secondary">Cabin Grid</a>
 <a href="{% url 'reservations:operating_season_create' %}" class="button button-primary">+ Add Operating Season</a>
 {% endblock %}
@@ -90,46 +92,54 @@ Set the opening and closing dates when the guest ranch is in operation. These da
                         <th>Opening Date</th>
                         <th>Closing Date</th>
                         <th>Duration</th>
+                        <th>Staffing &amp; Headcount</th>
                         <th>Status</th>
-                        <th>Notes</th>
                         <th class="text-right">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for season in seasons %}
+                    {% for item in season_staffing_data %}
                         <tr>
                             <td>
-                                <strong>{{ season.name }}</strong>
-                                {% if season.start_date <= today and season.end_date >= today %}
+                                <strong>{{ item.season.name }}</strong>
+                                {% if item.season.start_date <= today and item.season.end_date >= today %}
                                     <span class="badge badge-success" style="margin-left: 6px; font-size: 0.72rem;">Current</span>
-                                {% elif season.end_date < today %}
+                                {% elif item.season.end_date < today %}
                                     <span class="badge badge-info" style="margin-left: 6px; font-size: 0.72rem; opacity: 0.85;">Prior</span>
-                                {% elif season.start_date > today %}
+                                {% elif item.season.start_date > today %}
                                     <span class="badge badge-warning" style="margin-left: 6px; font-size: 0.72rem;">Upcoming</span>
                                 {% endif %}
                             </td>
-                            <td>{{ season.start_date|date:"l, M j, Y" }}</td>
-                            <td>{{ season.end_date|date:"l, M j, Y" }}</td>
-                            <td>{{ season.duration_days }} days ({{ season.duration_weeks }} wks)</td>
+                            <td>{{ item.season.start_date|date:"l, M j, Y" }}</td>
+                            <td>{{ item.season.end_date|date:"l, M j, Y" }}</td>
+                            <td>{{ item.season.duration_days }} days ({{ item.season.duration_weeks }} wks)</td>
                             <td>
-                                {% if season.is_active %}
+                                <div style="display: flex; flex-direction: column; gap: 4px;">
+                                    <div style="font-size: 0.88rem;">
+                                        <strong>{{ item.scheduled_count }}</strong> scheduled / <span style="color: var(--color-primary, #1d4ed8); font-weight: 700;">{{ item.target_count }}</span> target
+                                    </div>
+                                    <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                                        <a href="{% url 'employees:season_staffing_plan' item.season.pk %}" class="button button-small button-secondary" style="padding: 2px 7px; font-size: 0.75rem;" title="Configure positions and headcount targets">
+                                            📋 Staffing Plan
+                                        </a>
+                                        <a href="{% url 'employees:staffing_schedule' %}?season={{ item.season.pk }}" class="button button-small button-secondary" style="padding: 2px 7px; font-size: 0.75rem;" title="View Staffing Schedule Board">
+                                            📊 Board
+                                        </a>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                {% if item.season.is_active %}
                                     <span class="badge badge-success">Active</span>
                                 {% else %}
                                     <span class="badge badge-warning">Inactive</span>
                                 {% endif %}
                             </td>
                             <td>
-                                {% if season.notes %}
-                                    <span title="{{ season.notes }}">{{ season.notes|truncatechars:45 }}</span>
-                                {% else %}
-                                    <span class="table-muted">—</span>
-                                {% endif %}
-                            </td>
-                            <td>
                                 <div class="table-actions">
-                                    <a href="{% url 'reservations:reservation_grid' %}?year={{ season.start_date.year }}&month={{ season.start_date.month }}" class="button button-small button-secondary" title="View Cabin Grid for this season">Grid</a>
-                                    <a href="{% url 'reservations:operating_season_update' season.pk %}" class="button button-small button-primary">Edit</a>
-                                    <a href="{% url 'reservations:operating_season_delete' season.pk %}" class="button button-small button-danger">Delete</a>
+                                    <a href="{% url 'reservations:reservation_grid' %}?year={{ item.season.start_date.year }}&month={{ item.season.start_date.month }}" class="button button-small button-secondary" title="View Cabin Grid for this season">Grid</a>
+                                    <a href="{% url 'reservations:operating_season_update' item.season.pk %}" class="button button-small button-primary">Edit</a>
+                                    <a href="{% url 'reservations:operating_season_delete' item.season.pk %}" class="button button-small button-danger">Delete</a>
                                 </div>
                             </td>
                         </tr>

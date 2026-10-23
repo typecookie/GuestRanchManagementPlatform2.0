@@ -15,6 +15,10 @@ Full-season staffing plan spanning from 2 weeks before ranch opening ({{ timelin
 {% can_do user "Employees" "write" as can_write %}
 <a href="{% url 'employees:employee_list' %}" class="button button-secondary">Employees</a>
 <a href="{% url 'employees:interview_list' %}" class="button button-secondary">Interviews</a>
+<a href="{% url 'employees:department_position_list' %}" class="button button-secondary">Departments & Positions</a>
+{% if selected_season %}
+    <a href="{% url 'employees:season_staffing_plan' selected_season.pk %}" class="button button-secondary">📋 Staffing Plan ({{ total_count }}/{{ target_count_total }})</a>
+{% endif %}
 {% if can_write %}
 <a href="{% url 'employees:staff_schedule_create' %}{% if selected_season %}?season={{ selected_season.pk }}{% endif %}" class="button button-primary">+ Add Staff Position</a>
 {% endif %}
@@ -89,8 +93,8 @@ Full-season staffing plan spanning from 2 weeks before ranch opening ({{ timelin
 </div>
 
 <!-- Toolbar: Search & Filters -->
-<div class="page-toolbar" style="margin-bottom: 1.25rem;">
-    <div class="page-toolbar-main" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+<div class="page-toolbar" style="margin-bottom: 1.25rem; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+    <div class="page-toolbar-main" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; flex: 1;">
         <form class="search-form" method="get" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; flex: 1;">
             {% if selected_season %}
                 <input type="hidden" name="season" value="{{ selected_season.pk }}">
@@ -101,26 +105,43 @@ Full-season staffing plan spanning from 2 weeks before ranch opening ({{ timelin
                 value="{{ search_query }}"
                 placeholder="Search staff, position, notes..."
                 class="form-control"
-                style="min-width: 220px; max-width: 320px;"
+                style="min-width: 200px; max-width: 280px;"
             >
-            <select name="position" class="form-select" style="min-width: 170px;">
+            <select name="department" class="form-select" style="min-width: 150px;">
+                <option value="">All Departments</option>
+                {% for dept in all_departments %}
+                    <option value="{{ dept.name }}" {% if department_filter == dept.name %}selected{% endif %}>{{ dept.name }}</option>
+                {% endfor %}
+            </select>
+            <select name="position" class="form-select" style="min-width: 160px;">
                 <option value="">All Positions ({{ positions_count }})</option>
                 {% for pos in all_positions %}
                     <option value="{{ pos }}" {% if position_filter == pos %}selected{% endif %}>{{ pos }}</option>
                 {% endfor %}
             </select>
-            <select name="status" class="form-select" style="min-width: 170px;">
+            <select name="status" class="form-select" style="min-width: 150px;">
                 <option value="">All Statuses</option>
                 <option value="confirmed" {% if status_filter == 'confirmed' %}selected{% endif %}>Confirmed Staff</option>
                 <option value="tentative" {% if status_filter == 'tentative' %}selected{% endif %}>Tentative</option>
                 <option value="placeholder" {% if status_filter == 'placeholder' or status_filter == 'unconfirmed' %}selected{% endif %}>Placeholder / Unconfirmed</option>
             </select>
             <button type="submit" class="button button-secondary">Filter</button>
-            {% if search_query or position_filter or status_filter %}
+            {% if search_query or department_filter or position_filter or status_filter %}
                 <a href="{% url 'employees:staffing_schedule' %}{% if selected_season %}?season={{ selected_season.pk }}{% endif %}" class="button button-text">Reset</a>
             {% endif %}
         </form>
     </div>
+
+    {% if selected_season and can_write %}
+        <div style="display: flex; gap: 8px; align-items: center;">
+            <a href="{% url 'employees:season_staffing_plan' selected_season.pk %}" class="button button-secondary" style="font-size: 0.85rem;" title="Manage Headcount Targets for {{ selected_season.name }}">
+                📋 Targets ({{ total_count }}/{{ target_count_total }})
+            </a>
+            <a href="{% url 'employees:season_staffing_auto_fill' selected_season.pk %}?from=schedule" class="button button-primary" style="font-size: 0.85rem;" title="Auto-fill missing position placeholders into this schedule">
+                ⚡ Auto-Fill Missing
+            </a>
+        </div>
+    {% endif %}
 </div>
 
 <!-- Full Season Large Staffing Table -->
@@ -172,12 +193,19 @@ Full-season staffing plan spanning from 2 weeks before ranch opening ({{ timelin
                 <tr style="border-bottom: 1px solid var(--border-color, #e2e8f0); transition: background-color 0.15s ease;">
                     <!-- Column 1: Position -->
                     <td style="position: sticky; left: 0; z-index: 5; background: #ffffff; padding: 10px 12px; border-right: 1px solid var(--border-color, #e2e8f0); vertical-align: middle;">
-                        <strong style="color: var(--color-text, #0f172a); font-size: 0.9rem;">{{ row.position }}</strong>
-                        {% if row.schedule.notes %}
-                            <div style="font-size: 0.72rem; color: var(--text-muted, #64748b); margin-top: 2px;" title="{{ row.schedule.notes }}">
-                                {{ row.schedule.notes|truncatechars:35 }}
-                            </div>
-                        {% endif %}
+                        <div style="display: flex; flex-direction: column; gap: 2px;">
+                            <strong style="color: var(--color-text, #0f172a); font-size: 0.9rem;">{{ row.position }}</strong>
+                            {% if row.department_name %}
+                                <span class="badge" style="background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; font-size: 0.68rem; width: fit-content; padding: 0 5px;">
+                                    {{ row.department_name }}
+                                </span>
+                            {% endif %}
+                            {% if row.schedule.notes %}
+                                <div style="font-size: 0.72rem; color: var(--text-muted, #64748b); margin-top: 2px;" title="{{ row.schedule.notes }}">
+                                    {{ row.schedule.notes|truncatechars:35 }}
+                                </div>
+                            {% endif %}
+                        </div>
                     </td>
 
                     <!-- Column 2: Staff Member / Linked Employee or Placeholder -->

@@ -1117,8 +1117,23 @@ def operating_dates_list(request):
     upcoming_season = get_current_or_upcoming_season(today)
     is_open_today = is_date_open(today)
 
+    from apps.employees.models import StaffSchedule
+    season_staffing_data = []
+    for s in seasons:
+        targets = s.position_targets.all()
+        target_count = sum(t.target_count for t in targets)
+        scheduled_count = StaffSchedule.objects.filter(season=s).count()
+        confirmed_count = StaffSchedule.objects.filter(season=s, is_placeholder=False, status=StaffSchedule.Status.CONFIRMED).count()
+        season_staffing_data.append({
+            'season': s,
+            'target_count': target_count,
+            'scheduled_count': scheduled_count,
+            'confirmed_count': confirmed_count,
+        })
+
     context = {
         "seasons": seasons,
+        "season_staffing_data": season_staffing_data,
         "today": today,
         "active_seasons_count": active_seasons.count(),
         "current_season": current_season,
@@ -1135,7 +1150,14 @@ def operating_season_create(request):
         form = OperatingSeasonForm(request.POST)
         if form.is_valid():
             season = form.save()
-            messages.success(request, f"Operating season '{season.name}' was created successfully.")
+            from apps.employees.utils import sync_season_targets_from_schedule, auto_fill_schedule_from_season_targets
+            sync_season_targets_from_schedule(season)
+            auto_pop = request.POST.get('auto_populate_positions') in ['1', 'true', 'on', 'True']
+            if auto_pop:
+                created_count = auto_fill_schedule_from_season_targets(season)
+                messages.success(request, f"Operating season '{season.name}' was created and auto-populated with {created_count} staffing positions.")
+            else:
+                messages.success(request, f"Operating season '{season.name}' was created successfully.")
             return redirect("reservations:operating_dates_list")
         else:
             messages.error(request, "Please correct the errors below.")
@@ -1158,6 +1180,11 @@ def operating_season_create(request):
         "submit_label": "Save Operating Season",
     }
     return render(request, "reservations/operating_season_form.html", context)
+
+
+@module_permission_required('Reservations', 'read')
+def operating_season_staffing_plan(request, pk):
+    return redirect('employees:season_staffing_plan', season_id=pk)
 
 
 @module_permission_required('Reservations', 'write')

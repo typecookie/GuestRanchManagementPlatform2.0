@@ -61,6 +61,16 @@
             <span class="form-help">When active, this date range is treated as open for guest stays in the cabin grid and other platform views.</span>
         </div>
 
+        {% if not season %}
+            <div class="form-field form-grid-full checkbox-field" style="background: var(--bg-surface-secondary, #f8fafc); padding: 12px 14px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0);">
+                <label style="font-weight: 700; color: var(--color-text, #1e293b); display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" name="auto_populate_positions" value="1" checked class="form-check-input">
+                    ⚡ Auto-populate standard ranch positions in Staffing Schedule
+                </label>
+                <span class="form-help" style="margin-left: 28px;">Automatically generates baseline position placeholders across all ranch departments (Barn, Kitchen, Housekeeping, etc.) for this operating season.</span>
+            </div>
+        {% endif %}
+
         <div class="form-field form-grid-full">
             <label for="{{ form.notes.id_for_label }}">Notes / Details</label>
             {{ form.notes }}

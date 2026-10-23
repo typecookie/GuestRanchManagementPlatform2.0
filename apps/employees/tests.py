@@ -3,8 +3,14 @@ from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
-from apps.employees.models import Employee, PositionHistory, Interview, StaffSchedule
-from apps.employees.forms import InterviewForm, EmployeeForm, StaffScheduleForm
+from apps.employees.models import Employee, PositionHistory, Interview, StaffSchedule, Department, Position, SeasonPositionTarget
+from apps.employees.forms import InterviewForm, EmployeeForm, StaffScheduleForm, DepartmentForm, PositionForm, SeasonPositionTargetForm
+from apps.employees.utils import (
+    ensure_default_departments_and_positions,
+    sync_season_targets_from_schedule,
+    auto_fill_schedule_from_season_targets,
+    get_unique_positions
+)
 from apps.reservations.models import OperatingSeason
 
 User = get_user_model()
@@ -607,3 +613,225 @@ class StaffScheduleTests(TestCase):
         # Delete without permission
         resp = unauth_client.post(reverse('employees:staff_schedule_delete', kwargs={'pk': self.schedule_confirmed.pk}))
         self.assertEqual(resp.status_code, 403)
+
+
+class DepartmentPositionTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username="adminuser",
+            password="password123",
+            email="admin@example.com"
+        )
+        self.client = Client()
+        self.client.force_login(self.user)
+
+        self.season = OperatingSeason.objects.create(
+            name="Summer 2026",
+            start_date=date(2026, 6, 1),
+            end_date=date(2026, 9, 30),
+            is_active=True
+        )
+
+    def test_default_departments_and_positions_seeded(self):
+        ensure_default_departments_and_positions()
+        
+        # Check standard departments exist
+        dept_names = list(Department.objects.values_list('name', flat=True))
+        for expected in ['Barn', 'Kitchen', 'Housekeeping', 'Maintenance', 'Fishing', 'Office', 'Bar']:
+            self.assertIn(expected, dept_names)
+
+        # Check barn positions
+        barn = Department.objects.get(name='Barn')
+        barn_positions = list(barn.positions.values_list('title', flat=True))
+        for expected_pos in ['Head Wrangler', 'Corral Boss', 'Barn Boss', 'Wrangler', 'Wrangler/Packer']:
+            self.assertIn(expected_pos, barn_positions)
+
+        # Check kitchen positions
+        kitchen = Department.objects.get(name='Kitchen')
+        kitchen_positions = list(kitchen.positions.values_list('title', flat=True))
+        for expected_pos in ['Head Chef', 'Sous Chef', 'Breakfast Cook', 'Prep Cook']:
+            self.assertIn(expected_pos, kitchen_positions)
+
+        # Check head position flag
+        head_wrangler = Position.objects.get(department=barn, title='Head Wrangler')
+        self.assertTrue(head_wrangler.is_head)
+        self.assertEqual(head_wrangler.default_target_count, 1)
+
+        wrangler = Position.objects.get(department=barn, title='Wrangler')
+        self.assertFalse(wrangler.is_head)
+        self.assertEqual(wrangler.default_target_count, 10)
+
+    def test_department_crud_views(self):
+        # List view
+        resp = self.client.get(reverse('employees:department_position_list'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Ranch Departments & Positions")
+        self.assertContains(resp, "Barn")
+        self.assertContains(resp, "Kitchen")
+
+        # Create custom department
+        resp = self.client.post(reverse('employees:department_create'), {
+            'name': 'Wrangler Activities',
+            'code': 'activities',
+            'description': 'Guest entertainment and special rodeo events.',
+            'display_order': 80
+        })
+        self.assertEqual(resp.status_code, 302)
+        created_dept = Department.objects.filter(name='Wrangler Activities').first()
+        self.assertIsNotNone(created_dept)
+
+        # Update department
+        resp = self.client.post(reverse('employees:department_update', kwargs={'pk': created_dept.pk}), {
+            'name': 'Special Activities',
+            'code': 'activities',
+            'description': 'Updated description.',
+            'display_order': 85
+        })
+        self.assertEqual(resp.status_code, 302)
+        created_dept.refresh_from_db()
+        self.assertEqual(created_dept.name, 'Special Activities')
+
+        # Delete custom department
+        resp = self.client.post(reverse('employees:department_delete', kwargs={'pk': created_dept.pk}))
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(Department.objects.filter(pk=created_dept.pk).exists())
+
+    def test_position_crud_views(self):
+        ensure_default_departments_and_positions()
+        barn = Department.objects.get(name='Barn')
+
+        # Create position
+        resp = self.client.post(reverse('employees:position_create'), {
+            'department': barn.pk,
+            'title': 'Night Corral Guard',
+            'is_head': False,
+            'default_target_count': 1,
+            'display_order': 70,
+            'description': 'Overnight watch on main corrals.'
+        })
+        self.assertEqual(resp.status_code, 302)
+        pos = Position.objects.filter(title='Night Corral Guard').first()
+        self.assertIsNotNone(pos)
+        self.assertEqual(pos.department, barn)
+
+        # Update position
+        resp = self.client.post(reverse('employees:position_update', kwargs={'pk': pos.pk}), {
+            'department': barn.pk,
+            'title': 'Lead Night Corral Guard',
+            'is_head': True,
+            'default_target_count': 2,
+            'display_order': 75,
+            'description': 'Updated overnight watch lead.'
+        })
+        self.assertEqual(resp.status_code, 302)
+        pos.refresh_from_db()
+        self.assertEqual(pos.title, 'Lead Night Corral Guard')
+        self.assertTrue(pos.is_head)
+        self.assertEqual(pos.default_target_count, 2)
+
+        # Delete position
+        resp = self.client.post(reverse('employees:position_delete', kwargs={'pk': pos.pk}))
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(Position.objects.filter(pk=pos.pk).exists())
+
+    def test_season_staffing_plan_sync_and_auto_fill(self):
+        ensure_default_departments_and_positions()
+
+        # Create some existing schedules for season
+        StaffSchedule.objects.create(
+            season=self.season,
+            position='Head Wrangler',
+            placeholder_name='Placeholder Head Wrangler',
+            is_placeholder=True,
+            status=StaffSchedule.Status.UNCONFIRMED,
+            start_date=self.season.start_date,
+            end_date=self.season.end_date
+        )
+        StaffSchedule.objects.create(
+            season=self.season,
+            position='Wrangler',
+            placeholder_name='Mary Stanton',
+            is_placeholder=False,
+            status=StaffSchedule.Status.CONFIRMED,
+            start_date=self.season.start_date,
+            end_date=self.season.end_date
+        )
+
+        # Sync targets from schedule
+        sync_season_targets_from_schedule(self.season)
+        targets = SeasonPositionTarget.objects.filter(season=self.season)
+        self.assertTrue(targets.exists())
+
+        # Render season staffing plan view
+        url = reverse('employees:season_staffing_plan', kwargs={'season_id': self.season.pk})
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Staffing Plan & Headcounts: Summer 2026")
+        self.assertContains(resp, "Head Wrangler")
+        self.assertContains(resp, "Wrangler")
+        self.assertContains(resp, "Barn Boss")
+
+        # Auto-fill missing schedule slots via view POST
+        resp = self.client.post(url, {'action': 'auto_fill'})
+        self.assertEqual(resp.status_code, 302)
+
+        # Verify new placeholder schedules were generated
+        schedules_count = StaffSchedule.objects.filter(season=self.season).count()
+        # Head Wrangler: 1 (existing), Wrangler: 10 (1 existing + 9 new), plus default counts for all other positions
+        self.assertGreater(schedules_count, 15)
+
+        # Verify Wrangler has 10 schedules total
+        wrangler_schedules = StaffSchedule.objects.filter(season=self.season, position='Wrangler')
+        self.assertEqual(wrangler_schedules.count(), 10)
+
+    def test_season_staffing_plan_save_and_add_custom_position(self):
+        ensure_default_departments_and_positions()
+        sync_season_targets_from_schedule(self.season)
+
+        url = reverse('employees:season_staffing_plan', kwargs={'season_id': self.season.pk})
+        target_wrangler = SeasonPositionTarget.objects.filter(season=self.season, position__title='Wrangler').first()
+        self.assertIsNotNone(target_wrangler)
+
+        # Update target count for Wranglers from 10 to 12
+        resp = self.client.post(url, {
+            'action': 'save_targets',
+            f'target_{target_wrangler.pk}': '12',
+            'auto_fill_after_save': '1'
+        })
+        self.assertEqual(resp.status_code, 302)
+
+        target_wrangler.refresh_from_db()
+        self.assertEqual(target_wrangler.target_count, 12)
+
+        # Verify 12 Wrangler schedules exist now
+        wrangler_schedules = StaffSchedule.objects.filter(season=self.season, position='Wrangler')
+        self.assertEqual(wrangler_schedules.count(), 12)
+
+        # Add custom position to season
+        barn = Department.objects.get(name='Barn')
+        resp = self.client.post(url, {
+            'action': 'add_custom_position',
+            'department_id': barn.pk,
+            'position_title': 'Senior Wrangler / Trail Master',
+            'target_count': '2',
+            'create_master': '1'
+        })
+        self.assertEqual(resp.status_code, 302)
+
+        custom_target = SeasonPositionTarget.objects.filter(
+            season=self.season,
+            position__title='Senior Wrangler / Trail Master'
+        ).first()
+        self.assertIsNotNone(custom_target)
+        self.assertEqual(custom_target.target_count, 2)
+
+    def test_operating_dates_view_staffing_integration(self):
+        ensure_default_departments_and_positions()
+        sync_season_targets_from_schedule(self.season)
+
+        url = reverse('reservations:operating_dates_list')
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Summer 2026")
+        self.assertContains(resp, "Staffing Plan")
+        self.assertContains(resp, "scheduled /")

@@ -1,0 +1,342 @@
+{% extends "base.html" %}
+{% load group_perms %}
+
+{% block title %}Staffing Plan & Headcounts: {{ season.name }} | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}
+<a href="{% url 'reservations:operating_dates_list' %}">Operating Dates</a> / <a href="{% url 'employees:staffing_schedule' %}?season={{ season.pk }}">{{ season.name }}</a> / Staffing Plan
+{% endblock %}
+
+{% block page_title %}Staffing Plan & Headcounts: {{ season.name }}{% endblock %}
+
+{% block page_subtitle %}
+Set planned position headcounts for {{ season.name }} ({{ season.start_date|date:"M j, Y" }} – {{ season.end_date|date:"M j, Y" }}). Save and auto-fill placeholder slots directly into the Staffing Schedule.
+{% endblock %}
+
+{% block page_actions %}
+{% can_do user "Employees" "write" as can_write %}
+<div style="display: flex; gap: 8px; flex-wrap: wrap;">
+    <a href="{% url 'employees:staffing_schedule' %}?season={{ season.pk }}" class="button button-secondary">
+        📊 View Staffing Schedule
+    </a>
+    <a href="{% url 'employees:department_position_list' %}" class="button button-secondary">
+        🏢 Master Positions
+    </a>
+    <a href="{% url 'reservations:operating_dates_list' %}" class="button button-secondary">
+        📅 Operating Dates
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Season Selector Toolbar & Summary Metrics -->
+<div class="page-toolbar" style="margin-bottom: 1.5rem; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+        <label for="season-select" style="font-weight: 700; margin: 0; color: var(--color-text, #1e293b);">Operating Season:</label>
+        <select id="season-select" class="form-select" style="min-width: 220px;" onchange="window.location.href='{% url 'employees:season_staffing_plan' 0 %}'.replace('0', this.value);">
+            {% for s in all_seasons %}
+                <option value="{{ s.pk }}" {% if s.pk == season.pk %}selected{% endif %}>
+                    {{ s.name }} ({{ s.start_date|date:"M Y" }} – {{ s.end_date|date:"M Y" }})
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    {% can_do user "Employees" "write" as can_write %}
+    {% if can_write %}
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <form method="post" style="display: inline;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="sync_from_schedule">
+                <button type="submit" class="button button-secondary" title="Update target counts to match what is currently assigned or scheduled in the Staffing Schedule">
+                    🔄 Sync Targets from Current Schedule
+                </button>
+            </form>
+
+            <form method="post" style="display: inline;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="auto_fill">
+                <button type="submit" class="button button-primary" title="Generate unconfirmed placeholder slots in Staffing Schedule for all unfilled position targets">
+                    ⚡ Auto-Fill Missing Schedule Slots
+                </button>
+            </form>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Key Stat Cards -->
+<div class="stat-grid" style="margin-bottom: 2rem;">
+    <div class="stat-card">
+        <span>Total Planned Headcount</span>
+        <strong style="color: var(--color-primary, #1d4ed8);">{{ total_planned }}</strong>
+        <div style="font-size: 0.8rem; color: var(--color-muted, #64748b);">positions needed</div>
+    </div>
+    <div class="stat-card">
+        <span>Currently Scheduled</span>
+        <strong>{{ total_scheduled }}</strong>
+        <div style="font-size: 0.8rem; color: var(--color-muted, #64748b);">on staffing board</div>
+    </div>
+    <div class="stat-card">
+        <span>Confirmed Employees</span>
+        <strong style="color: #059669;">{{ total_confirmed }}</strong>
+        <div style="font-size: 0.8rem; color: var(--color-muted, #64748b);">assigned profiles</div>
+    </div>
+    <div class="stat-card">
+        <span>Unconfirmed Placeholders</span>
+        <strong style="color: #d97706;">{{ total_placeholders }}</strong>
+        <div style="font-size: 0.8rem; color: var(--color-muted, #64748b);">pending hires</div>
+    </div>
+</div>
+
+<!-- Main Headcount Configuration Form -->
+<form method="post" id="targets-form">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="save_targets">
+
+    <div style="display: flex; flex-direction: column; gap: 2rem;">
+        {% for plan in dept_plans %}
+            <div class="table-card" style="border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <!-- Department Header -->
+                <div style="background: var(--bg-surface-secondary, #f8fafc); border-bottom: 1px solid var(--border-color, #e2e8f0); padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--color-text, #0f172a);">
+                            {{ plan.department.name }} Department
+                        </h3>
+                        {% if plan.department.is_default %}
+                            <span class="badge badge-info" style="font-size: 0.7rem;">Default Ranch Dept</span>
+                        {% endif %}
+                    </div>
+
+                    <div style="font-size: 0.85rem; color: var(--color-muted, #64748b); display: flex; gap: 14px;">
+                        <span>Target: <strong style="color: var(--color-text, #1e293b);">{{ plan.planned_total }}</strong></span>
+                        <span>Scheduled: <strong style="color: var(--color-text, #1e293b);">{{ plan.scheduled_total }}</strong></span>
+                        <span>Confirmed: <strong style="color: #059669;">{{ plan.confirmed_total }}</strong></span>
+                    </div>
+                </div>
+
+                <!-- Department Positions Table -->
+                <div class="table-responsive">
+                    <table class="data-table" style="margin: 0;">
+                        <thead>
+                            <tr>
+                                <th style="width: 30%;">Position Title</th>
+                                <th style="width: 18%;">Role Type</th>
+                                <th style="width: 18%; text-align: center;">Target Headcount</th>
+                                <th style="width: 18%; text-align: center;">Currently Scheduled</th>
+                                <th style="width: 16%; text-align: center;">Status / Diff</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in plan.rows %}
+                                <tr>
+                                    <td>
+                                        <div style="font-weight: 700; color: var(--color-text, #0f172a);">
+                                            {{ r.title }}
+                                        </div>
+                                        {% if r.position and r.position.description %}
+                                            <div style="font-size: 0.78rem; color: var(--color-muted, #64748b);">
+                                                {{ r.position.description|truncatechars:55 }}
+                                            </div>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if r.is_head %}
+                                            <span class="badge" style="background: #fef3c7; color: #92400e; border: 1px solid #fde68a; font-weight: 700; font-size: 0.72rem;">
+                                                ⭐ Dept Head / Boss
+                                            </span>
+                                        {% else %}
+                                            <span class="badge" style="background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; font-size: 0.72rem;">
+                                                Staff Role
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td style="text-align: center;">
+                                        {% if can_write %}
+                                            <input 
+                                                type="number" 
+                                                name="target_{{ r.target.pk }}" 
+                                                value="{{ r.target_count }}" 
+                                                min="0" 
+                                                class="form-control" 
+                                                style="width: 85px; display: inline-block; text-align: center; font-weight: 700; font-size: 0.95rem;"
+                                            >
+                                        {% else %}
+                                            <strong style="font-size: 1rem;">{{ r.target_count }}</strong>
+                                        {% endif %}
+                                    </td>
+                                    <td style="text-align: center;">
+                                        <div style="font-weight: 700; font-size: 0.95rem;">
+                                            {{ r.scheduled_count }}
+                                        </div>
+                                        <div style="font-size: 0.75rem; color: var(--color-muted, #64748b);">
+                                            {{ r.confirmed_count }} confirmed, {{ r.placeholder_count }} placeholder
+                                        </div>
+                                    </td>
+                                    <td style="text-align: center;">
+                                        {% if r.difference > 0 %}
+                                            <span class="badge" style="background: #fef3c7; color: #b45309; border: 1px solid #fde68a; font-size: 0.75rem;" title="Needs {{ r.difference }} more staff to reach target">
+                                                ⚠ Need {{ r.difference }}
+                                            </span>
+                                        {% elif r.difference == 0 %}
+                                            <span class="badge" style="background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; font-size: 0.75rem;">
+                                                ✓ Target Met ({{ r.scheduled_count }})
+                                            </span>
+                                        {% else %}
+                                            <span class="badge" style="background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; font-size: 0.75rem;">
+                                                +{{ r.scheduled_count|add:"-1" }} Extra
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted" style="padding: 1rem;">
+                                        No positions configured for {{ plan.department.name }}.
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% endfor %}
+
+        {% if custom_rows %}
+            <!-- Extra / Custom Positions -->
+            <div class="table-card" style="border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px; overflow: hidden;">
+                <div style="background: var(--bg-surface-secondary, #f8fafc); border-bottom: 1px solid var(--border-color, #e2e8f0); padding: 12px 18px;">
+                    <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--color-text, #0f172a);">
+                        Extra / Custom Season Positions
+                    </h3>
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table" style="margin: 0;">
+                        <thead>
+                            <tr>
+                                <th style="width: 30%;">Position Title</th>
+                                <th style="width: 18%;">Department</th>
+                                <th style="width: 18%; text-align: center;">Target Headcount</th>
+                                <th style="width: 18%; text-align: center;">Currently Scheduled</th>
+                                <th style="width: 16%; text-align: center;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in custom_rows %}
+                                <tr>
+                                    <td>
+                                        <div style="font-weight: 700;">{{ r.title }}</div>
+                                    </td>
+                                    <td>
+                                        <span class="badge" style="background: #e2e8f0; color: #334155;">
+                                            {{ r.target.department_name }}
+                                        </span>
+                                    </td>
+                                    <td style="text-align: center;">
+                                        {% if can_write %}
+                                            <input 
+                                                type="number" 
+                                                name="target_{{ r.target.pk }}" 
+                                                value="{{ r.target_count }}" 
+                                                min="0" 
+                                                class="form-control" 
+                                                style="width: 85px; display: inline-block; text-align: center; font-weight: 700;"
+                                            >
+                                        {% else %}
+                                            <strong>{{ r.target_count }}</strong>
+                                        {% endif %}
+                                    </td>
+                                    <td style="text-align: center;">
+                                        <strong>{{ r.scheduled_count }}</strong>
+                                    </td>
+                                    <td style="text-align: center;">
+                                        {% if r.difference > 0 %}
+                                            <span class="badge" style="background: #fef3c7; color: #b45309; border: 1px solid #fde68a;">
+                                                Need {{ r.difference }}
+                                            </span>
+                                        {% else %}
+                                            <span class="badge" style="background: #d1fae5; color: #065f46;">
+                                                ✓ Met
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Save & Auto-Fill Toolbar -->
+    {% if can_write %}
+        <div class="form-card" style="margin-top: 2rem; background: #ffffff; border: 1px solid var(--border-color, #cbd5e1); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; position: sticky; bottom: 20px; z-index: 10; box-shadow: 0 4px 12px rgba(0,0,0,0.12);">
+            <div>
+                <label style="font-weight: 700; color: var(--color-text, #1e293b); display: inline-flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" name="auto_fill_after_save" value="1" checked class="form-check-input">
+                    ⚡ Auto-fill missing placeholder slots in Staffing Schedule upon saving
+                </label>
+                <div style="font-size: 0.8rem; color: var(--color-muted, #64748b); margin-left: 24px;">
+                    Creates unconfirmed placeholder entries (e.g. Placeholder Wrangler #1, #2) for any unfilled quota.
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <a href="{% url 'employees:staffing_schedule' %}?season={{ season.pk }}" class="button button-secondary">
+                    Cancel
+                </a>
+                <button type="submit" class="button button-primary" style="font-size: 1rem; padding: 8px 20px;">
+                    💾 Save Staffing Headcounts
+                </button>
+            </div>
+        </div>
+    {% endif %}
+</form>
+
+<!-- Quick Add Extra Position Form for this Season -->
+{% if can_write %}
+    <div class="form-card" style="margin-top: 2.5rem; background: var(--bg-surface-secondary, #f8fafc); border: 1px solid var(--border-color, #e2e8f0);">
+        <h3 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 1.1rem; color: var(--color-text, #1e293b);">
+            + Build Extra Position for {{ season.name }}
+        </h3>
+        <p style="font-size: 0.88rem; color: var(--color-muted, #64748b); margin-bottom: 1rem;">
+            Quickly add an additional position or specialty role to a department for this season.
+        </p>
+
+        <form method="post" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; align-items: flex-end;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_custom_position">
+
+            <div>
+                <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">Department</label>
+                <select name="department_id" class="form-select" required>
+                    {% for d in departments %}
+                        <option value="{{ d.pk }}">{{ d.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">Position Title</label>
+                <input type="text" name="position_title" class="form-control" placeholder="e.g. Trail Guide, Night Wrangler, Barista" required>
+            </div>
+
+            <div>
+                <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">Target Headcount</label>
+                <input type="number" name="target_count" value="1" min="1" class="form-control" required>
+            </div>
+
+            <div>
+                <label style="font-size: 0.82rem; display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
+                    <input type="checkbox" name="create_master" value="1" checked class="form-check-input">
+                    Save to Master Positions
+                </label>
+                <button type="submit" class="button button-secondary" style="width: 100%;">
+                    + Add Position Target
+                </button>
+            </div>
+        </form>
+    </div>
+{% endif %}
+
+{% endblock %}

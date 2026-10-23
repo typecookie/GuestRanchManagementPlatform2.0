@@ -102,6 +102,14 @@ class StaffSchedule(models.Model):
         related_name='staff_schedules',
         help_text="Operating season for this staffing assignment"
     )
+    department = models.ForeignKey(
+        'Department',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='staff_schedules',
+        help_text="Department for this position assignment"
+    )
     position = models.CharField(
         max_length=255, 
         help_text="Job position / role"
@@ -170,9 +178,138 @@ class StaffSchedule(models.Model):
         if self.start_date and self.end_date and self.start_date > self.end_date:
             raise ValidationError({'end_date': "End date cannot be earlier than start date."})
 
+    def save(self, *args, **kwargs):
+        if not self.department and self.position:
+            # Try to resolve department from Position model
+            matched_pos = Position.objects.filter(title__iexact=self.position.strip()).first()
+            if matched_pos and matched_pos.department:
+                self.department = matched_pos.department
+        super().save(*args, **kwargs)
+
     def __str__(self):
         name = self.staff_name
         return f"{self.position}: {name} ({self.start_date} – {self.end_date})"
 
     class Meta:
         ordering = ['position', 'start_date', 'employee__last_name']
+
+
+class Department(models.Model):
+    name = models.CharField(max_length=100, unique=True, help_text="Department name (e.g. Barn, Kitchen, Housekeeping)")
+    code = models.CharField(max_length=50, blank=True, help_text="Department identifier or slug (e.g. barn, kitchen)")
+    description = models.TextField(blank=True, help_text="Department description or responsibilities")
+    display_order = models.PositiveIntegerField(default=0, help_text="Display sorting order")
+    is_default = models.BooleanField(default=False, help_text="Whether this is a standard ranch department")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        ordering = ['display_order', 'name']
+
+
+class Position(models.Model):
+    department = models.ForeignKey(Department, on_delete=models.CASCADE, related_name='positions')
+    title = models.CharField(max_length=255, help_text="Position title (e.g. Head Wrangler, Prep Cook)")
+    is_head = models.BooleanField(default=False, help_text="Department head or supervisory leadership role")
+    default_target_count = models.PositiveIntegerField(default=1, help_text="Standard season target headcount for this position")
+    display_order = models.PositiveIntegerField(default=0, help_text="Display ordering within department")
+    description = models.TextField(blank=True, help_text="Role responsibilities and requirements")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.title} ({self.department.name})"
+
+    class Meta:
+        ordering = ['department__display_order', 'display_order', 'title']
+        unique_together = [('department', 'title')]
+
+
+class SeasonPositionTarget(models.Model):
+    season = models.ForeignKey(
+        'reservations.OperatingSeason',
+        on_delete=models.CASCADE,
+        related_name='position_targets',
+        help_text="Operating season for this position headcount target"
+    )
+    department = models.ForeignKey(
+        Department,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='season_targets',
+        help_text="Department for this position"
+    )
+    position = models.ForeignKey(
+        Position,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='season_targets',
+        help_text="Master position definition (optional)"
+    )
+    custom_position_title = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Custom position title if not linked to a master position"
+    )
+    target_count = models.PositiveIntegerField(
+        default=1,
+        help_text="Planned headcount for this position during this season"
+    )
+    notes = models.TextField(blank=True, help_text="Notes regarding this position requirement")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def position_title(self):
+        if self.position:
+            return self.position.title
+        return self.custom_position_title or "Unassigned Position"
+
+    @property
+    def department_name(self):
+        if self.department:
+            return self.department.name
+        if self.position and self.position.department:
+            return self.position.department.name
+        return "General / Unassigned"
+
+    def get_scheduled_count(self):
+        title = self.position_title
+        return StaffSchedule.objects.filter(season=self.season, position__iexact=title).count()
+
+    def get_confirmed_count(self):
+        title = self.position_title
+        return StaffSchedule.objects.filter(
+            season=self.season,
+            position__iexact=title,
+            status=StaffSchedule.Status.CONFIRMED,
+            is_placeholder=False
+        ).count()
+
+    def get_placeholder_count(self):
+        title = self.position_title
+        return StaffSchedule.objects.filter(
+            season=self.season,
+            position__iexact=title
+        ).filter(
+            models.Q(is_placeholder=True) | models.Q(status=StaffSchedule.Status.UNCONFIRMED)
+        ).count()
+
+    def get_tentative_count(self):
+        title = self.position_title
+        return StaffSchedule.objects.filter(
+            season=self.season,
+            position__iexact=title,
+            status=StaffSchedule.Status.TENTATIVE
+        ).count()
+
+    def __str__(self):
+        return f"{self.season.name}: {self.position_title} (Target: {self.target_count})"
+
+    class Meta:
+        ordering = ['department__display_order', 'position__display_order', 'id']

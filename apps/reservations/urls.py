@@ -14,6 +14,7 @@ urlpatterns = [
     path("operating-dates/reset-defaults/", views.operating_season_reset_defaults, name="operating_season_reset_defaults"),
     path("operating-dates/<int:pk>/edit/", views.operating_season_update, name="operating_season_update"),
     path("operating-dates/<int:pk>/delete/", views.operating_season_delete, name="operating_season_delete"),
+    path("operating-dates/<int:pk>/staffing/", views.operating_season_staffing_plan, name="operating_season_staffing_plan"),
 
     path("<int:pk>/", views.reservation_detail, name="reservation_detail"),
     path("<int:pk>/edit/", views.reservation_update, name="reservation_update"),
