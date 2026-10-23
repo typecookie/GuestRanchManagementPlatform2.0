@@ -123,19 +123,14 @@ class StaffScheduleForm(forms.ModelForm):
             self.add_error('end_date', "End date cannot be earlier than start date.")
 
         if not employee:
-            cleaned_data['is_placeholder'] = True
             if not placeholder_name or not placeholder_name.strip():
                 if position:
                     cleaned_data['placeholder_name'] = f"Placeholder {position.strip()}"
                 else:
-                    cleaned_data['placeholder_name'] = "Unassigned Placeholder"
-            if status == StaffSchedule.Status.CONFIRMED:
-                cleaned_data['status'] = StaffSchedule.Status.UNCONFIRMED
+                    cleaned_data['placeholder_name'] = "Unassigned Staff"
         else:
             if not is_placeholder:
                 cleaned_data['placeholder_name'] = ''
-                if status == StaffSchedule.Status.UNCONFIRMED:
-                    cleaned_data['status'] = StaffSchedule.Status.CONFIRMED
 
         return cleaned_data
 

@@ -143,8 +143,16 @@ class StaffSchedule(models.Model):
         return self.placeholder_name or "Unassigned Position"
 
     @property
+    def is_tentative(self):
+        return self.status == self.Status.TENTATIVE
+
+    @property
+    def is_confirmed(self):
+        return self.status == self.Status.CONFIRMED and not self.is_placeholder
+
+    @property
     def is_unconfirmed_entry(self):
-        return bool(not self.employee or self.is_placeholder or self.status == self.Status.UNCONFIRMED)
+        return bool(self.is_placeholder or self.status == self.Status.UNCONFIRMED)
 
     @property
     def duration_days(self):

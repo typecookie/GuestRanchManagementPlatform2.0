@@ -456,6 +456,58 @@ class StaffScheduleTests(TestCase):
         self.assertIsNone(created.employee)
         self.assertTrue(created.is_placeholder)
 
+    def test_staff_schedule_unmark_placeholder_on_save(self):
+        # Update existing placeholder schedule to unmark placeholder checkbox
+        url = reverse('employees:staff_schedule_update', kwargs={'pk': self.schedule_placeholder.pk})
+        data = {
+            'season': self.season.pk,
+            'position': 'Assistant Cook',
+            'employee': '',
+            'placeholder_name': 'Confirmed Non-profile Cook',
+            'status': 'confirmed',
+            'start_date': '2026-06-15',
+            'end_date': '2026-08-31',
+            'notes': 'Candidate confirmed but profile not created yet.'
+            # Note: is_placeholder is omitted/unchecked
+        }
+        resp = self.client.post(url, data)
+        self.assertEqual(resp.status_code, 302)
+
+        self.schedule_placeholder.refresh_from_db()
+        self.assertFalse(self.schedule_placeholder.is_placeholder)
+        self.assertEqual(self.schedule_placeholder.status, 'confirmed')
+        self.assertEqual(self.schedule_placeholder.staff_name, 'Confirmed Non-profile Cook')
+        self.assertFalse(self.schedule_placeholder.is_unconfirmed_entry)
+
+    def test_staff_schedule_create_unmarked_placeholder(self):
+        url = reverse('employees:staff_schedule_create')
+        data = {
+            'season': self.season.pk,
+            'position': 'Dishwasher',
+            'employee': '',
+            'placeholder_name': 'Sam Smith',
+            'status': 'confirmed',
+            'start_date': '2026-06-01',
+            'end_date': '2026-09-01',
+            'notes': 'Confirmed seasonal worker.'
+        }
+        resp = self.client.post(url, data)
+        self.assertEqual(resp.status_code, 302)
+
+        created = StaffSchedule.objects.filter(placeholder_name='Sam Smith').first()
+        self.assertIsNotNone(created)
+        self.assertFalse(created.is_placeholder)
+        self.assertEqual(created.status, 'confirmed')
+        self.assertFalse(created.is_unconfirmed_entry)
+
+        # Verify staffing schedule view renders properly without NoReverseMatch error
+        view_url = reverse('employees:staffing_schedule')
+        resp = self.client.get(view_url, {'season': self.season.pk})
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Sam Smith")
+        self.assertContains(resp, "Confirmed Staff")
+        self.assertContains(resp, "Jake Dunne")
+
     def test_staff_schedule_link_employee(self):
         placeholder_pk = self.schedule_placeholder.pk
         url = reverse('employees:staff_schedule_link_employee', kwargs={'pk': placeholder_pk})
@@ -490,6 +542,50 @@ class StaffScheduleTests(TestCase):
         resp = self.client.post(url)
         self.assertEqual(resp.status_code, 302)
         self.assertFalse(StaffSchedule.objects.filter(pk=schedule_pk).exists())
+
+    def test_staff_schedule_tentative_assignment(self):
+        # Create tentative schedule linked to an employee
+        tentative_emp = StaffSchedule.objects.create(
+            season=self.season,
+            position='Head Wrangler',
+            employee=self.emp_wrangler,
+            status=StaffSchedule.Status.TENTATIVE,
+            start_date=date(2026, 6, 1),
+            end_date=date(2026, 9, 1),
+            notes='Pending summer contract confirmation'
+        )
+        self.assertTrue(tentative_emp.is_tentative)
+        self.assertFalse(tentative_emp.is_confirmed)
+
+        # Create tentative schedule unlinked
+        tentative_unlinked = StaffSchedule.objects.create(
+            season=self.season,
+            position='Trail Guide',
+            placeholder_name='Alex Rivers',
+            status=StaffSchedule.Status.TENTATIVE,
+            start_date=date(2026, 6, 15),
+            end_date=date(2026, 8, 15),
+        )
+        self.assertTrue(tentative_unlinked.is_tentative)
+
+        # Verify page renders tentative styling, legend, and badges
+        url = reverse('employees:staffing_schedule')
+        resp = self.client.get(url, {'season': self.season.pk})
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Tentative (2)")
+        self.assertContains(resp, "Tentative (Employee)")
+        self.assertContains(resp, "Tentative Staff")
+        self.assertContains(resp, "⏳ [Tentative]")
+        self.assertContains(resp, "linear-gradient(135deg, #8b5cf6, #6d28d9)")
+
+        # Verify filtering by status=tentative
+        resp_filtered = self.client.get(url, {'season': self.season.pk, 'status': 'tentative'})
+        self.assertEqual(resp_filtered.status_code, 200)
+        self.assertEqual(len(resp_filtered.context['schedule_rows']), 2)
+        self.assertContains(resp_filtered, "Head Wrangler")
+        self.assertContains(resp_filtered, "Alex Rivers")
+        self.assertNotContains(resp_filtered, "Line Cook Placeholder #1")
+        self.assertNotContains(resp_filtered, "Assigned lead wrangler for the entire season.")
 
     def test_permissions_enforced(self):
         regular_user = User.objects.create_user(

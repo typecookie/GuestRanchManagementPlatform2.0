@@ -402,9 +402,11 @@ def staffing_schedule(request):
 
     status_filter = request.GET.get('status', '').strip()
     if status_filter == 'confirmed':
-        schedules_qs = schedules_qs.filter(is_placeholder=False, employee__isnull=False, status=StaffSchedule.Status.CONFIRMED)
+        schedules_qs = schedules_qs.filter(is_placeholder=False, status=StaffSchedule.Status.CONFIRMED)
+    elif status_filter == 'tentative':
+        schedules_qs = schedules_qs.filter(status=StaffSchedule.Status.TENTATIVE)
     elif status_filter in ['placeholder', 'unconfirmed']:
-        schedules_qs = schedules_qs.filter(Q(is_placeholder=True) | Q(employee__isnull=True) | Q(status=StaffSchedule.Status.UNCONFIRMED))
+        schedules_qs = schedules_qs.filter(Q(is_placeholder=True) | Q(status=StaffSchedule.Status.UNCONFIRMED))
 
     schedules_qs = schedules_qs.order_by('position', 'start_date', 'employee__last_name', 'placeholder_name')
 
@@ -412,12 +414,14 @@ def staffing_schedule(request):
 
     schedule_rows = []
     confirmed_count = 0
+    tentative_count = 0
     placeholder_count = 0
     positions_seen = set()
 
     for item in schedules_qs:
-        is_placeholder = item.is_unconfirmed_entry
-        if is_placeholder:
+        if item.status == StaffSchedule.Status.TENTATIVE:
+            tentative_count += 1
+        elif item.is_placeholder or item.status == StaffSchedule.Status.UNCONFIRMED:
             placeholder_count += 1
         else:
             confirmed_count += 1
@@ -448,7 +452,10 @@ def staffing_schedule(request):
 
         schedule_rows.append({
             'schedule': item,
-            'is_placeholder': is_placeholder,
+            'status': item.status,
+            'is_tentative': (item.status == StaffSchedule.Status.TENTATIVE),
+            'is_placeholder': (item.is_placeholder or item.status == StaffSchedule.Status.UNCONFIRMED),
+            'is_confirmed': (item.status == StaffSchedule.Status.CONFIRMED and not item.is_placeholder),
             'staff_name': item.staff_name,
             'position': item.position,
             'start_date': item.start_date,
@@ -477,6 +484,7 @@ def staffing_schedule(request):
         'schedule_rows': schedule_rows,
         'total_count': len(schedule_rows),
         'confirmed_count': confirmed_count,
+        'tentative_count': tentative_count,
         'placeholder_count': placeholder_count,
         'positions_count': len(positions_seen),
         'all_positions': all_positions,

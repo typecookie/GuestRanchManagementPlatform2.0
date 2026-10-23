@@ -132,34 +132,37 @@
         const statusSelect = document.getElementById('{{ form.status.id_for_label }}');
         const positionInput = document.getElementById('{{ form.position.id_for_label }}');
 
-        function updateState() {
-            if (!employeeSelect) return;
-            const hasEmployee = Boolean(employeeSelect.value);
-            if (hasEmployee) {
-                if (isPlaceholderCheckbox && !isPlaceholderCheckbox.checked) {
+        if (employeeSelect) {
+            employeeSelect.addEventListener('change', function() {
+                const hasEmployee = Boolean(employeeSelect.value);
+                if (hasEmployee) {
+                    if (isPlaceholderCheckbox) {
+                        isPlaceholderCheckbox.checked = false;
+                    }
                     if (statusSelect && statusSelect.value === 'unconfirmed') {
                         statusSelect.value = 'confirmed';
                     }
                 }
-            } else {
-                if (isPlaceholderCheckbox) {
-                    isPlaceholderCheckbox.checked = true;
-                }
-                if (statusSelect && statusSelect.value === 'confirmed') {
-                    statusSelect.value = 'unconfirmed';
-                }
-                if (placeholderInput && !placeholderInput.value.trim() && positionInput && positionInput.value.trim()) {
-                    placeholderInput.placeholder = 'e.g. Placeholder ' + positionInput.value.trim();
-                }
-            }
+            });
         }
 
-        if (employeeSelect) {
-            employeeSelect.addEventListener('change', updateState);
+        if (isPlaceholderCheckbox) {
+            isPlaceholderCheckbox.addEventListener('change', function() {
+                if (!isPlaceholderCheckbox.checked) {
+                    if (statusSelect && statusSelect.value === 'unconfirmed') {
+                        statusSelect.value = 'confirmed';
+                    }
+                } else {
+                    if (statusSelect && statusSelect.value === 'confirmed') {
+                        statusSelect.value = 'unconfirmed';
+                    }
+                }
+            });
         }
+
         if (positionInput) {
             positionInput.addEventListener('input', function() {
-                if (!employeeSelect.value && placeholderInput && !placeholderInput.value) {
+                if (employeeSelect && !employeeSelect.value && placeholderInput && !placeholderInput.value) {
                     placeholderInput.placeholder = 'e.g. Placeholder ' + positionInput.value;
                 }
             });

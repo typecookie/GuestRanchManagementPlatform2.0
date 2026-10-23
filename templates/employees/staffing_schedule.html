@@ -76,6 +76,10 @@ Full-season staffing plan spanning from 2 weeks before ranch opening ({{ timelin
                     Confirmed Staff ({{ confirmed_count }})
                 </span>
                 <span style="display: inline-flex; align-items: center; gap: 5px; margin-left: 10px;">
+                    <span style="display: inline-block; width: 14px; height: 14px; background: #8b5cf6; border-radius: 3px;"></span>
+                    Tentative ({{ tentative_count }})
+                </span>
+                <span style="display: inline-flex; align-items: center; gap: 5px; margin-left: 10px;">
                     <span style="display: inline-block; width: 14px; height: 14px; background: #f59e0b; border: 1px dashed #b45309; border-radius: 3px;"></span>
                     Placeholder / Unconfirmed ({{ placeholder_count }})
                 </span>
@@ -108,6 +112,7 @@ Full-season staffing plan spanning from 2 weeks before ranch opening ({{ timelin
             <select name="status" class="form-select" style="min-width: 170px;">
                 <option value="">All Statuses</option>
                 <option value="confirmed" {% if status_filter == 'confirmed' %}selected{% endif %}>Confirmed Staff</option>
+                <option value="tentative" {% if status_filter == 'tentative' %}selected{% endif %}>Tentative</option>
                 <option value="placeholder" {% if status_filter == 'placeholder' or status_filter == 'unconfirmed' %}selected{% endif %}>Placeholder / Unconfirmed</option>
             </select>
             <button type="submit" class="button button-secondary">Filter</button>
@@ -177,24 +182,50 @@ Full-season staffing plan spanning from 2 weeks before ranch opening ({{ timelin
 
                     <!-- Column 2: Staff Member / Linked Employee or Placeholder -->
                     <td style="position: sticky; left: 170px; z-index: 5; background: #ffffff; padding: 10px 12px; border-right: 1px solid var(--border-color, #e2e8f0); vertical-align: middle;">
-                        {% if row.is_placeholder %}
+                        {% if row.schedule.employee %}
                             <div style="display: flex; flex-direction: column; gap: 3px;">
-                                <span style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: #b45309; font-size: 0.88rem;">
-                                    <span style="display: inline-block; width: 8px; height: 8px; background: #f59e0b; border-radius: 50%;"></span>
+                                <a href="{% url 'employees:employee_detail' row.schedule.employee.pk %}" style="font-weight: 700; {% if row.is_tentative %}color: #6d28d9;{% elif row.is_placeholder %}color: #b45309;{% else %}color: #1d4ed8;{% endif %} font-size: 0.88rem; text-decoration: none;">
                                     {{ row.staff_name }}
-                                </span>
-                                <span class="badge" style="background: #fef3c7; color: #92400e; border: 1px solid #fde68a; font-size: 0.7rem; width: fit-content; padding: 1px 6px;">
-                                    Placeholder / Unconfirmed
-                                </span>
+                                </a>
+                                {% if row.is_tentative %}
+                                    <span class="badge" style="background: #ede9fe; color: #5b21b6; border: 1px solid #ddd6fe; font-size: 0.7rem; width: fit-content; padding: 1px 6px;">
+                                        Tentative (Employee)
+                                    </span>
+                                {% elif row.is_placeholder %}
+                                    <span class="badge" style="background: #fef3c7; color: #92400e; border: 1px solid #fde68a; font-size: 0.7rem; width: fit-content; padding: 1px 6px;">
+                                        Placeholder / Unconfirmed
+                                    </span>
+                                {% else %}
+                                    <span class="badge" style="background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; font-size: 0.7rem; width: fit-content; padding: 1px 6px;">
+                                        Confirmed Employee
+                                    </span>
+                                {% endif %}
                             </div>
                         {% else %}
                             <div style="display: flex; flex-direction: column; gap: 3px;">
-                                <a href="{% url 'employees:employee_detail' row.schedule.employee.pk %}" style="font-weight: 700; color: #1d4ed8; font-size: 0.88rem; text-decoration: none;">
+                                <span style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; {% if row.is_tentative %}color: #6d28d9;{% elif row.is_placeholder %}color: #b45309;{% else %}color: #0f766e;{% endif %} font-size: 0.88rem;">
+                                    {% if row.is_tentative %}
+                                        <span style="display: inline-block; width: 8px; height: 8px; background: #8b5cf6; border-radius: 50%;"></span>
+                                    {% elif row.is_placeholder %}
+                                        <span style="display: inline-block; width: 8px; height: 8px; background: #f59e0b; border-radius: 50%;"></span>
+                                    {% else %}
+                                        <span style="display: inline-block; width: 8px; height: 8px; background: #0d9488; border-radius: 50%;"></span>
+                                    {% endif %}
                                     {{ row.staff_name }}
-                                </a>
-                                <span class="badge" style="background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; font-size: 0.7rem; width: fit-content; padding: 1px 6px;">
-                                    Confirmed Employee
                                 </span>
+                                {% if row.is_tentative %}
+                                    <span class="badge" style="background: #ede9fe; color: #5b21b6; border: 1px solid #ddd6fe; font-size: 0.7rem; width: fit-content; padding: 1px 6px;">
+                                        Tentative Staff
+                                    </span>
+                                {% elif row.is_placeholder %}
+                                    <span class="badge" style="background: #fef3c7; color: #92400e; border: 1px solid #fde68a; font-size: 0.7rem; width: fit-content; padding: 1px 6px;">
+                                        Placeholder / Unconfirmed
+                                    </span>
+                                {% else %}
+                                    <span class="badge" style="background: #ccfbf1; color: #115e59; border: 1px solid #99f6e4; font-size: 0.7rem; width: fit-content; padding: 1px 6px;">
+                                        Confirmed Staff
+                                    </span>
+                                {% endif %}
                             </div>
                         {% endif %}
                     </td>
@@ -224,11 +255,11 @@ Full-season staffing plan spanning from 2 weeks before ranch opening ({{ timelin
                         <!-- Timeline Bar across the Season -->
                         <div style="position: relative; height: 32px; margin: 0 4px; display: flex; align-items: center;">
                             <div
-                                style="position: absolute; left: {{ row.left_percent }}%; width: {{ row.width_percent }}%; height: 26px; border-radius: 5px; display: flex; align-items: center; justify-content: space-between; padding: 0 8px; font-size: 0.75rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 1px 3px rgba(0,0,0,0.1); z-index: 2; {% if row.is_placeholder %}background: repeating-linear-gradient(45deg, #f59e0b, #f59e0b 8px, #d97706 8px, #d97706 16px); color: #ffffff; border: 1px solid #b45309;{% else %}background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #ffffff; border: 1px solid #1e40af;{% endif %}"
-                                title="{{ row.staff_name }} ({{ row.position }}): {{ row.start_date|date:'M j, Y' }} – {{ row.end_date|date:'M j, Y' }} ({{ row.duration_days }} days)"
+                                style="position: absolute; left: {{ row.left_percent }}%; width: {{ row.width_percent }}%; height: 26px; border-radius: 5px; display: flex; align-items: center; justify-content: space-between; padding: 0 8px; font-size: 0.75rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 1px 3px rgba(0,0,0,0.1); z-index: 2; {% if row.is_tentative %}background: linear-gradient(135deg, #8b5cf6, #6d28d9); color: #ffffff; border: 1px solid #5b21b6;{% elif row.is_placeholder %}background: repeating-linear-gradient(45deg, #f59e0b, #f59e0b 8px, #d97706 8px, #d97706 16px); color: #ffffff; border: 1px solid #b45309;{% else %}background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #ffffff; border: 1px solid #1e40af;{% endif %}"
+                                title="{{ row.staff_name }} ({{ row.position }}): {{ row.start_date|date:'M j, Y' }} – {{ row.end_date|date:'M j, Y' }} ({{ row.duration_days }} days){% if row.is_tentative %} [Tentative]{% elif row.is_placeholder %} [Placeholder]{% else %} [Confirmed]{% endif %}"
                             >
                                 <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,0.3);">
-                                    {% if row.is_placeholder %}⚠ [Placeholder] {% endif %}{{ row.staff_name }}
+                                    {% if row.is_tentative %}⏳ [Tentative] {% elif row.is_placeholder %}⚠ [Placeholder] {% endif %}{{ row.staff_name }}
                                 </span>
                                 <span style="font-size: 0.68rem; opacity: 0.95; margin-left: 6px; text-shadow: 0 1px 2px rgba(0,0,0,0.3); flex-shrink: 0;">
                                     {{ row.start_date|date:"M j" }} – {{ row.end_date|date:"M j" }}
@@ -240,7 +271,7 @@ Full-season staffing plan spanning from 2 weeks before ranch opening ({{ timelin
                     <!-- Column 5: Actions -->
                     <td style="text-align: right; padding: 10px 12px; vertical-align: middle;">
                         <div class="table-actions" style="display: flex; gap: 4px; justify-content: flex-end; align-items: center;">
-                            {% if row.is_placeholder and can_write %}
+                            {% if not row.schedule.employee and can_write %}
                                 <a href="{% url 'employees:staff_schedule_link_employee' row.schedule.pk %}" class="button button-small" style="background: #f59e0b; color: #ffffff; border: none; padding: 2px 8px; font-size: 0.75rem;" title="Link to Employee">
                                     Link
                                 </a>
