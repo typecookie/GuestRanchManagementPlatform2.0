@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Delete Interview | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}
+{% if employee %}
+    <a href="{% url 'employees:employee_detail' employee.pk %}">{{ employee.full_name }}</a> / Interviews
+{% else %}
+    <a href="{% url 'employees:interview_list' %}">Interviews</a>
+{% endif %}
+{% endblock %}
+
+{% block page_title %}Delete Interview Record{% endblock %}
+
+{% block content %}
+<div class="form-card" style="max-width: 650px;">
+    <h3 style="margin-top: 0; color: var(--color-danger, #dc2626);">Confirm Interview Deletion</h3>
+    <p>Are you sure you want to delete the interview record for <strong>{{ interview.interviewee_name }}</strong> conducted on <strong>{{ interview.date }}</strong>?</p>
+    
+    <div style="background: var(--bg-surface-secondary, rgba(0,0,0,0.03)); padding: 1rem; border-radius: 8px; margin: 1rem 0; border: 1px solid var(--border-color, rgba(0,0,0,0.1));">
+        <div><strong>Interviewee:</strong> {{ interview.interviewee_name }} {% if interview.employee %}<span class="badge badge-neutral small">Employee</span>{% else %}<span class="badge badge-info small">Candidate</span>{% endif %}</div>
+        <div style="margin-top: 0.25rem;"><strong>Status:</strong> {{ interview.get_status_display }}</div>
+        {% if interview.offered_position %}
+            <div style="margin-top: 0.25rem;"><strong>Offered Position:</strong> {{ interview.offered_position }}</div>
+        {% endif %}
+        {% if interview.follow_up_reason %}
+            <div style="margin-top: 0.25rem;"><strong>Follow-up Reason:</strong> {{ interview.follow_up_reason }}</div>
+        {% endif %}
+        {% if interview.notes %}
+            <div style="margin-top: 0.25rem;"><strong>Notes:</strong> {{ interview.notes|truncatechars:120 }}</div>
+        {% endif %}
+    </div>
+
+    <p class="help-text" style="color: var(--text-muted, #666);">This action cannot be undone and will permanently remove this interview record.</p>
+    
+    <form method="post" style="margin-top: 1.5rem;">
+        {% csrf_token %}
+        <div class="form-actions" style="display: flex; gap: 1rem;">
+            <button type="submit" class="button button-danger">Yes, Delete Interview</button>
+            {% if employee %}
+                <a href="{% url 'employees:employee_detail' employee.pk %}" class="button button-secondary">Cancel</a>
+            {% else %}
+                <a href="{% url 'employees:interview_list' %}" class="button button-secondary">Cancel</a>
+            {% endif %}
+        </div>
+    </form>
+</div>
+{% endblock %}

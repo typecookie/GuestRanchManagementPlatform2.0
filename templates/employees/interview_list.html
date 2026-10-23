@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load group_perms %}
 
 {% block title %}Interviews | Guest Ranch Management{% endblock %}
 
@@ -11,13 +12,34 @@ Track and review all employee interviews and candidate evaluations.
 {% endblock %}
 
 {% block page_actions %}
+{% can_do user "Employees" "write" as can_write %}
 <a href="{% url 'employees:employee_list' %}" class="button button-secondary">Back to Employees</a>
+{% if can_write %}
+<a href="{% url 'employees:interview_create' %}" class="button button-primary">Add Interview</a>
+{% endif %}
 {% endblock %}
 
 {% block content %}
+{% can_do user "Employees" "write" as can_write %}
+{% can_do user "Employees" "delete" as can_delete %}
+
 <div class="page-toolbar">
     <div class="page-toolbar-main">
         <form class="search-form" method="get">
+            <input
+                type="search"
+                name="q"
+                class="search-input"
+                placeholder="Search candidate, employee, position, notes..."
+                value="{{ request.GET.q }}"
+            >
+
+            <select name="type" class="form-select">
+                <option value="">All interviewees</option>
+                <option value="candidate" {% if request.GET.type == "candidate" %}selected{% endif %}>Candidates Only</option>
+                <option value="employee" {% if request.GET.type == "employee" %}selected{% endif %}>Current Employees Only</option>
+            </select>
+
             <select name="status" class="form-select">
                 <option value="">All statuses</option>
                 {% for value, label in status_choices %}
@@ -36,7 +58,7 @@ Track and review all employee interviews and candidate evaluations.
 
             <button type="submit" class="button button-secondary">Filter & Sort</button>
 
-            {% if request.GET.status or request.GET.sort != "-date" %}
+            {% if request.GET.q or request.GET.type or request.GET.status or request.GET.sort != "-date" and request.GET.sort %}
                 <a href="{% url 'employees:interview_list' %}" class="button button-secondary">Reset</a>
             {% endif %}
         </form>
@@ -66,13 +88,30 @@ Track and review all employee interviews and candidate evaluations.
                             </td>
 
                             <td>
-                                <a href="{% url 'employees:employee_detail' interview.employee.pk %}">
-                                    {{ interview.employee.full_name }}
-                                </a>
+                                {% if interview.employee %}
+                                    <a href="{% url 'employees:employee_detail' interview.employee.pk %}">
+                                        <strong>{{ interview.employee.full_name }}</strong>
+                                    </a>
+                                    <span class="badge badge-neutral small">Employee</span>
+                                {% else %}
+                                    <strong>{{ interview.candidate_name|default:"Candidate" }}</strong>
+                                    <span class="badge badge-info small">Candidate</span>
+                                    {% if interview.candidate_email or interview.candidate_phone %}
+                                        <div class="text-muted small">
+                                            {{ interview.candidate_email }}{% if interview.candidate_email and interview.candidate_phone %} &bull; {% endif %}{{ interview.candidate_phone }}
+                                        </div>
+                                    {% endif %}
+                                {% endif %}
                             </td>
 
                             <td>
                                 {{ interview.get_status_display }}
+                                {% if interview.status == 'job_offered' and interview.offered_position %}
+                                    <div class="text-muted small">Offer: {{ interview.offered_position }}</div>
+                                {% endif %}
+                                {% if interview.status == 'follow_up' and interview.follow_up_reason %}
+                                    <div class="text-muted small">Follow-up: {{ interview.follow_up_reason }}</div>
+                                {% endif %}
                             </td>
 
                             <td>
@@ -89,7 +128,19 @@ Track and review all employee interviews and candidate evaluations.
 
                             <td>
                                 <div class="table-actions">
-                                    <a href="{% url 'employees:employee_detail' interview.employee.pk %}" class="button button-small button-secondary">View Profile</a>
+                                    {% if interview.employee %}
+                                        <a href="{% url 'employees:employee_detail' interview.employee.pk %}" class="button button-small button-secondary">View Profile</a>
+                                    {% else %}
+                                        {% if can_write %}
+                                            <a href="{% url 'employees:hire_candidate' interview.pk %}" class="button button-small button-primary">Hire</a>
+                                        {% endif %}
+                                    {% endif %}
+                                    {% if can_write %}
+                                        <a href="{% url 'employees:interview_update' interview.pk %}" class="button button-small button-secondary">Edit</a>
+                                    {% endif %}
+                                    {% if can_delete %}
+                                        <a href="{% url 'employees:interview_delete' interview.pk %}" class="button button-small button-danger">Delete</a>
+                                    {% endif %}
                                 </div>
                             </td>
                         </tr>
@@ -104,9 +155,18 @@ Track and review all employee interviews and candidate evaluations.
             <div class="empty-state-icon">📝</div>
             <h2>No interviews found</h2>
             <p>
-                There are no interview records matching your current filters.
+                {% if request.GET.q or request.GET.type or request.GET.status %}
+                    There are no interview records matching your current filters.
+                {% else %}
+                    Start by recording candidate interviews or employee evaluations.
+                {% endif %}
             </p>
-            <a href="{% url 'employees:employee_list' %}" class="button button-secondary">Back to Employees</a>
+            <div style="display: flex; gap: 8px; justify-content: center; margin-top: 12px;">
+                {% if can_write %}
+                    <a href="{% url 'employees:interview_create' %}" class="button button-primary">Add Interview</a>
+                {% endif %}
+                <a href="{% url 'employees:employee_list' %}" class="button button-secondary">Back to Employees</a>
+            </div>
         </div>
     </div>
 {% endif %}

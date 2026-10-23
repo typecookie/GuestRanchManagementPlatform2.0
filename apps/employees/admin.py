@@ -18,6 +18,6 @@ class EmployeeAdmin(admin.ModelAdmin):
 
 @admin.register(Interview)
 class InterviewAdmin(admin.ModelAdmin):
-    list_display = ('employee', 'date', 'status', 'is_interviewing')
+    list_display = ('interviewee_name', 'employee', 'date', 'status', 'is_interviewing')
     list_filter = ('status', 'is_interviewing', 'date')
-    search_fields = ('employee__first_name', 'employee__last_name', 'notes')
+    search_fields = ('candidate_name', 'employee__first_name', 'employee__last_name', 'notes')

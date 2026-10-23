@@ -1,0 +1,15 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Ranch - Setup admin" type="PythonConfigurationType" factoryName="Python">
+    <module name="GuestRanchManagementPlatform2.0" />
+    <option name="IS_MODULE_SDK" value="true" />
+    <option name="PARENT_ENVS" value="true" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+    <option name="SCRIPT_NAME" value="$PROJECT_DIR$/manage.py" />
+    <option name="PARAMETERS" value="setup_admin" />
+    <option name="EMULATE_TERMINAL" value="true" />
+    <envs>
+      <env name="PYTHONUNBUFFERED" value="1" />
+    </envs>
+    <method v="2" />
+  </configuration>
+</component>

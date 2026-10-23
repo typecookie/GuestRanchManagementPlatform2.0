@@ -60,7 +60,10 @@ class Interview(models.Model):
         PROMOTION_RECOMMENDED = "promotion_recommended", "Recommended for Promotion"
         PROMOTION_FOLLOW_UP = "promotion_follow_up", "Promotion Follow-up"
     
-    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='interviews')
+    employee = models.ForeignKey(Employee, on_delete=models.SET_NULL, null=True, blank=True, related_name='interviews')
+    candidate_name = models.CharField(max_length=255, blank=True, help_text="Candidate name if not yet an employee")
+    candidate_email = models.EmailField(blank=True, help_text="Contact email of candidate")
+    candidate_phone = models.CharField(max_length=50, blank=True, help_text="Contact phone number of candidate")
     date = models.DateField(default=timezone.now)
     notes = models.TextField(blank=True)
     status = models.CharField(max_length=30, choices=Status.choices)
@@ -72,8 +75,14 @@ class Interview(models.Model):
     offered_position = models.CharField(max_length=255, blank=True, help_text="Position offered if job offered")
     follow_up_reason = models.TextField(blank=True, help_text="Reason why follow-up is required")
     
+    @property
+    def interviewee_name(self):
+        if self.employee:
+            return self.employee.full_name
+        return self.candidate_name or "Candidate"
+
     def __str__(self):
-        return f"Interview for {self.employee} on {self.date} ({self.get_status_display()})"
+        return f"Interview for {self.interviewee_name} on {self.date} ({self.get_status_display()})"
 
     class Meta:
         ordering = ['-date']

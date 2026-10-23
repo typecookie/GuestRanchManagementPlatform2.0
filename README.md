@@ -81,6 +81,30 @@ The installation and update scripts are designed to handle this automatically, b
 
 ## Development
 
+### Windows / PyCharm
+
+Open the project root (the folder containing `manage.py`) in PyCharm and select
+`.venv\Scripts\python.exe` as the project interpreter. Install `requirements.txt`
+into that environment if this is a fresh checkout.
+
+The project includes these configurations in the Run dropdown:
+
+1. **Ranch - Migrate**: prepare or update the local SQLite database.
+2. **Ranch - Setup admin**: create the Ranch Admins group and prompt for a
+   superuser if none exists. Enter the requested details in the Run console.
+3. **Ranch - Run server**: start the app at http://127.0.0.1:8000/.
+
+Sign in at http://127.0.0.1:8000/accounts/login/. Superusers can also use
+http://127.0.0.1:8000/admin/. Existing database users and passwords carry over
+when you reuse `db.sqlite3`.
+
+`setup_admin.py` is a Django management command. Run it using the configuration
+above or `python manage.py setup_admin` from the project root; running that file
+directly bypasses Django initialization. The configurations use `manage.py`,
+which also loads a project-root `.env` file when one is present.
+
+### Terminal
+
 1. Create a virtual environment: `python -m venv venv`
 2. Activate it: `source venv/bin/activate` (Linux) or `venv\Scripts\activate` (Windows)
 3. Install dependencies: `pip install -r requirements.txt`

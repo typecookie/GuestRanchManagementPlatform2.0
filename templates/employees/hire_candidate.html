@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Candidate Hiring{% endblock %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block page_subtitle %}
+Convert this interview into an active employee profile. The interview record and position history will automatically be linked to the new employee.
+{% endblock %}
+
+{% block content %}
+<div class="detail-card mb-4">
+    <h2>Interview Evaluation Summary</h2>
+    <div class="detail-list">
+        <div class="detail-row">
+            <span class="detail-label">Candidate Name</span>
+            <span class="detail-value"><strong>{{ interview.candidate_name|default:"Candidate" }}</strong></span>
+        </div>
+        {% if interview.candidate_email or interview.candidate_phone %}
+        <div class="detail-row">
+            <span class="detail-label">Contact</span>
+            <span class="detail-value">
+                {{ interview.candidate_email|default:"" }}
+                {% if interview.candidate_email and interview.candidate_phone %} &bull; {% endif %}
+                {{ interview.candidate_phone|default:"" }}
+            </span>
+        </div>
+        {% endif %}
+        <div class="detail-row">
+            <span class="detail-label">Interview Date</span>
+            <span class="detail-value">{{ interview.date }}</span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-label">Interview Status</span>
+            <span class="detail-value">{{ interview.get_status_display }}</span>
+        </div>
+        {% if interview.offered_position %}
+        <div class="detail-row">
+            <span class="detail-label">Offered Position</span>
+            <span class="detail-value"><span class="badge badge-info">{{ interview.offered_position }}</span></span>
+        </div>
+        {% endif %}
+        {% if interview.notes %}
+        <div class="detail-row">
+            <span class="detail-label">Interview Notes</span>
+            <span class="detail-value">{{ interview.notes|linebreaksbr }}</span>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="form-card">
+    <h2>New Employee Details</h2>
+    <form method="post">
+        {% csrf_token %}
+        
+        <div class="form-grid">
+            <div class="form-field">
+                <label for="{{ form.first_name.id_for_label }}">First Name <span class="text-danger">*</span></label>
+                {{ form.first_name }}
+                {% if form.first_name.errors %}<div class="form-error">{{ form.first_name.errors }}</div>{% endif %}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.last_name.id_for_label }}">Last Name <span class="text-danger">*</span></label>
+                {{ form.last_name }}
+                {% if form.last_name.errors %}<div class="form-error">{{ form.last_name.errors }}</div>{% endif %}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.current_position.id_for_label }}">Current Position</label>
+                {{ form.current_position }}
+                {% if form.current_position.errors %}<div class="form-error">{{ form.current_position.errors }}</div>{% endif %}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.status.id_for_label }}">Status</label>
+                {{ form.status }}
+                {% if form.status.errors %}<div class="form-error">{{ form.status.errors }}</div>{% endif %}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.user.id_for_label }}">Linked User</label>
+                {{ form.user }}
+                <div class="form-help">Optionally link this employee to an existing system user account.</div>
+                {% if form.user.errors %}<div class="form-error">{{ form.user.errors }}</div>{% endif %}
+            </div>
+
+            <div class="form-field form-grid-full" id="status-reason-field" {% if form.status.value == 'active' or not form.status.value %}style="display:none;"{% endif %}>
+                <label for="{{ form.status_reason.id_for_label }}">Reason for Status Change</label>
+                {{ form.status_reason }}
+                {% if form.status_reason.errors %}<div class="form-error">{{ form.status_reason.errors }}</div>{% endif %}
+            </div>
+
+            <div class="form-field form-grid-full">
+                <label for="{{ form.performance_notes.id_for_label }}">Performance / Initial Notes</label>
+                {{ form.performance_notes }}
+                <div class="form-help">Initial employee notes or interview summary notes.</div>
+                {% if form.performance_notes.errors %}<div class="form-error">{{ form.performance_notes.errors }}</div>{% endif %}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <a href="{% url 'employees:interview_list' %}" class="button button-secondary">Cancel</a>
+            <button type="submit" class="button button-primary">Complete Hiring & Create Employee</button>
+        </div>
+    </form>
+</div>
+
+{% include "employees/_positions_datalist.html" %}
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const statusSelect = document.querySelector('select[name="status"]');
+        const reasonField = document.getElementById('status-reason-field');
+
+        if (statusSelect && reasonField) {
+            statusSelect.addEventListener('change', function() {
+                if (this.value === 'active') {
+                    reasonField.style.display = 'none';
+                } else {
+                    reasonField.style.display = 'block';
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

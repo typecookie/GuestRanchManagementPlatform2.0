@@ -1,17 +1,67 @@
 {% extends "base.html" %}
+{% load group_perms %}
 
 {% block title %}{{ title }} | Guest Ranch Management{% endblock %}
 
-{% block eyebrow %}Employee: {{ employee.full_name }}{% endblock %}
+{% block eyebrow %}
+{% if employee %}
+    Employee: {{ employee.full_name }}
+{% elif interview and interview.candidate_name %}
+    Candidate: {{ interview.candidate_name }}
+{% else %}
+    Candidate / Employee Evaluation
+{% endif %}
+{% endblock %}
 
 {% block page_title %}{{ title }}{% endblock %}
 
 {% block content %}
+{% can_do user "Employees" "delete" as can_delete %}
 <div class="form-card">
     <form method="post">
         {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <div class="form-error mb-4">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
         
         <div class="form-grid">
+            {% if form.employee.is_hidden %}
+                {{ form.employee }}
+                {{ form.candidate_name }}
+                {{ form.candidate_email }}
+                {{ form.candidate_phone }}
+            {% else %}
+                <div class="form-field form-grid-full">
+                    <label for="{{ form.employee.id_for_label }}">Existing Employee (Optional)</label>
+                    {{ form.employee }}
+                    <div class="form-help">Select an existing employee, or leave as None to record an interview for a new candidate / applicant.</div>
+                    {% if form.employee.errors %}<div class="form-error">{{ form.employee.errors }}</div>{% endif %}
+                </div>
+
+                <div id="candidate-fields-group" class="form-grid-full form-grid" style="grid-column: span 2; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; background: var(--bg-surface-secondary, rgba(0,0,0,0.02)); padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem; border: 1px solid var(--border-color, rgba(0,0,0,0.08));">
+                    <div class="form-field">
+                        <label for="{{ form.candidate_name.id_for_label }}">Candidate Full Name <span class="text-danger">*</span></label>
+                        {{ form.candidate_name }}
+                        {% if form.candidate_name.errors %}<div class="form-error">{{ form.candidate_name.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="form-field">
+                        <label for="{{ form.candidate_email.id_for_label }}">Candidate Email</label>
+                        {{ form.candidate_email }}
+                        {% if form.candidate_email.errors %}<div class="form-error">{{ form.candidate_email.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="form-field">
+                        <label for="{{ form.candidate_phone.id_for_label }}">Candidate Phone</label>
+                        {{ form.candidate_phone }}
+                        {% if form.candidate_phone.errors %}<div class="form-error">{{ form.candidate_phone.errors }}</div>{% endif %}
+                    </div>
+                </div>
+            {% endif %}
+
             <div class="form-field">
                 <label for="{{ form.date.id_for_label }}">Interview Date</label>
                 {{ form.date }}
@@ -38,7 +88,7 @@
                 {% if form.offered_position.errors %}<div class="form-error">{{ form.offered_position.errors }}</div>{% endif %}
             </div>
 
-            <div class="form-field form-grid-full" id="follow-up-reason-field" {% if form.status.value != 'follow_up' %}style="display:none;"{% endif %}>
+            <div class="form-field form-grid-full" id="follow-up-reason-field" {% if form.status.value != 'follow_up' and form.status.value != 'promotion_follow_up' %}style="display:none;"{% endif %}>
                 <label for="{{ form.follow_up_reason.id_for_label }}">Follow-up Reason / Details</label>
                 {{ form.follow_up_reason }}
                 {% if form.follow_up_reason.errors %}<div class="form-error">{{ form.follow_up_reason.errors }}</div>{% endif %}
@@ -52,9 +102,22 @@
             </div>
         </div>
 
-        <div class="form-actions">
-            <a href="{% url 'employees:employee_detail' employee.pk %}" class="button button-secondary">Cancel</a>
-            <button type="submit" class="button button-primary">Save Interview</button>
+        <div class="form-actions" style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                {% if interview and interview.pk and can_delete %}
+                    <a href="{% url 'employees:interview_delete' interview.pk %}" class="button button-danger">Delete Interview</a>
+                {% endif %}
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+                {% if employee %}
+                    <a href="{% url 'employees:employee_detail' employee.pk %}" class="button button-secondary">Cancel</a>
+                {% elif interview and interview.employee %}
+                    <a href="{% url 'employees:employee_detail' interview.employee.pk %}" class="button button-secondary">Cancel</a>
+                {% else %}
+                    <a href="{% url 'employees:interview_list' %}" class="button button-secondary">Cancel</a>
+                {% endif %}
+                <button type="submit" class="button button-primary">Save Interview</button>
+            </div>
         </div>
     </form>
 </div>
@@ -66,11 +129,35 @@
         const statusSelect = document.querySelector('select[name="status"]');
         const offerField = document.getElementById('offered-position-field');
         const followUpField = document.getElementById('follow-up-reason-field');
+        const employeeSelect = document.querySelector('select[name="employee"]');
+        const candidateGroup = document.getElementById('candidate-fields-group');
 
-        statusSelect.addEventListener('change', function() {
-            offerField.style.display = (this.value === 'job_offered') ? 'block' : 'none';
-            followUpField.style.display = (this.value === 'follow_up') ? 'block' : 'none';
-        });
+        function updateStatusFields() {
+            if (!statusSelect) return;
+            const val = statusSelect.value;
+            if (offerField) {
+                offerField.style.display = (val === 'job_offered') ? 'block' : 'none';
+            }
+            if (followUpField) {
+                followUpField.style.display = (val === 'follow_up' || val === 'promotion_follow_up') ? 'block' : 'none';
+            }
+        }
+
+        function updateCandidateFields() {
+            if (!employeeSelect || !candidateGroup) return;
+            const hasEmployee = Boolean(employeeSelect.value);
+            candidateGroup.style.display = hasEmployee ? 'none' : 'grid';
+        }
+
+        if (statusSelect) {
+            statusSelect.addEventListener('change', updateStatusFields);
+            updateStatusFields();
+        }
+
+        if (employeeSelect) {
+            employeeSelect.addEventListener('change', updateCandidateFields);
+            updateCandidateFields();
+        }
     });
 </script>
 {% endblock %}
