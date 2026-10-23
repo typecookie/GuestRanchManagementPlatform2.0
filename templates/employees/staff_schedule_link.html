@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Link Employee to Position | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}
+<a href="{% url 'employees:staffing_schedule' %}{% if schedule.season %}?season={{ schedule.season.pk }}{% endif %}">Season Staffing</a> / Link Employee
+{% endblock %}
+
+{% block page_title %}Assign Employee to Placeholder Position{% endblock %}
+
+{% block content %}
+<div class="form-card" style="max-width: 700px;">
+    <h3 style="margin-top: 0; color: #1e293b;">Assign Confirmed Employee</h3>
+    <p>Convert placeholder <strong>{{ schedule.staff_name }}</strong> for the <strong>{{ schedule.position }}</strong> position into a confirmed employee profile.</p>
+
+    <div style="background: #fef3c7; border: 1px solid #fde68a; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; color: #92400e;">
+        <div><strong>Position:</strong> {{ schedule.position }}</div>
+        <div><strong>Current Placeholder:</strong> {{ schedule.staff_name }}</div>
+        <div><strong>Scheduled Dates:</strong> {{ schedule.start_date|date:"M j, Y" }} – {{ schedule.end_date|date:"M j, Y" }} ({{ schedule.duration_days }} days)</div>
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <div class="form-error" style="background: #fee2e2; color: #991b1b; padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1rem;">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+
+        <div class="form-grid">
+            <div class="form-group full-width">
+                <label for="{{ form.employee.id_for_label }}">Select Confirmed Employee *</label>
+                {{ form.employee }}
+                {% if form.employee.errors %}
+                    <span class="field-error">{{ form.employee.errors }}</span>
+                {% endif %}
+                <span class="help-text">Choose the active employee taking over this scheduled role.</span>
+            </div>
+
+            <div class="form-group full-width">
+                <label for="{{ form.status.id_for_label }}">Updated Status</label>
+                {{ form.status }}
+                {% if form.status.errors %}
+                    <span class="field-error">{{ form.status.errors }}</span>
+                {% endif %}
+            </div>
+
+            <div class="form-group full-width">
+                <label for="{{ form.notes.id_for_label }}">Additional Notes (Optional)</label>
+                {{ form.notes }}
+                {% if form.notes.errors %}
+                    <span class="field-error">{{ form.notes.errors }}</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="form-actions" style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+            <button type="submit" class="button button-primary">Confirm &amp; Link Employee</button>
+            <a href="{% url 'employees:staffing_schedule' %}{% if schedule.season %}?season={{ schedule.season.pk }}{% endif %}" class="button button-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

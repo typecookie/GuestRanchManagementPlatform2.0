@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Employee, PositionHistory, Interview
+from .models import Employee, PositionHistory, Interview, StaffSchedule
 
 class PositionHistoryInline(admin.TabularInline):
     model = PositionHistory
@@ -21,3 +21,10 @@ class InterviewAdmin(admin.ModelAdmin):
     list_display = ('interviewee_name', 'employee', 'date', 'status', 'is_interviewing')
     list_filter = ('status', 'is_interviewing', 'date')
     search_fields = ('candidate_name', 'employee__first_name', 'employee__last_name', 'notes')
+
+
+@admin.register(StaffSchedule)
+class StaffScheduleAdmin(admin.ModelAdmin):
+    list_display = ('position', 'staff_name', 'season', 'status', 'is_placeholder', 'start_date', 'end_date')
+    list_filter = ('season', 'status', 'is_placeholder', 'position')
+    search_fields = ('position', 'placeholder_name', 'employee__first_name', 'employee__last_name', 'notes')

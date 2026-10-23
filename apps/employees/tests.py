@@ -1,10 +1,11 @@
-from datetime import date
+from datetime import date, timedelta
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
-from apps.employees.models import Employee, PositionHistory, Interview
-from apps.employees.forms import InterviewForm, EmployeeForm
+from apps.employees.models import Employee, PositionHistory, Interview, StaffSchedule
+from apps.employees.forms import InterviewForm, EmployeeForm, StaffScheduleForm
+from apps.reservations.models import OperatingSeason
 
 User = get_user_model()
 
@@ -275,3 +276,238 @@ class EmployeeInterviewTests(TestCase):
         resp_anon = anon_client.get(url)
         self.assertEqual(resp_anon.status_code, 302)
         self.assertIn('/accounts/login/', resp_anon.url)
+
+
+class StaffScheduleTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            username="ranchmanager",
+            password="password123",
+            email="manager@example.com"
+        )
+        self.client = Client()
+        self.client.force_login(self.admin)
+
+        # Create Operating Season: June 1, 2026 to September 30, 2026
+        self.season = OperatingSeason.objects.create(
+            name="Summer 2026",
+            start_date=date(2026, 6, 1),
+            end_date=date(2026, 9, 30),
+            is_active=True
+        )
+
+        # Create Employees
+        self.emp_wrangler = Employee.objects.create(
+            first_name="Jake",
+            last_name="Dunne",
+            current_position="Lead Wrangler",
+            status=Employee.Status.ACTIVE
+        )
+        self.emp_chef = Employee.objects.create(
+            first_name="Elena",
+            last_name="Rostova",
+            current_position="Executive Chef",
+            status=Employee.Status.ACTIVE
+        )
+
+        # Create Confirmed Staff Schedule (starts 1 week before opening, ends with closing)
+        self.schedule_confirmed = StaffSchedule.objects.create(
+            season=self.season,
+            position="Lead Wrangler",
+            employee=self.emp_wrangler,
+            status=StaffSchedule.Status.CONFIRMED,
+            is_placeholder=False,
+            start_date=date(2026, 5, 25),
+            end_date=date(2026, 9, 30),
+            notes="Assigned lead wrangler for the entire season."
+        )
+
+        # Create Placeholder Unconfirmed Staff Schedule
+        self.schedule_placeholder = StaffSchedule.objects.create(
+            season=self.season,
+            position="Assistant Cook",
+            employee=None,
+            placeholder_name="Line Cook Placeholder #1",
+            status=StaffSchedule.Status.UNCONFIRMED,
+            is_placeholder=True,
+            start_date=date(2026, 6, 15),
+            end_date=date(2026, 8, 31),
+            notes="Pending candidate interview."
+        )
+
+    def test_model_properties_and_validation(self):
+        self.assertEqual(self.schedule_confirmed.staff_name, "Jake Dunne")
+        self.assertFalse(self.schedule_confirmed.is_unconfirmed_entry)
+        self.assertEqual(self.schedule_confirmed.duration_days, 129)
+
+        self.assertEqual(self.schedule_placeholder.staff_name, "Line Cook Placeholder #1")
+        self.assertTrue(self.schedule_placeholder.is_unconfirmed_entry)
+        self.assertEqual(self.schedule_placeholder.duration_days, 78)
+
+        # Validation error when end_date < start_date
+        invalid_schedule = StaffSchedule(
+            season=self.season,
+            position="Test",
+            start_date=date(2026, 7, 10),
+            end_date=date(2026, 7, 5)
+        )
+        from django.core.exceptions import ValidationError
+        with self.assertRaises(ValidationError):
+            invalid_schedule.clean()
+
+    def test_staffing_schedule_view_timeline_bounds(self):
+        url = reverse('employees:staffing_schedule') + f"?season={self.season.pk}"
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+
+        # 2 weeks before opening date (June 1 - 14 days = May 18, 2026)
+        expected_start = self.season.start_date - timedelta(days=14)
+        self.assertEqual(expected_start, date(2026, 5, 18))
+        self.assertEqual(resp.context['timeline_start'], expected_start)
+
+        # 2 weeks after closing date (September 30 + 14 days = October 14, 2026)
+        expected_end = self.season.end_date + timedelta(days=14)
+        self.assertEqual(expected_end, date(2026, 10, 14))
+        self.assertEqual(resp.context['timeline_end'], expected_end)
+
+        # Check total days
+        self.assertEqual(resp.context['total_days'], (expected_end - expected_start).days + 1)
+
+        # Check season dates in context
+        self.assertEqual(resp.context['season_start'], self.season.start_date)
+        self.assertEqual(resp.context['season_end'], self.season.end_date)
+
+        # Verify page contents
+        self.assertContains(resp, "Jake Dunne")
+        self.assertContains(resp, "Lead Wrangler")
+        self.assertContains(resp, "Confirmed Employee")
+        self.assertContains(resp, "Line Cook Placeholder #1")
+        self.assertContains(resp, "Placeholder / Unconfirmed")
+
+    def test_staffing_schedule_filters(self):
+        url = reverse('employees:staffing_schedule')
+
+        # Filter by position
+        resp = self.client.get(url, {'season': self.season.pk, 'position': 'Lead Wrangler'})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.context['schedule_rows']), 1)
+        self.assertEqual(resp.context['schedule_rows'][0]['staff_name'], 'Jake Dunne')
+
+        # Filter by status: confirmed
+        resp = self.client.get(url, {'season': self.season.pk, 'status': 'confirmed'})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.context['schedule_rows']), 1)
+        self.assertEqual(resp.context['schedule_rows'][0]['staff_name'], 'Jake Dunne')
+
+        # Filter by status: placeholder
+        resp = self.client.get(url, {'season': self.season.pk, 'status': 'placeholder'})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.context['schedule_rows']), 1)
+        self.assertEqual(resp.context['schedule_rows'][0]['staff_name'], 'Line Cook Placeholder #1')
+
+        # Search query
+        resp = self.client.get(url, {'season': self.season.pk, 'q': 'Dunne'})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.context['schedule_rows']), 1)
+        self.assertEqual(resp.context['schedule_rows'][0]['staff_name'], 'Jake Dunne')
+
+    def test_staff_schedule_create_confirmed(self):
+        url = reverse('employees:staff_schedule_create')
+        data = {
+            'season': self.season.pk,
+            'position': 'Executive Chef',
+            'employee': self.emp_chef.pk,
+            'placeholder_name': '',
+            'is_placeholder': False,
+            'status': 'confirmed',
+            'start_date': '2026-05-18',
+            'end_date': '2026-10-14',
+            'notes': 'Head chef full span.'
+        }
+        resp = self.client.post(url, data)
+        self.assertEqual(resp.status_code, 302)
+        
+        created = StaffSchedule.objects.filter(employee=self.emp_chef).first()
+        self.assertIsNotNone(created)
+        self.assertEqual(created.position, 'Executive Chef')
+        self.assertEqual(created.start_date, date(2026, 5, 18))
+        self.assertEqual(created.end_date, date(2026, 10, 14))
+        self.assertFalse(created.is_placeholder)
+
+    def test_staff_schedule_create_placeholder(self):
+        url = reverse('employees:staff_schedule_create')
+        data = {
+            'season': self.season.pk,
+            'position': 'Housekeeper',
+            'employee': '',
+            'placeholder_name': 'Candidate Mary',
+            'is_placeholder': True,
+            'status': 'unconfirmed',
+            'start_date': '2026-06-01',
+            'end_date': '2026-09-01',
+            'notes': 'Interview pending.'
+        }
+        resp = self.client.post(url, data)
+        self.assertEqual(resp.status_code, 302)
+
+        created = StaffSchedule.objects.filter(placeholder_name='Candidate Mary').first()
+        self.assertIsNotNone(created)
+        self.assertEqual(created.position, 'Housekeeper')
+        self.assertIsNone(created.employee)
+        self.assertTrue(created.is_placeholder)
+
+    def test_staff_schedule_link_employee(self):
+        placeholder_pk = self.schedule_placeholder.pk
+        url = reverse('employees:staff_schedule_link_employee', kwargs={'pk': placeholder_pk})
+
+        # GET form
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Line Cook Placeholder #1")
+
+        # POST link to employee
+        resp = self.client.post(url, {
+            'employee': self.emp_chef.pk,
+            'status': 'confirmed',
+            'notes': 'Hired and confirmed on schedule.'
+        })
+        self.assertEqual(resp.status_code, 302)
+
+        self.schedule_placeholder.refresh_from_db()
+        self.assertEqual(self.schedule_placeholder.employee, self.emp_chef)
+        self.assertFalse(self.schedule_placeholder.is_placeholder)
+        self.assertEqual(self.schedule_placeholder.status, 'confirmed')
+        self.assertEqual(self.schedule_placeholder.staff_name, 'Elena Rostova')
+
+    def test_staff_schedule_delete(self):
+        schedule_pk = self.schedule_placeholder.pk
+        url = reverse('employees:staff_schedule_delete', kwargs={'pk': schedule_pk})
+
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Confirm Staff Assignment Deletion")
+
+        resp = self.client.post(url)
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(StaffSchedule.objects.filter(pk=schedule_pk).exists())
+
+    def test_permissions_enforced(self):
+        regular_user = User.objects.create_user(
+            username="unprivileged",
+            password="password123",
+            email="regular@example.com"
+        )
+        unauth_client = Client()
+        unauth_client.force_login(regular_user)
+
+        # Read without permission
+        resp = unauth_client.get(reverse('employees:staffing_schedule'))
+        self.assertEqual(resp.status_code, 403)
+
+        # Write without permission
+        resp = unauth_client.get(reverse('employees:staff_schedule_create'))
+        self.assertEqual(resp.status_code, 403)
+
+        # Delete without permission
+        resp = unauth_client.post(reverse('employees:staff_schedule_delete', kwargs={'pk': self.schedule_confirmed.pk}))
+        self.assertEqual(resp.status_code, 403)

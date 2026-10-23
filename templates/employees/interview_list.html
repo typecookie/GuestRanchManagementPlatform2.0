@@ -13,6 +13,7 @@ Track and review all employee interviews and candidate evaluations.
 
 {% block page_actions %}
 {% can_do user "Employees" "write" as can_write %}
+<a href="{% url 'employees:staffing_schedule' %}" class="button button-secondary">Staffing Schedule</a>
 <a href="{% url 'employees:employee_list' %}" class="button button-secondary">Back to Employees</a>
 {% if can_write %}
 <a href="{% url 'employees:interview_create' %}" class="button button-primary">Add Interview</a>

@@ -72,6 +72,52 @@ Position: {{ employee.current_position|default:"None" }} | Status: {{ employee.g
                 </div>
             </div>
 
+            <!-- Season Staffing Assignments -->
+            <div class="table-card">
+                <div class="section-heading" style="padding: 22px 22px 0; display: flex; justify-content: space-between; align-items: center;">
+                    <h2>Season Staffing Assignments</h2>
+                    <a href="{% url 'employees:staffing_schedule' %}" class="button button-small button-secondary">Full Season Board</a>
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Position</th>
+                                <th>Season</th>
+                                <th>Start Date</th>
+                                <th>End Date</th>
+                                <th>Status</th>
+                                {% if can_write %}
+                                <th class="text-right">Actions</th>
+                                {% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for schedule in staff_schedules %}
+                                <tr>
+                                    <td><strong>{{ schedule.position }}</strong></td>
+                                    <td>{{ schedule.season.name|default:"Standard Season" }}</td>
+                                    <td>{{ schedule.start_date }}</td>
+                                    <td>{{ schedule.end_date }}</td>
+                                    <td>
+                                        <span class="badge badge-success small">{{ schedule.get_status_display }}</span>
+                                    </td>
+                                    {% if can_write %}
+                                    <td class="text-right">
+                                        <a href="{% url 'employees:staff_schedule_update' schedule.pk %}" class="button button-small button-secondary">Edit</a>
+                                    </td>
+                                    {% endif %}
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="{% if can_write %}6{% else %}5{% endif %}" class="text-center text-muted">No season staffing assignments scheduled.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <!-- Interviews -->
             <div class="table-card">
                 <div class="section-heading" style="padding: 22px 22px 0;">

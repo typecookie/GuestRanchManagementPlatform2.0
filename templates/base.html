@@ -103,9 +103,21 @@
                         {% if perms.employees.view_employee %}
                         <a
                             href="{% url 'employees:employee_list' %}?dept=admin"
-                            class="subnav-link {% if request.resolver_match.namespace == 'employees' %}is-active{% endif %}"
+                            class="subnav-link {% if request.resolver_match.namespace == 'employees' and 'staff' not in request.resolver_match.url_name and 'interview' not in request.resolver_match.url_name %}is-active{% endif %}"
                         >
                             Employees
+                        </a>
+                        <a
+                            href="{% url 'employees:staffing_schedule' %}?dept=admin"
+                            class="subnav-link {% if 'staff' in request.resolver_match.url_name %}is-active{% endif %}"
+                        >
+                            Staffing Schedule
+                        </a>
+                        <a
+                            href="{% url 'employees:interview_list' %}?dept=admin"
+                            class="subnav-link {% if 'interview' in request.resolver_match.url_name %}is-active{% endif %}"
+                        >
+                            Interviews
                         </a>
                         {% endif %}
 

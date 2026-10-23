@@ -13,6 +13,7 @@ Manage employee profiles, position history, and interview records.
 
 {% block page_actions %}
 {% can_do user "Employees" "write" as can_write %}
+<a href="{% url 'employees:staffing_schedule' %}" class="button button-secondary">Staffing Schedule</a>
 <a href="{% url 'employees:interview_list' %}" class="button button-secondary">Interviews</a>
 {% if can_write %}
 <a href="{% url 'employees:employee_create' %}" class="button button-primary">Add Employee</a>

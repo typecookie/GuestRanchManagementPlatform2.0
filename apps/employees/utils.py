@@ -1,4 +1,4 @@
-from .models import Employee, PositionHistory, Interview
+from .models import Employee, PositionHistory, Interview, StaffSchedule
 
 def get_unique_positions():
     positions = set()
@@ -11,5 +11,8 @@ def get_unique_positions():
     
     # From Interview
     positions.update(Interview.objects.exclude(offered_position="").values_list('offered_position', flat=True))
+
+    # From StaffSchedule
+    positions.update(StaffSchedule.objects.exclude(position="").values_list('position', flat=True))
     
     return sorted(list(positions))
