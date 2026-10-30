@@ -1,0 +1,753 @@
+{% extends "base.html" %}
+
+{% block title %}Visual Guest Directory | Guest Ranch Management{% endblock %}
+
+{% block eyebrow %}Ranch Owner Command Center{% endblock %}
+
+{% block page_title %}Visual Guest & Group Directory{% endblock %}
+
+{% block page_subtitle %}
+Quickly look up guest photos, family groups, and travel party rosters by name.
+{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'core:dashboard' %}?view=default" class="button button-secondary" title="View standard operations command center">
+    Operations Dashboard
+</a>
+{% endblock %}
+
+{% block content %}
+<style>
+    .owner-search-container {
+        background: #ffffff;
+        border: 1px solid var(--color-border);
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: var(--shadow-sm);
+        margin-bottom: 2rem;
+    }
+
+    .owner-search-form {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+    }
+
+    .owner-search-input {
+        flex: 1;
+        font-size: 1.15rem;
+        padding: 0.85rem 1.25rem;
+        border: 2px solid var(--color-border);
+        border-radius: 8px;
+        outline: none;
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .owner-search-input:focus {
+        border-color: var(--color-primary);
+        box-shadow: 0 0 0 3px rgba(30, 58, 95, 0.15);
+    }
+
+    .owner-search-btn {
+        padding: 0.85rem 1.75rem;
+        font-size: 1.05rem;
+        font-weight: 600;
+        border-radius: 8px;
+    }
+
+    .search-status-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 1rem;
+        font-size: 0.95rem;
+        color: var(--color-text-muted);
+    }
+
+    .group-unit-card {
+        background: #ffffff;
+        border: 1px solid var(--color-border);
+        border-radius: 12px;
+        box-shadow: var(--shadow-sm);
+        margin-bottom: 2.25rem;
+        overflow: hidden;
+    }
+
+    .group-header {
+        background: #f8fafc;
+        border-bottom: 1px solid var(--color-border);
+        padding: 1.25rem 1.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .group-title-area h2 {
+        margin: 0;
+        font-size: 1.35rem;
+        font-weight: 700;
+        color: var(--color-primary);
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+    }
+
+    .group-badges {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    .group-photo-banner {
+        background: #f1f5f9;
+        border-bottom: 1px solid var(--color-border);
+        padding: 1.25rem 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+    }
+
+    .banner-preview-img {
+        width: 220px;
+        height: 140px;
+        object-fit: cover;
+        border-radius: 8px;
+        border: 2px solid #ffffff;
+        box-shadow: var(--shadow-sm);
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .banner-preview-img:hover {
+        transform: scale(1.02);
+        box-shadow: var(--shadow-md);
+    }
+
+    .banner-meta {
+        flex: 1;
+    }
+
+    .banner-meta h4 {
+        margin: 0 0 0.35rem 0;
+        font-size: 1.05rem;
+        color: var(--color-text-dark);
+    }
+
+    .banner-meta p {
+        margin: 0;
+        font-size: 0.9rem;
+        color: var(--color-text-muted);
+    }
+
+    .photo-click-hint {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        margin-top: 0.5rem;
+        font-size: 0.85rem;
+        color: var(--color-primary);
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .group-content {
+        padding: 1.5rem;
+    }
+
+    .families-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .family-card {
+        background: #ffffff;
+        border: 1px solid var(--color-border);
+        border-radius: 10px;
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+
+    .family-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid #f1f5f9;
+        padding-bottom: 0.65rem;
+    }
+
+    .family-header h3 {
+        margin: 0;
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: var(--color-text-dark);
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    .family-photo-wrapper {
+        position: relative;
+        background: #f8fafc;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid var(--color-border);
+        text-align: center;
+    }
+
+    .family-photo-img {
+        width: 100%;
+        height: 180px;
+        object-fit: cover;
+        cursor: pointer;
+        display: block;
+        transition: transform 0.2s;
+    }
+
+    .family-photo-img:hover {
+        transform: scale(1.02);
+    }
+
+    .photo-overlay-tag {
+        position: absolute;
+        bottom: 8px;
+        right: 8px;
+        background: rgba(15, 23, 42, 0.75);
+        color: #ffffff;
+        padding: 0.2rem 0.55rem;
+        font-size: 0.75rem;
+        border-radius: 4px;
+        pointer-events: none;
+        backdrop-filter: blur(2px);
+    }
+
+    .members-roster {
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+    }
+
+    .member-row {
+        display: flex;
+        align-items: center;
+        gap: 0.85rem;
+        padding: 0.5rem 0.65rem;
+        background: #fbfcfd;
+        border: 1px solid #f1f5f9;
+        border-radius: 8px;
+        transition: background 0.15s;
+    }
+
+    .member-row.matched {
+        background: #f0fdf4;
+        border-color: #bbf7d0;
+    }
+
+    .member-avatar {
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid #e2e8f0;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+        cursor: pointer;
+        flex-shrink: 0;
+        transition: transform 0.15s, border-color 0.15s;
+    }
+
+    .member-avatar:hover {
+        transform: scale(1.08);
+        border-color: var(--color-primary);
+    }
+
+    .member-avatar-placeholder {
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        background: #e2e8f0;
+        color: #64748b;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 1.1rem;
+        flex-shrink: 0;
+        border: 2px solid #cbd5e1;
+    }
+
+    .member-details {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .member-name {
+        font-weight: 700;
+        font-size: 0.98rem;
+        color: var(--color-text-dark);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        flex-wrap: wrap;
+    }
+
+    .member-meta {
+        font-size: 0.85rem;
+        color: var(--color-text-muted);
+        margin: 0.15rem 0 0 0;
+    }
+
+    /* Modal Lightbox */
+    .photo-lightbox-modal {
+        display: none;
+        position: fixed;
+        z-index: 9999;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(15, 23, 42, 0.92);
+        backdrop-filter: blur(6px);
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        padding: 1.5rem;
+        box-sizing: border-box;
+    }
+
+    .photo-lightbox-modal.active {
+        display: flex;
+    }
+
+    .lightbox-close-btn {
+        position: absolute;
+        top: 1.5rem;
+        right: 1.5rem;
+        background: rgba(255, 255, 255, 0.15);
+        color: #ffffff;
+        border: none;
+        font-size: 2rem;
+        line-height: 1;
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s, transform 0.2s;
+    }
+
+    .lightbox-close-btn:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: scale(1.08);
+    }
+
+    .lightbox-img {
+        max-width: 92vw;
+        max-height: 82vh;
+        object-fit: contain;
+        border-radius: 8px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+
+    .lightbox-caption {
+        margin-top: 1rem;
+        color: #ffffff;
+        font-size: 1.15rem;
+        font-weight: 600;
+        text-align: center;
+        max-width: 80vw;
+    }
+</style>
+
+<div class="owner-search-container">
+    <form method="get" action="{% url 'core:dashboard' %}" class="owner-search-form">
+        <input type="hidden" name="view" value="owner">
+        <input 
+            type="text" 
+            name="q" 
+            class="owner-search-input" 
+            value="{{ query }}" 
+            placeholder="Search guest last name, first name, family name, or travel group (e.g. Miller)..." 
+            autofocus 
+            autocomplete="off"
+        >
+        <button type="submit" class="button button-primary owner-search-btn">
+            🔍 Search Photos
+        </button>
+        {% if query %}
+            <a href="{% url 'core:dashboard' %}?view=owner" class="button button-secondary" style="padding: 0.85rem 1.25rem;">
+                ✕ Clear
+            </a>
+        {% endif %}
+    </form>
+
+    <div class="search-status-bar">
+        {% if query %}
+            <div>
+                Showing results for <strong>"{{ query }}"</strong> ({{ total_results_count }} group{{ total_results_count|pluralize }} found)
+            </div>
+            <div>
+                <a href="{% url 'core:dashboard' %}?view=owner" class="text-muted" style="text-decoration: underline;">Reset Search</a>
+            </div>
+        {% else %}
+            <div>
+                💡 <em>Tip: Enter a last name (e.g. <strong>Miller</strong>) to see all related travel party photos, family pictures, and member headshots.</em>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if query and not results %}
+    <div class="table-card" style="padding: 3rem 1.5rem; text-align: center; color: var(--color-text-muted);">
+        <div style="font-size: 3rem; margin-bottom: 1rem;">🔍</div>
+        <h3 style="margin-bottom: 0.5rem; color: var(--color-text-dark);">No Groups or Guests Found</h3>
+        <p>No travel groups, families, or guests matched "<strong>{{ query }}</strong>".</p>
+        <p style="font-size: 0.9rem;">Try searching by last name, first name, or household name.</p>
+        <a href="{% url 'core:dashboard' %}?view=owner" class="button button-secondary" style="margin-top: 1rem;">View Recent Photos</a>
+    </div>
+{% endif %}
+
+{% if not query and recent_groups %}
+    <div style="margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between;">
+        <h3 style="margin: 0; font-size: 1.15rem; color: var(--color-text-muted);">Recent Groups & Families</h3>
+        <span class="text-muted" style="font-size: 0.85rem;">Click any photo to view fullscreen</span>
+    </div>
+{% endif %}
+
+{% with display_items=results|default:recent_groups %}
+    {% for item in display_items %}
+        {% if item.type == 'travel_group' %}
+            <div class="group-unit-card">
+                <div class="group-header">
+                    <div class="group-title-area">
+                        <h2>✈️ Travel Group: {{ item.name }}</h2>
+                    </div>
+                    <div class="group-badges">
+                        <span class="badge badge-info">{{ item.group_category }}</span>
+                        <span class="badge badge-neutral">{{ item.total_guests }} Guest{{ item.total_guests|pluralize }}</span>
+                    </div>
+                </div>
+
+                {% if item.has_photo %}
+                    <div class="group-photo-banner">
+                        <img 
+                            src="{{ item.photo_url }}" 
+                            alt="{{ item.name }}" 
+                            class="banner-preview-img js-lightbox-trigger"
+                            data-full-photo="{{ item.photo_url }}"
+                            data-caption="Travel Group: {{ item.name }}"
+                            loading="lazy"
+                        >
+                        <div class="banner-meta">
+                            <h4>Travel Group Photo</h4>
+                            <p>Group portrait for {{ item.name }} ({{ item.total_guests }} members across {{ item.households|length }} families).</p>
+                            <span 
+                                class="photo-click-hint js-lightbox-trigger"
+                                data-full-photo="{{ item.photo_url }}"
+                                data-caption="Travel Group: {{ item.name }}"
+                            >
+                                🔍 Click to view high-resolution photo
+                            </span>
+                        </div>
+                    </div>
+                {% endif %}
+
+                <div class="group-content">
+                    {% if item.households %}
+                        <div class="families-grid">
+                            {% for hh in item.households %}
+                                <div class="family-card">
+                                    <div class="family-header">
+                                        <h3>🏡 {{ hh.name }}</h3>
+                                        <span class="badge badge-neutral">{{ hh.member_count }} Member{{ hh.member_count|pluralize }}</span>
+                                    </div>
+
+                                    {% if hh.has_photo %}
+                                        <div class="family-photo-wrapper">
+                                            <img 
+                                                src="{{ hh.photo_url }}" 
+                                                alt="{{ hh.name }}" 
+                                                class="family-photo-img js-lightbox-trigger"
+                                                data-full-photo="{{ hh.photo_url }}"
+                                                data-caption="Family Photo: {{ hh.name }}"
+                                                loading="lazy"
+                                            >
+                                            <span class="photo-overlay-tag">🔍 Family Photo</span>
+                                        </div>
+                                    {% endif %}
+
+                                    <div class="members-roster">
+                                        {% for member in hh.members %}
+                                            <div class="member-row {% if member.is_match %}matched{% endif %}">
+                                                {% if member.has_photo %}
+                                                    <img 
+                                                        src="{{ member.photo_url }}" 
+                                                        alt="{{ member.full_name }}" 
+                                                        class="member-avatar js-lightbox-trigger"
+                                                        data-full-photo="{{ member.photo_url }}"
+                                                        data-caption="{{ member.full_name }} ({{ member.relationship|default:'Member' }} - {{ hh.name }})"
+                                                        loading="lazy"
+                                                        title="Click to view full photo"
+                                                    >
+                                                {% else %}
+                                                    <div class="member-avatar-placeholder" title="No individual photo uploaded">
+                                                        {{ member.display_name|slice:":1" }}
+                                                    </div>
+                                                {% endif %}
+
+                                                <div class="member-details">
+                                                    <div class="member-name">
+                                                        <span>{{ member.display_name }}</span>
+                                                        {% if member.is_match %}
+                                                            <span class="badge badge-success" style="font-size: 0.75rem; padding: 0.15rem 0.45rem;">Search Match</span>
+                                                        {% endif %}
+                                                        {% if member.is_primary %}
+                                                            <span class="badge badge-neutral" style="font-size: 0.7rem; padding: 0.1rem 0.35rem;">Primary</span>
+                                                        {% endif %}
+                                                    </div>
+                                                    <div class="member-meta">
+                                                        {{ member.relationship|default:"Household Member" }}{% if member.age %}, Age {{ member.age }}{% endif %}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {% empty %}
+                                            <p class="text-muted" style="font-size: 0.9rem; margin: 0;">No member records in this family.</p>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    {% if item.direct_members %}
+                        <div style="margin-top: 1.5rem;">
+                            <h4 style="margin: 0 0 0.75rem 0; font-size: 1rem; color: var(--color-text-dark);">Additional Group Members:</h4>
+                            <div class="members-roster" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.75rem;">
+                                {% for member in item.direct_members %}
+                                    <div class="member-row {% if member.is_match %}matched{% endif %}">
+                                        {% if member.has_photo %}
+                                            <img 
+                                                src="{{ member.photo_url }}" 
+                                                alt="{{ member.full_name }}" 
+                                                class="member-avatar js-lightbox-trigger"
+                                                data-full-photo="{{ member.photo_url }}"
+                                                data-caption="{{ member.full_name }} ({{ member.relationship|default:'Member' }})"
+                                                loading="lazy"
+                                                title="Click to view full photo"
+                                            >
+                                        {% else %}
+                                            <div class="member-avatar-placeholder">
+                                                {{ member.display_name|slice:":1" }}
+                                            </div>
+                                        {% endif %}
+                                        <div class="member-details">
+                                            <div class="member-name">
+                                                <span>{{ member.display_name }}</span>
+                                                {% if member.is_match %}
+                                                    <span class="badge badge-success" style="font-size: 0.75rem; padding: 0.15rem 0.45rem;">Search Match</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="member-meta">{{ member.relationship|default:"Member" }}{% if member.age %}, Age {{ member.age }}{% endif %}</div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+        {% elif item.type == 'household' %}
+            <div class="group-unit-card">
+                <div class="group-header">
+                    <div class="group-title-area">
+                        <h2>🏡 Family / Household: {{ item.name }}</h2>
+                    </div>
+                    <div class="group-badges">
+                        <span class="badge badge-neutral">{{ item.total_guests }} Member{{ item.total_guests|pluralize }}</span>
+                    </div>
+                </div>
+
+                {% if item.has_photo %}
+                    <div class="group-photo-banner">
+                        <img 
+                            src="{{ item.photo_url }}" 
+                            alt="{{ item.name }}" 
+                            class="banner-preview-img js-lightbox-trigger"
+                            data-full-photo="{{ item.photo_url }}"
+                            data-caption="Family Photo: {{ item.name }}"
+                            loading="lazy"
+                        >
+                        <div class="banner-meta">
+                            <h4>Family Group Photo</h4>
+                            <p>Photo for {{ item.name }} ({{ item.total_guests }} members).</p>
+                            <span 
+                                class="photo-click-hint js-lightbox-trigger"
+                                data-full-photo="{{ item.photo_url }}"
+                                data-caption="Family Photo: {{ item.name }}"
+                            >
+                                🔍 Click to view high-resolution photo
+                            </span>
+                        </div>
+                    </div>
+                {% endif %}
+
+                <div class="group-content">
+                    <h4 style="margin: 0 0 0.75rem 0; font-size: 1rem; color: var(--color-text-dark);">Family Members:</h4>
+                    <div class="members-roster" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.75rem;">
+                        {% for member in item.members %}
+                            <div class="member-row {% if member.is_match %}matched{% endif %}">
+                                {% if member.has_photo %}
+                                    <img 
+                                        src="{{ member.photo_url }}" 
+                                        alt="{{ member.full_name }}" 
+                                        class="member-avatar js-lightbox-trigger"
+                                        data-full-photo="{{ member.photo_url }}"
+                                        data-caption="{{ member.full_name }} ({{ member.relationship|default:'Member' }} - {{ item.name }})"
+                                        loading="lazy"
+                                        title="Click to view full photo"
+                                    >
+                                {% else %}
+                                    <div class="member-avatar-placeholder">
+                                        {{ member.display_name|slice:":1" }}
+                                    </div>
+                                {% endif %}
+
+                                <div class="member-details">
+                                    <div class="member-name">
+                                        <span>{{ member.display_name }}</span>
+                                        {% if member.is_match %}
+                                            <span class="badge badge-success" style="font-size: 0.75rem; padding: 0.15rem 0.45rem;">Search Match</span>
+                                        {% endif %}
+                                        {% if member.is_primary %}
+                                            <span class="badge badge-neutral" style="font-size: 0.7rem; padding: 0.1rem 0.35rem;">Primary</span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="member-meta">
+                                        {{ member.relationship|default:"Household Member" }}{% if member.age %}, Age {{ member.age }}{% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        {% empty %}
+                            <p class="text-muted" style="font-size: 0.9rem; margin: 0;">No member records in this family.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+        {% elif item.type == 'client' %}
+            <div class="group-unit-card">
+                <div class="group-header">
+                    <div class="group-title-area">
+                        <h2>👤 Individual Guest: {{ item.name }}</h2>
+                    </div>
+                    <div class="group-badges">
+                        <span class="badge badge-info">{{ item.client_type }}</span>
+                        <span class="badge badge-success">Search Match</span>
+                    </div>
+                </div>
+
+                <div class="group-content" style="display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;">
+                    {% if item.has_photo %}
+                        <img 
+                            src="{{ item.photo_url }}" 
+                            alt="{{ item.name }}" 
+                            class="banner-preview-img js-lightbox-trigger"
+                            data-full-photo="{{ item.photo_url }}"
+                            data-caption="Guest Photo: {{ item.name }}"
+                            loading="lazy"
+                        >
+                    {% else %}
+                        <div class="member-avatar-placeholder" style="width: 100px; height: 100px; font-size: 2rem;">
+                            {{ item.display_name|slice:":1" }}
+                        </div>
+                    {% endif %}
+
+                    <div>
+                        <h3 style="margin: 0 0 0.35rem 0; font-size: 1.2rem; color: var(--color-text-dark);">{{ item.name }}</h3>
+                        <p class="text-muted" style="margin: 0 0 0.5rem 0;">Individual Guest Record{% if item.age %} • Age {{ item.age }}{% endif %}</p>
+                        {% if item.has_photo %}
+                            <span 
+                                class="photo-click-hint js-lightbox-trigger"
+                                data-full-photo="{{ item.photo_url }}"
+                                data-caption="Guest Photo: {{ item.name }}"
+                            >
+                                🔍 Click to view full photo
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    {% endfor %}
+{% endwith %}
+
+<!-- Fullscreen Lightbox Modal -->
+<div id="photoLightboxModal" class="photo-lightbox-modal" role="dialog" aria-modal="true" aria-label="Fullscreen Photo View">
+    <button type="button" class="lightbox-close-btn" id="lightboxCloseBtn" aria-label="Close photo view">&times;</button>
+    <img id="lightboxImg" class="lightbox-img" src="" alt="Full view">
+    <div id="lightboxCaption" class="lightbox-caption"></div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var modal = document.getElementById('photoLightboxModal');
+    var modalImg = document.getElementById('lightboxImg');
+    var modalCaption = document.getElementById('lightboxCaption');
+    var closeBtn = document.getElementById('lightboxCloseBtn');
+
+    function openLightbox(src, caption) {
+        if (!src) return;
+        modalImg.src = src;
+        modalCaption.textContent = caption || '';
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeLightbox() {
+        modal.classList.remove('active');
+        modalImg.src = '';
+        modalCaption.textContent = '';
+        document.body.style.overflow = '';
+    }
+
+    document.querySelectorAll('.js-lightbox-trigger').forEach(function (el) {
+        el.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var src = this.getAttribute('data-full-photo') || this.getAttribute('src');
+            var caption = this.getAttribute('data-caption') || this.getAttribute('alt') || '';
+            openLightbox(src, caption);
+        });
+    });
+
+    if (closeBtn) {
+        closeBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            closeLightbox();
+        });
+    }
+
+    if (modal) {
+        modal.addEventListener('click', function (e) {
+            if (e.target === modal || e.target === closeBtn) {
+                closeLightbox();
+            }
+        });
+    }
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && modal.classList.contains('active')) {
+            closeLightbox();
+        }
+    });
+});
+</script>
+{% endblock %}

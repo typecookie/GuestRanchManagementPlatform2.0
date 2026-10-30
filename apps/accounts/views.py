@@ -9,7 +9,7 @@ def is_admin(user):
 
 @module_permission_required('User Management', 'read')
 def user_list(request):
-    users = User.objects.all().prefetch_related('groups')
+    users = User.objects.all().prefetch_related('groups').select_related('profile')
     return render(request, 'accounts/user_list.html', {'users': users})
 
 @module_permission_required('User Management', 'write')

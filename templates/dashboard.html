@@ -9,6 +9,7 @@ Welcome to your guest ranch command center.
 {% endblock %}
 
 {% block page_actions %}
+<a href="{% url 'core:dashboard' %}?view=owner" class="button button-secondary" title="Switch to Ranch Owner Visual Directory">Owner Visual Directory</a>
 <a href="{% url 'reservations:reservation_create' %}" class="button button-primary">New Reservation</a>
 {% endblock %}
 
