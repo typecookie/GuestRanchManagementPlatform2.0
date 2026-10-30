@@ -16,7 +16,9 @@ class HorseForm(forms.ModelForm):
         model = Horse
         fields = [
             'name', 'breed', 'color', 'birth_year', 
-            'gender', 'status', 'pasture', 'notes', 'medical_notes'
+            'gender', 'status', 'pasture',
+            'photo_front', 'photo_left', 'photo_right', 'photo_back',
+            'notes', 'medical_notes'
         ]
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. Spirit'}),
@@ -26,6 +28,10 @@ class HorseForm(forms.ModelForm):
             'gender': forms.Select(attrs={'class': 'form-select'}),
             'status': forms.Select(attrs={'class': 'form-select'}),
             'pasture': forms.Select(attrs={'class': 'form-select'}),
+            'photo_front': forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
+            'photo_left': forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
+            'photo_right': forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
+            'photo_back': forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
             'notes': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3}),
             'medical_notes': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3}),
         }

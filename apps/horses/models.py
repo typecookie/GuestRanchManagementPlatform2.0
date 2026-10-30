@@ -57,6 +57,35 @@ class Horse(models.Model):
         help_text="Current pasture location of the horse"
     )
     
+    photo_front = models.ImageField(
+        upload_to="horses/photos/",
+        null=True,
+        blank=True,
+        verbose_name="Front Photo",
+        help_text="High-quality front profile photo"
+    )
+    photo_left = models.ImageField(
+        upload_to="horses/photos/",
+        null=True,
+        blank=True,
+        verbose_name="Left Side Photo",
+        help_text="High-quality left profile photo"
+    )
+    photo_right = models.ImageField(
+        upload_to="horses/photos/",
+        null=True,
+        blank=True,
+        verbose_name="Right Side Photo",
+        help_text="High-quality right profile photo"
+    )
+    photo_back = models.ImageField(
+        upload_to="horses/photos/",
+        null=True,
+        blank=True,
+        verbose_name="Back Photo",
+        help_text="High-quality rear profile photo"
+    )
+
     notes = models.TextField(blank=True)
     medical_notes = models.TextField(blank=True, help_text="Legacy medical notes")
     
@@ -68,6 +97,10 @@ class Horse(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def has_photos(self):
+        return bool(self.photo_front or self.photo_left or self.photo_right or self.photo_back)
 
 class Saddle(models.Model):
     class Status(models.TextChoices):

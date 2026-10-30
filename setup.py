@@ -10,6 +10,7 @@ setup(
         "gunicorn",
         "whitenoise",
         "python-dotenv",
+        "Pillow>=10.0.0",
     ],
     entry_points={
         "console_scripts": [

@@ -8,7 +8,7 @@
 
 {% block content %}
 <div class="form-card">
-    <form method="post">
+    <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
         
         <div class="form-grid">
@@ -69,6 +69,63 @@
                 {{ form.pasture }}
                 {% if form.pasture.errors %}
                     <div class="form-error">{{ form.pasture.errors }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-grid-full" style="margin-top: 1.5rem;">
+                <h3>Identification Photos (4 Angles)</h3>
+                <p class="text-muted" style="margin-top: -0.25rem; font-size: 0.9rem;">High-resolution photos for identification and tack fitting (Front, Left Side, Right Side, Back).</p>
+            </div>
+            
+            <div class="form-field">
+                <label for="{{ form.photo_front.id_for_label }}">Front Photo</label>
+                {% if horse.photo_front %}
+                    <div style="margin-bottom: 0.5rem;">
+                        <a href="{{ horse.photo_front.url }}" target="_blank" class="text-muted" style="font-size: 0.85rem;">View current photo</a>
+                    </div>
+                {% endif %}
+                {{ form.photo_front }}
+                {% if form.photo_front.errors %}
+                    <div class="form-error">{{ form.photo_front.errors }}</div>
+                {% endif %}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.photo_left.id_for_label }}">Left Side Photo</label>
+                {% if horse.photo_left %}
+                    <div style="margin-bottom: 0.5rem;">
+                        <a href="{{ horse.photo_left.url }}" target="_blank" class="text-muted" style="font-size: 0.85rem;">View current photo</a>
+                    </div>
+                {% endif %}
+                {{ form.photo_left }}
+                {% if form.photo_left.errors %}
+                    <div class="form-error">{{ form.photo_left.errors }}</div>
+                {% endif %}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.photo_right.id_for_label }}">Right Side Photo</label>
+                {% if horse.photo_right %}
+                    <div style="margin-bottom: 0.5rem;">
+                        <a href="{{ horse.photo_right.url }}" target="_blank" class="text-muted" style="font-size: 0.85rem;">View current photo</a>
+                    </div>
+                {% endif %}
+                {{ form.photo_right }}
+                {% if form.photo_right.errors %}
+                    <div class="form-error">{{ form.photo_right.errors }}</div>
+                {% endif %}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.photo_back.id_for_label }}">Back Photo</label>
+                {% if horse.photo_back %}
+                    <div style="margin-bottom: 0.5rem;">
+                        <a href="{{ horse.photo_back.url }}" target="_blank" class="text-muted" style="font-size: 0.85rem;">View current photo</a>
+                    </div>
+                {% endif %}
+                {{ form.photo_back }}
+                {% if form.photo_back.errors %}
+                    <div class="form-error">{{ form.photo_back.errors }}</div>
                 {% endif %}
             </div>
             

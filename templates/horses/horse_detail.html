@@ -76,6 +76,54 @@
             </div>
         </div>
 
+        {% if horse.has_photos %}
+        <div class="detail-card">
+            <details>
+                <summary style="cursor: pointer; font-weight: 600; font-size: 1.1rem; display: flex; align-items: center; justify-content: space-between; padding: 0.25rem 0; user-select: none;">
+                    <span>📷 Identification Photos (4 Angles)</span>
+                    <span class="text-muted" style="font-size: 0.85rem; font-weight: normal;">Click to view / hide photos</span>
+                </summary>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; margin-top: 1.25rem;">
+                    {% if horse.photo_front %}
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <span class="detail-label">Front</span>
+                        <a href="{{ horse.photo_front.url }}" target="_blank" rel="noopener noreferrer" style="display: block; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color);">
+                            <img src="{{ horse.photo_front.url }}" alt="{{ horse.name }} - Front" loading="lazy" style="width: 100%; height: 200px; object-fit: cover; display: block;">
+                        </a>
+                    </div>
+                    {% endif %}
+
+                    {% if horse.photo_left %}
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <span class="detail-label">Left Side</span>
+                        <a href="{{ horse.photo_left.url }}" target="_blank" rel="noopener noreferrer" style="display: block; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color);">
+                            <img src="{{ horse.photo_left.url }}" alt="{{ horse.name }} - Left Side" loading="lazy" style="width: 100%; height: 200px; object-fit: cover; display: block;">
+                        </a>
+                    </div>
+                    {% endif %}
+
+                    {% if horse.photo_right %}
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <span class="detail-label">Right Side</span>
+                        <a href="{{ horse.photo_right.url }}" target="_blank" rel="noopener noreferrer" style="display: block; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color);">
+                            <img src="{{ horse.photo_right.url }}" alt="{{ horse.name }} - Right Side" loading="lazy" style="width: 100%; height: 200px; object-fit: cover; display: block;">
+                        </a>
+                    </div>
+                    {% endif %}
+
+                    {% if horse.photo_back %}
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <span class="detail-label">Back</span>
+                        <a href="{{ horse.photo_back.url }}" target="_blank" rel="noopener noreferrer" style="display: block; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color);">
+                            <img src="{{ horse.photo_back.url }}" alt="{{ horse.name }} - Back" loading="lazy" style="width: 100%; height: 200px; object-fit: cover; display: block;">
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </details>
+        </div>
+        {% endif %}
+
         <div class="detail-card">
             <h2>General Notes</h2>
             {% if horse.notes %}

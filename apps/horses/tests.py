@@ -1,11 +1,25 @@
-from django.test import TestCase, Client as TestClient
+import io
+import os
+import shutil
+import tempfile
+from PIL import Image
+from django.test import TestCase, Client as TestClient, override_settings
 from django.urls import reverse
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.contrib.auth import get_user_model
 from apps.horses.models import Horse, Pasture, Saddle, MedicalRecord
 from apps.horses.forms import HorseForm, PastureForm
 
 User = get_user_model()
+
+
+def get_test_image(filename="photo.jpg"):
+    file_obj = io.BytesIO()
+    img = Image.new("RGB", (100, 100), color=(200, 150, 100))
+    img.save(file_obj, format="JPEG")
+    file_obj.seek(0)
+    return SimpleUploadedFile(filename, file_obj.read(), content_type="image/jpeg")
 
 
 class PastureModelTests(TestCase):
@@ -302,3 +316,93 @@ class HorseIntegrationTests(TestCase):
         self.assertTrue(form.is_valid(), form.errors)
         horse = form.save()
         self.assertEqual(horse.pasture, self.pasture)
+
+
+class HorsePhotoTests(TestCase):
+    def setUp(self):
+        self.temp_media = tempfile.mkdtemp()
+        self.user = User.objects.create_superuser(
+            username="photoadmin",
+            password="password",
+            email="photo@ranch.local"
+        )
+        self.client = TestClient()
+        self.client.force_login(self.user)
+
+    def tearDown(self):
+        shutil.rmtree(self.temp_media, ignore_errors=True)
+
+    def test_horse_photo_fields_and_has_photos(self):
+        with override_settings(MEDIA_ROOT=self.temp_media):
+            horse = Horse.objects.create(name="PhotoStar")
+            self.assertFalse(horse.has_photos)
+            
+            horse.photo_front = get_test_image("front.jpg")
+            horse.photo_left = get_test_image("left.jpg")
+            horse.photo_right = get_test_image("right.jpg")
+            horse.photo_back = get_test_image("back.jpg")
+            horse.save()
+            
+            self.assertTrue(horse.has_photos)
+            self.assertTrue(horse.photo_front.name.startswith("horses/photos/"))
+            self.assertTrue(horse.photo_left.name.startswith("horses/photos/"))
+            self.assertTrue(horse.photo_right.name.startswith("horses/photos/"))
+            self.assertTrue(horse.photo_back.name.startswith("horses/photos/"))
+
+    def test_horse_create_with_all_4_photos(self):
+        with override_settings(MEDIA_ROOT=self.temp_media):
+            post_data = {
+                "name": "Champion",
+                "breed": "Mustang",
+                "gender": Horse.Gender.GELDING,
+                "status": Horse.Status.ACTIVE,
+                "photo_front": get_test_image("front.jpg"),
+                "photo_left": get_test_image("left.jpg"),
+                "photo_right": get_test_image("right.jpg"),
+                "photo_back": get_test_image("back.jpg"),
+            }
+            response = self.client.post(reverse("horses:horse_create"), post_data)
+            self.assertEqual(response.status_code, 302)
+            horse = Horse.objects.get(name="Champion")
+            self.assertTrue(horse.photo_front)
+            self.assertTrue(horse.photo_left)
+            self.assertTrue(horse.photo_right)
+            self.assertTrue(horse.photo_back)
+            self.assertTrue(horse.has_photos)
+
+    def test_horse_update_photos(self):
+        with override_settings(MEDIA_ROOT=self.temp_media):
+            horse = Horse.objects.create(name="Silver")
+            self.assertFalse(horse.has_photos)
+            
+            post_data = {
+                "name": "Silver",
+                "breed": "Mustang",
+                "gender": Horse.Gender.GELDING,
+                "status": Horse.Status.ACTIVE,
+                "photo_front": get_test_image("front_new.jpg"),
+            }
+            response = self.client.post(reverse("horses:horse_update", args=[horse.pk]), post_data)
+            self.assertEqual(response.status_code, 302)
+            horse.refresh_from_db()
+            self.assertTrue(horse.photo_front)
+            self.assertTrue(horse.has_photos)
+
+    def test_horse_detail_shows_photos_when_present(self):
+        with override_settings(MEDIA_ROOT=self.temp_media):
+            horse = Horse.objects.create(
+                name="GalleryHorse",
+                photo_front=get_test_image("front.jpg"),
+                photo_left=get_test_image("left.jpg")
+            )
+            response = self.client.get(reverse("horses:horse_detail", args=[horse.pk]))
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, "Identification Photos (4 Angles)")
+            self.assertContains(response, horse.photo_front.url)
+            self.assertContains(response, horse.photo_left.url)
+
+    def test_horse_detail_hides_photos_when_absent(self):
+        horse = Horse.objects.create(name="NoPhotoHorse")
+        response = self.client.get(reverse("horses:horse_detail", args=[horse.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Identification Photos (4 Angles)")

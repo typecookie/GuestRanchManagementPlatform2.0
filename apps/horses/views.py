@@ -221,7 +221,7 @@ def update_horse_pasture(request, pk):
 @module_permission_required('Horses', 'write')
 def horse_create(request):
     if request.method == 'POST':
-        form = HorseForm(request.POST)
+        form = HorseForm(request.POST, request.FILES)
         if form.is_valid():
             horse = form.save()
             messages.success(request, f"Horse '{horse.name}' created successfully.")
@@ -238,7 +238,7 @@ def horse_create(request):
 def horse_update(request, pk):
     horse = get_object_or_404(Horse, pk=pk)
     if request.method == 'POST':
-        form = HorseForm(request.POST, instance=horse)
+        form = HorseForm(request.POST, request.FILES, instance=horse)
         if form.is_valid():
             form.save()
             messages.success(request, f"Horse '{horse.name}' updated successfully.")
