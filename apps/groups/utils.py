@@ -132,7 +132,7 @@ def has_module_permission(user, module_name, access_type):
     """
     Checks if a user has the specified access_type ('read', 'write', 'delete') for a module.
     """
-    if user.is_superuser:
+    if user.is_superuser or user.groups.filter(name__in=['Ranch Admins', 'administrator']).exists():
         return True
     
     if module_name not in MODULE_MAPPING:

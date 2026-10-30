@@ -1,8 +1,9 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.models import User, Group
+from django.contrib.auth import update_session_auth_hash
 from django.contrib import messages
 from apps.groups.decorators import module_permission_required
-from .forms import UserForm
+from .forms import UserForm, AdminUserPasswordChangeForm
 
 def is_admin(user):
     return user.is_superuser or user.groups.filter(name__in=['Ranch Admins', 'administrator']).exists()
@@ -43,6 +44,26 @@ def user_update(request, pk):
     return render(request, 'accounts/user_form.html', {
         'form': form,
         'title': f'Edit User: {user.username}'
+    })
+
+@module_permission_required('User Management', 'write')
+def user_change_password(request, pk):
+    target_user = get_object_or_404(User, pk=pk)
+    if request.method == 'POST':
+        form = AdminUserPasswordChangeForm(user=target_user, data=request.POST)
+        if form.is_valid():
+            form.save()
+            if target_user == request.user:
+                update_session_auth_hash(request, target_user)
+            messages.success(request, f'Password for user {target_user.username} has been changed successfully.')
+            return redirect('accounts:user_list')
+    else:
+        form = AdminUserPasswordChangeForm(user=target_user)
+
+    return render(request, 'accounts/user_change_password.html', {
+        'form': form,
+        'target_user': target_user,
+        'title': f'Change Password: {target_user.username}',
     })
 
 @module_permission_required('User Management', 'write')

@@ -10,6 +10,12 @@
 Assign roles and manage account access for ranch staff.
 {% endblock %}
 
+{% block page_actions %}
+{% if form.instance and form.instance.pk %}
+<a href="{% url 'accounts:user_change_password' form.instance.pk %}" class="button button-secondary">Change Password</a>
+{% endif %}
+{% endblock %}
+
 {% block content %}
 <div class="form-card">
     <form method="post" class="standard-form">
@@ -36,6 +42,9 @@ Assign roles and manage account access for ranch staff.
 
         <div class="form-actions">
             <a href="{% url 'accounts:user_list' %}" class="button button-secondary">Cancel</a>
+            {% if form.instance and form.instance.pk %}
+            <a href="{% url 'accounts:user_change_password' form.instance.pk %}" class="button button-secondary">Change Password</a>
+            {% endif %}
             <button type="submit" class="button button-primary">Save User</button>
         </div>
     </form>

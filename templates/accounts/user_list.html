@@ -66,6 +66,7 @@ Manage system users, passwords, and access roles.
                         <div class="table-actions">
                             {% if can_write %}
                             <a href="{% url 'accounts:user_update' user.pk %}" class="button button-small button-primary">Edit</a>
+                            <a href="{% url 'accounts:user_change_password' user.pk %}" class="button button-small button-secondary">Password</a>
                             {% endif %}
                             
                             {% if user != request.user %}

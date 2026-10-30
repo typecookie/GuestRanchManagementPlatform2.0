@@ -1,5 +1,6 @@
 from django import forms
 from django.contrib.auth.models import User, Group
+from django.contrib.auth.forms import SetPasswordForm
 from .models import UserProfile
 
 
@@ -62,3 +63,10 @@ class UserForm(forms.ModelForm):
             self.save_m2m = save_profile_and_m2m
 
         return user
+
+
+class AdminUserPasswordChangeForm(SetPasswordForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.widget.attrs.update({"class": "form-control"})
