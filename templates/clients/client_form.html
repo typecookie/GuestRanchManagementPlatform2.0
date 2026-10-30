@@ -23,7 +23,7 @@
 {% endblock %}
 
 {% block content %}
-<form method="post" class="form-card">
+<form method="post" class="form-card" enctype="multipart/form-data">
     {% csrf_token %}
 
     {% if form.non_field_errors %}
@@ -121,6 +121,21 @@
             {% for error in form.client_type.errors %}
                 <span class="form-error">{{ error }}</span>
             {% endfor %}
+        </div>
+
+        <div class="form-field">
+            <label for="{{ form.photo.id_for_label }}">Individual Photo / Avatar</label>
+            {% if client and client.photo %}
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                    <img src="{{ client.photo.url }}" alt="{{ client.display_name }}" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 1px solid var(--color-border);">
+                    <a href="{{ client.photo.url }}" target="_blank" class="text-muted" style="font-size: 0.85rem;">View current photo</a>
+                </div>
+            {% endif %}
+            {{ form.photo }}
+            {% for error in form.photo.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+            <span class="form-help">Upload an individual photo (ideal for guests traveling alone or custom headshots).</span>
         </div>
 
         <div class="form-field">

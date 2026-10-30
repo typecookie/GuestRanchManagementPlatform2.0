@@ -1,6 +1,9 @@
+import io
 import json
+from PIL import Image, ImageOps
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.files.base import ContentFile
 from django.db import transaction
 from django.db.models import Q
 from django.http import JsonResponse
@@ -11,10 +14,13 @@ from apps.groups.decorators import module_permission_required
 from .forms import (
     ClientForm,
     ClientNoteForm,
+    ClientPhotoUploadForm,
     HouseholdForm,
     HouseholdMemberForm,
+    HouseholdPhotoUploadForm,
     TravelGroupForm,
     TravelGroupMemberForm,
+    TravelGroupPhotoUploadForm,
 )
 from .models import Client, Household, HouseholdMember, TravelGroup, TravelGroupMember
 from apps.reservations.models import Reservation, ReservationGuest
@@ -103,7 +109,7 @@ def client_detail(request, pk):
 @module_permission_required('Clients', 'write')
 def client_create(request):
     if request.method == "POST":
-        form = ClientForm(request.POST)
+        form = ClientForm(request.POST, request.FILES)
 
         if form.is_valid():
             client = form.save()
@@ -127,7 +133,7 @@ def client_update(request, pk):
     client = get_object_or_404(Client, pk=pk)
 
     if request.method == "POST":
-        form = ClientForm(request.POST, instance=client)
+        form = ClientForm(request.POST, request.FILES, instance=client)
 
         if form.is_valid():
             client = form.save()
@@ -228,7 +234,7 @@ def client_note_create(request, pk):
 @module_permission_required('Clients', 'write')
 def household_create(request):
     if request.method == "POST":
-        form = HouseholdForm(request.POST)
+        form = HouseholdForm(request.POST, request.FILES)
 
         if form.is_valid():
             household = form.save()
@@ -271,7 +277,7 @@ def household_update(request, pk):
     household = get_object_or_404(Household, pk=pk)
 
     if request.method == "POST":
-        form = HouseholdForm(request.POST, instance=household)
+        form = HouseholdForm(request.POST, request.FILES, instance=household)
 
         if form.is_valid():
             household = form.save()
@@ -324,7 +330,7 @@ def household_member_create_new_client(request, pk):
     household = get_object_or_404(Household, pk=pk)
 
     if request.method == "POST":
-        form = ClientForm(request.POST)
+        form = ClientForm(request.POST, request.FILES)
 
         if form.is_valid():
             client = form.save()
@@ -374,7 +380,7 @@ def household_member_delete(request, pk):
 @module_permission_required('Clients', 'write')
 def travel_group_create(request):
     if request.method == "POST":
-        form = TravelGroupForm(request.POST)
+        form = TravelGroupForm(request.POST, request.FILES)
 
         if form.is_valid():
             travel_group = form.save()
@@ -420,7 +426,7 @@ def travel_group_update(request, pk):
     travel_group = get_object_or_404(TravelGroup, pk=pk)
 
     if request.method == "POST":
-        form = TravelGroupForm(request.POST, instance=travel_group)
+        form = TravelGroupForm(request.POST, request.FILES, instance=travel_group)
 
         if form.is_valid():
             travel_group = form.save()
@@ -465,7 +471,7 @@ def travel_group_member_create_new_client(request, pk):
     travel_group = get_object_or_404(TravelGroup, pk=pk)
 
     if request.method == "POST":
-        form = ClientForm(request.POST)
+        form = ClientForm(request.POST, request.FILES)
 
         if form.is_valid():
             client = form.save()
@@ -1391,3 +1397,278 @@ def group_builder(request):
     }
 
     return render(request, "clients/group_builder.html", context)
+
+
+def crop_and_save_client_photo(client, source_file, crop_data):
+    """
+    Crops a source image based on crop_data (x, y, width, height)
+    and saves the high-quality cropped JPEG to client.photo.
+    """
+    if hasattr(source_file, 'open'):
+        source_file.open('rb')
+    elif hasattr(source_file, 'seek'):
+        source_file.seek(0)
+
+    img = Image.open(source_file)
+    img = ImageOps.exif_transpose(img)
+    orig_w, orig_h = img.size
+
+    crop_x = float(crop_data.get("x", 0))
+    crop_y = float(crop_data.get("y", 0))
+    crop_w = float(crop_data.get("width", orig_w))
+    crop_h = float(crop_data.get("height", orig_h))
+
+    display_w = float(crop_data.get("displayWidth", 0) or 0)
+    display_h = float(crop_data.get("displayHeight", 0) or 0)
+
+    if display_w > 0 and display_h > 0:
+        scale_x = orig_w / display_w
+        scale_y = orig_h / display_h
+        left = int(crop_x * scale_x)
+        top = int(crop_y * scale_y)
+        width = int(crop_w * scale_x)
+        height = int(crop_h * scale_y)
+    elif crop_data.get("isNormalized") or (crop_w <= 1.0 and crop_h <= 1.0 and orig_w > 1 and orig_h > 1):
+        left = int(crop_x * orig_w)
+        top = int(crop_y * orig_h)
+        width = int(crop_w * orig_w)
+        height = int(crop_h * orig_h)
+    else:
+        left = int(crop_x)
+        top = int(crop_y)
+        width = int(crop_w)
+        height = int(crop_h)
+
+    left = max(0, min(left, orig_w - 1))
+    top = max(0, min(top, orig_h - 1))
+    right = max(left + 1, min(left + width, orig_w))
+    bottom = max(top + 1, min(top + height, orig_h))
+
+    cropped = img.crop((left, top, right, bottom))
+    if cropped.mode in ("RGBA", "P"):
+        cropped = cropped.convert("RGB")
+
+    buf = io.BytesIO()
+    cropped.save(buf, format="JPEG", quality=95)
+    buf.seek(0)
+
+    safe_first = "".join(c for c in client.first_name if c.isalnum()).lower() or "guest"
+    safe_last = "".join(c for c in client.last_name if c.isalnum()).lower() or "member"
+    filename = f"client_{client.pk}_{safe_first}_{safe_last}.jpg"
+
+    client.photo.save(filename, ContentFile(buf.read()), save=True)
+    return client.photo.url
+
+
+@module_permission_required('Clients', 'write')
+def household_photos(request, pk):
+    household = get_object_or_404(Household, pk=pk)
+    
+    if request.method == "POST":
+        if "clear_photo" in request.POST:
+            if household.photo:
+                household.photo.delete(save=False)
+                household.photo = None
+                household.save()
+                messages.success(request, "Household photo was removed.")
+            return redirect("clients:household_photos", pk=household.pk)
+        
+        form = HouseholdPhotoUploadForm(request.POST, request.FILES, instance=household)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Household photo uploaded successfully. You can now crop squares to assign individual photos to members.")
+            return redirect("clients:household_photos", pk=household.pk)
+        else:
+            messages.error(request, "Error uploading photo. Please ensure a valid image file is selected.")
+    else:
+        form = HouseholdPhotoUploadForm(instance=household)
+
+    memberships = household.memberships.select_related("client").order_by("client__last_name", "client__first_name")
+    
+    members_data = []
+    for m in memberships:
+        c = m.client
+        members_data.append({
+            "id": c.id,
+            "full_name": c.full_name,
+            "display_name": c.display_name,
+            "relationship": m.get_relationship_display(),
+            "photo_url": c.photo.url if c.photo else "",
+            "has_photo": bool(c.photo),
+            "client_url": reverse("clients:client_detail", args=[c.pk]),
+        })
+
+    context = {
+        "household": household,
+        "memberships": memberships,
+        "members_json": json.dumps(members_data),
+        "members_list": members_data,
+        "upload_form": form,
+        "source_type": "household",
+        "source_id": household.pk,
+        "source_photo_url": household.photo.url if household.photo else "",
+    }
+    return render(request, "clients/crop_member_photos.html", context)
+
+
+@module_permission_required('Clients', 'write')
+def travel_group_photos(request, pk):
+    travel_group = get_object_or_404(TravelGroup, pk=pk)
+    
+    if request.method == "POST":
+        if "clear_photo" in request.POST:
+            if travel_group.photo:
+                travel_group.photo.delete(save=False)
+                travel_group.photo = None
+                travel_group.save()
+                messages.success(request, "Travel group photo was removed.")
+            return redirect("clients:travel_group_photos", pk=travel_group.pk)
+        
+        form = TravelGroupPhotoUploadForm(request.POST, request.FILES, instance=travel_group)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Travel group photo uploaded successfully. You can now crop squares to assign individual photos to members.")
+            return redirect("clients:travel_group_photos", pk=travel_group.pk)
+        else:
+            messages.error(request, "Error uploading photo. Please ensure a valid image file is selected.")
+    else:
+        form = TravelGroupPhotoUploadForm(instance=travel_group)
+
+    # Collect all unique clients in this travel group (direct clients + household members)
+    direct_members = travel_group.memberships.filter(client__isnull=False).select_related("client")
+    hh_members = HouseholdMember.objects.filter(household__travel_group_memberships__travel_group=travel_group).select_related("client", "household")
+
+    seen_client_ids = set()
+    members_data = []
+
+    for m in direct_members:
+        c = m.client
+        if c.id not in seen_client_ids:
+            seen_client_ids.add(c.id)
+            members_data.append({
+                "id": c.id,
+                "full_name": c.full_name,
+                "display_name": c.display_name,
+                "relationship": m.get_role_display(),
+                "photo_url": c.photo.url if c.photo else "",
+                "has_photo": bool(c.photo),
+                "client_url": reverse("clients:client_detail", args=[c.pk]),
+            })
+
+    for m in hh_members:
+        c = m.client
+        if c.id not in seen_client_ids:
+            seen_client_ids.add(c.id)
+            members_data.append({
+                "id": c.id,
+                "full_name": c.full_name,
+                "display_name": c.display_name,
+                "relationship": f"{m.household.name} ({m.get_relationship_display()})",
+                "photo_url": c.photo.url if c.photo else "",
+                "has_photo": bool(c.photo),
+                "client_url": reverse("clients:client_detail", args=[c.pk]),
+            })
+
+    context = {
+        "travel_group": travel_group,
+        "members_json": json.dumps(members_data),
+        "members_list": members_data,
+        "upload_form": form,
+        "source_type": "travel_group",
+        "source_id": travel_group.pk,
+        "source_photo_url": travel_group.photo.url if travel_group.photo else "",
+    }
+    return render(request, "clients/crop_member_photos.html", context)
+
+
+@module_permission_required('Clients', 'write')
+def crop_assign_photo(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST method required."}, status=405)
+
+    is_json = "application/json" in (request.content_type or "")
+    if is_json:
+        try:
+            data = json.loads(request.body)
+        except Exception:
+            return JsonResponse({"error": "Invalid JSON."}, status=400)
+    else:
+        data = request.POST
+
+    client_id = data.get("client_id")
+    source_type = data.get("source_type")
+    source_id = data.get("source_id")
+
+    if not client_id:
+        return JsonResponse({"error": "Missing client_id."}, status=400)
+
+    client = get_object_or_404(Client, pk=client_id)
+
+    source_file = None
+    if source_type == "household" and source_id:
+        household = get_object_or_404(Household, pk=source_id)
+        if household.photo:
+            source_file = household.photo
+    elif source_type == "travel_group" and source_id:
+        tg = get_object_or_404(TravelGroup, pk=source_id)
+        if tg.photo:
+            source_file = tg.photo
+    elif "photo" in request.FILES:
+        source_file = request.FILES["photo"]
+
+    if not source_file:
+        return JsonResponse({"error": "No source photo available to crop."}, status=400)
+
+    crop_data = {
+        "x": data.get("crop_x", data.get("x", 0)),
+        "y": data.get("crop_y", data.get("y", 0)),
+        "width": data.get("crop_width", data.get("width", 0)),
+        "height": data.get("crop_height", data.get("height", 0)),
+        "displayWidth": data.get("display_width", data.get("displayWidth", 0)),
+        "displayHeight": data.get("display_height", data.get("displayHeight", 0)),
+        "isNormalized": data.get("is_normalized", False),
+    }
+
+    try:
+        photo_url = crop_and_save_client_photo(client, source_file, crop_data)
+        return JsonResponse({
+            "success": True,
+            "status": "success",
+            "client_id": client.pk,
+            "client_name": client.display_name,
+            "photo_url": photo_url,
+            "message": f"Successfully assigned photo to {client.display_name}.",
+        })
+    except Exception as e:
+        return JsonResponse({"error": f"Failed to crop photo: {str(e)}"}, status=500)
+
+
+@module_permission_required('Clients', 'write')
+def client_photo_upload(request, pk):
+    client = get_object_or_404(Client, pk=pk)
+
+    if request.method == "POST":
+        if "clear_photo" in request.POST:
+            if client.photo:
+                client.photo.delete(save=False)
+                client.photo = None
+                client.save()
+                messages.success(request, f"Photo removed for {client.display_name}.")
+            return redirect("clients:client_detail", pk=client.pk)
+
+        form = ClientPhotoUploadForm(request.POST, request.FILES, instance=client)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Photo uploaded for {client.display_name}.")
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest' or 'application/json' in request.META.get('HTTP_ACCEPT', ''):
+                return JsonResponse({
+                    "success": True,
+                    "client_id": client.pk,
+                    "photo_url": client.photo.url,
+                    "message": f"Photo uploaded for {client.display_name}.",
+                })
+            return redirect("clients:client_detail", pk=client.pk)
+        else:
+            messages.error(request, "Failed to upload photo. Please check the image format.")
+
+    return redirect("clients:client_detail", pk=client.pk)

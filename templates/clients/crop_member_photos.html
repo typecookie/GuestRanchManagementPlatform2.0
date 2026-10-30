@@ -1,0 +1,712 @@
+{% extends "base.html" %}
+
+{% block title %}Photo Manager & Member Cropper | {% if household %}{{ household.name }}{% else %}{{ travel_group.name }}{% endif %}{% endblock %}
+
+{% block eyebrow %}Photo Manager{% endblock %}
+
+{% block page_title %}
+    {% if household %}
+        Photo Manager — {{ household.name }}
+    {% else %}
+        Photo Manager — {{ travel_group.name }}
+    {% endif %}
+{% endblock %}
+
+{% block page_subtitle %}
+    Upload a family or group photo, select a square for each member, and attach cropped portraits directly to their guest profiles.
+{% endblock %}
+
+{% block page_actions %}
+    {% if household %}
+        <a href="{% url 'clients:household_detail' household.pk %}" class="button button-secondary">← Back to Household</a>
+    {% else %}
+        <a href="{% url 'clients:travel_group_detail' travel_group.pk %}" class="button button-secondary">← Back to Travel Group</a>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+<style>
+    .photo-manager-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr);
+        gap: 1.5rem;
+        align-items: start;
+    }
+
+    @media (max-width: 992px) {
+        .photo-manager-layout {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .cropper-card {
+        background: #ffffff;
+        border-radius: 12px;
+        border: 1px solid var(--color-border);
+        box-shadow: var(--shadow-sm);
+        padding: 1.25rem;
+    }
+
+    .cropper-viewport {
+        position: relative;
+        background: #1e293b;
+        border-radius: 8px;
+        overflow: hidden;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        user-select: none;
+        touch-action: none;
+        min-height: 380px;
+        max-height: 600px;
+    }
+
+    .cropper-image {
+        display: block;
+        max-width: 100%;
+        max-height: 580px;
+        object-fit: contain;
+        pointer-events: none;
+    }
+
+    .cropper-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        cursor: crosshair;
+    }
+
+    .crop-box {
+        position: absolute;
+        border: 2px solid #38bdf8;
+        box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.65);
+        cursor: move;
+        box-sizing: border-box;
+        border-radius: 4px;
+        display: none;
+    }
+
+    .crop-handle {
+        position: absolute;
+        width: 12px;
+        height: 12px;
+        background: #38bdf8;
+        border: 2px solid #ffffff;
+        border-radius: 50%;
+    }
+
+    .handle-nw { top: -6px; left: -6px; cursor: nwse-resize; }
+    .handle-ne { top: -6px; right: -6px; cursor: nesw-resize; }
+    .handle-sw { bottom: -6px; left: -6px; cursor: nesw-resize; }
+    .handle-se { bottom: -6px; right: -6px; cursor: nwse-resize; }
+
+    .member-sidebar-card {
+        background: #ffffff;
+        border-radius: 12px;
+        border: 1px solid var(--color-border);
+        box-shadow: var(--shadow-sm);
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+    }
+
+    .preview-box-container {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        background: #f8fafc;
+        border: 1px solid var(--color-border);
+        padding: 0.85rem;
+        border-radius: 8px;
+    }
+
+    .preview-avatar {
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
+        overflow: hidden;
+        border: 2px solid #38bdf8;
+        background: #e2e8f0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .preview-canvas {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .member-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+        max-height: 480px;
+        overflow-y: auto;
+    }
+
+    .member-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.75rem;
+        border: 1px solid var(--color-border);
+        border-radius: 8px;
+        background: #ffffff;
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+
+    .member-item:hover {
+        border-color: #94a3b8;
+        background: #f8fafc;
+    }
+
+    .member-item.is-active {
+        border-color: #0284c7;
+        background: #f0f9ff;
+        box-shadow: 0 0 0 1px #0284c7;
+    }
+
+    .member-item-info {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .member-avatar {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        object-fit: cover;
+        background: #cbd5e1;
+        border: 1px solid var(--color-border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        color: #475569;
+        font-size: 0.9rem;
+        flex-shrink: 0;
+    }
+
+    .member-name {
+        font-weight: 600;
+        color: var(--color-charcoal);
+        font-size: 0.95rem;
+    }
+
+    .member-role {
+        font-size: 0.8rem;
+        color: var(--color-muted);
+    }
+
+    .status-badge {
+        font-size: 0.75rem;
+        padding: 2px 8px;
+        border-radius: 9999px;
+        font-weight: 600;
+    }
+
+    .status-badge-has-photo {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .status-badge-no-photo {
+        background: #f1f5f9;
+        color: #64748b;
+    }
+
+    .notification-toast {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        background: #0f172a;
+        color: #ffffff;
+        padding: 12px 20px;
+        border-radius: 8px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        font-size: 0.9rem;
+        display: none;
+        z-index: 1000;
+        animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+        from { transform: translateY(20px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+</style>
+
+<div class="photo-manager-layout">
+    <!-- LEFT PANEL: Image Viewer & Cropper -->
+    <div class="cropper-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div>
+                <h2 style="margin: 0; font-size: 1.2rem; font-weight: 700;">
+                    {% if household %}Family / Household Photo{% else %}Travel Group Photo{% endif %}
+                </h2>
+                <p style="margin: 2px 0 0; font-size: 0.85rem; color: var(--color-muted);">
+                    Click and drag a box over any person's face/body, then click "Assign to Member" on the right.
+                </p>
+            </div>
+            
+            {% if source_photo_url %}
+            <div style="display: flex; gap: 8px;">
+                <button type="button" class="button button-small button-secondary" onclick="document.getElementById('upload-modal').style.display='block';">
+                    🔄 Replace Photo
+                </button>
+                <form method="post" onsubmit="return confirm('Are you sure you want to remove this group photo?');" style="display: inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="clear_photo" value="1">
+                    <button type="submit" class="button button-small button-danger">Remove</button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if source_photo_url %}
+            <div class="cropper-viewport" id="cropper-viewport">
+                <img src="{{ source_photo_url }}" id="source-image" class="cropper-image" alt="Group Photo">
+                <div class="cropper-overlay" id="cropper-overlay">
+                    <div class="crop-box" id="crop-box">
+                        <div class="crop-handle handle-nw" data-handle="nw"></div>
+                        <div class="crop-handle handle-ne" data-handle="ne"></div>
+                        <div class="crop-handle handle-sw" data-handle="sw"></div>
+                        <div class="crop-handle handle-se" data-handle="se"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem; font-size: 0.85rem; color: var(--color-muted);">
+                <span>💡 Tip: Click &amp; drag anywhere on the photo to draw a square, or drag handles to resize.</span>
+                <button type="button" id="btn-reset-crop" class="button button-small button-secondary" style="font-size: 0.75rem; padding: 2px 8px;">
+                    Reset Box
+                </button>
+            </div>
+        {% else %}
+            <!-- Upload Prompt Card -->
+            <div style="border: 2px dashed var(--color-border); border-radius: 8px; padding: 3rem 1.5rem; text-align: center; background: #f8fafc;">
+                <div style="font-size: 3rem; margin-bottom: 0.5rem;">📷</div>
+                <h3 style="margin-bottom: 0.5rem; font-weight: 700;">No Group Photo Uploaded Yet</h3>
+                <p class="text-muted" style="max-width: 420px; margin: 0 auto 1.5rem; font-size: 0.9rem;">
+                    Upload a high-quality photo of the whole family or travel group to easily crop and assign individual photos to every guest.
+                </p>
+                <form method="post" enctype="multipart/form-data" style="max-width: 360px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px;">
+                    {% csrf_token %}
+                    {{ upload_form.photo }}
+                    <button type="submit" class="button button-primary" style="width: 100%;">
+                        📤 Upload Group Photo &amp; Begin Tagging
+                    </button>
+                </form>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- RIGHT PANEL: Member Selection & Crop Assignment -->
+    <div class="member-sidebar-card">
+        <div>
+            <h2 style="margin: 0; font-size: 1.15rem; font-weight: 700;">Member Face Cropper</h2>
+            <p style="margin: 2px 0 0; font-size: 0.85rem; color: var(--color-muted);">
+                Select a member below and assign the active crop.
+            </p>
+        </div>
+
+        <!-- Preview Card -->
+        <div class="preview-box-container">
+            <div class="preview-avatar">
+                <canvas id="preview-canvas" width="120" height="120" class="preview-canvas"></canvas>
+            </div>
+            <div style="flex: 1;">
+                <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--color-muted); letter-spacing: 0.05em;">Target Member</div>
+                <div id="target-member-name" style="font-size: 1.1rem; font-weight: 700; color: var(--color-charcoal); margin: 2px 0;">
+                    Select a member below
+                </div>
+                <div id="target-member-role" style="font-size: 0.85rem; color: var(--color-muted);">
+                    Click a member from the roster
+                </div>
+            </div>
+        </div>
+
+        <button type="button" id="btn-assign-crop" class="button button-primary" style="width: 100%; padding: 0.75rem; font-size: 1rem; justify-content: center;" {% if not source_photo_url %}disabled{% endif %}>
+            ✂️ Crop &amp; Assign Photo to Selected Member
+        </button>
+
+        <!-- Member Roster -->
+        <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <span style="font-size: 0.85rem; font-weight: 700; text-transform: uppercase; color: var(--color-muted); letter-spacing: 0.05em;">
+                    Roster Members (<span id="member-count">0</span>)
+                </span>
+            </div>
+
+            <div class="member-list" id="member-list-container">
+                <!-- Dynamically populated from members_json -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload / Replace Photo Modal -->
+<div id="upload-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); z-index: 1000; display: none; align-items: center; justify-content: center;">
+    <div style="background: #ffffff; border-radius: 12px; padding: 1.5rem; max-width: 440px; width: 90%; box-shadow: var(--shadow-lg); margin: auto; position: relative; top: 15%;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="margin: 0; font-weight: 700;">Replace Group Photo</h3>
+            <button type="button" onclick="document.getElementById('upload-modal').style.display='none';" style="background: none; border: none; font-size: 1.25rem; cursor: pointer;">✕</button>
+        </div>
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="form-field" style="margin-bottom: 1rem;">
+                <label>Select New Image File</label>
+                {{ upload_form.photo }}
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                <button type="button" class="button button-secondary" onclick="document.getElementById('upload-modal').style.display='none';">Cancel</button>
+                <button type="submit" class="button button-primary">Upload &amp; Replace</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="notification-toast" class="notification-toast"></div>
+
+<!-- Data Script Block -->
+<script type="application/json" id="members-data">
+    {{ members_json|safe }}
+</script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const membersData = JSON.parse(document.getElementById("members-data").textContent || "[]");
+    document.getElementById("member-count").textContent = membersData.length;
+
+    let selectedMemberId = membersData.length > 0 ? membersData[0].id : null;
+    const sourceImage = document.getElementById("source-image");
+    const cropperOverlay = document.getElementById("cropper-overlay");
+    const cropBox = document.getElementById("crop-box");
+    const previewCanvas = document.getElementById("preview-canvas");
+    const previewCtx = previewCanvas ? previewCanvas.getContext("2d") : null;
+    const btnAssign = document.getElementById("btn-assign-crop");
+    const btnReset = document.getElementById("btn-reset-crop");
+    const toast = document.getElementById("notification-toast");
+
+    let isDrawing = false;
+    let isMoving = false;
+    let isResizing = false;
+    let resizeHandle = null;
+    let startX = 0, startY = 0;
+    let boxX = 0, boxY = 0, boxW = 0, boxH = 0;
+    let moveOffsetX = 0, moveOffsetY = 0;
+
+    function showToast(msg) {
+        toast.textContent = msg;
+        toast.style.display = "block";
+        setTimeout(() => { toast.style.display = "none"; }, 3500);
+    }
+
+    function renderMemberList() {
+        const container = document.getElementById("member-list-container");
+        container.innerHTML = "";
+
+        membersData.forEach(member => {
+            const item = document.createElement("div");
+            item.className = "member-item" + (member.id === selectedMemberId ? " is-active" : "");
+            item.dataset.id = member.id;
+
+            const avatarHtml = member.photo_url 
+                ? `<img src="${member.photo_url}" class="member-avatar" alt="${member.display_name}">`
+                : `<div class="member-avatar">${(member.display_name || "?").charAt(0).toUpperCase()}</div>`;
+
+            const statusHtml = member.has_photo
+                ? `<span class="status-badge status-badge-has-photo">✓ Photo Set</span>`
+                : `<span class="status-badge status-badge-no-photo">No Photo</span>`;
+
+            item.innerHTML = `
+                <div class="member-item-info">
+                    ${avatarHtml}
+                    <div>
+                        <div class="member-name">${member.display_name}</div>
+                        <div class="member-role">${member.relationship || "Member"}</div>
+                    </div>
+                </div>
+                <div>${statusHtml}</div>
+            `;
+
+            item.addEventListener("click", () => {
+                selectedMemberId = member.id;
+                updateSelectedMemberUI();
+            });
+
+            container.appendChild(item);
+        });
+
+        updateSelectedMemberUI();
+    }
+
+    function updateSelectedMemberUI() {
+        document.querySelectorAll(".member-item").forEach(item => {
+            if (parseInt(item.dataset.id) === selectedMemberId) {
+                item.classList.add("is-active");
+            } else {
+                item.classList.remove("is-active");
+            }
+        });
+
+        const activeMember = membersData.find(m => m.id === selectedMemberId);
+        if (activeMember) {
+            document.getElementById("target-member-name").textContent = activeMember.display_name;
+            document.getElementById("target-member-role").textContent = activeMember.relationship || "Member";
+            btnAssign.textContent = `✂️ Crop & Assign to ${activeMember.display_name}`;
+            btnAssign.disabled = false;
+        } else {
+            document.getElementById("target-member-name").textContent = "Select a member below";
+            document.getElementById("target-member-role").textContent = "Click a member from the roster";
+            btnAssign.textContent = "✂️ Select a Member First";
+            btnAssign.disabled = true;
+        }
+    }
+
+    renderMemberList();
+
+    if (!sourceImage || !cropperOverlay || !cropBox) return;
+
+    function getOverlayRect() {
+        return cropperOverlay.getBoundingClientRect();
+    }
+
+    function getImageDisplayRect() {
+        const imgRect = sourceImage.getBoundingClientRect();
+        const overRect = getOverlayRect();
+        return {
+            left: imgRect.left - overRect.left,
+            top: imgRect.top - overRect.top,
+            width: imgRect.width,
+            height: imgRect.height,
+        };
+    }
+
+    function updateCropBoxDOM() {
+        cropBox.style.left = boxX + "px";
+        cropBox.style.top = boxY + "px";
+        cropBox.style.width = boxW + "px";
+        cropBox.style.height = boxH + "px";
+        cropBox.style.display = "block";
+        updatePreview();
+    }
+
+    function updatePreview() {
+        if (!previewCtx || !sourceImage.complete || sourceImage.naturalWidth === 0) return;
+        const imgBounds = getImageDisplayRect();
+        if (imgBounds.width === 0 || imgBounds.height === 0) return;
+
+        const scaleX = sourceImage.naturalWidth / imgBounds.width;
+        const scaleY = sourceImage.naturalHeight / imgBounds.height;
+
+        const cropRelX = Math.max(0, boxX - imgBounds.left);
+        const cropRelY = Math.max(0, boxY - imgBounds.top);
+
+        const sourceX = cropRelX * scaleX;
+        const sourceY = cropRelY * scaleY;
+        const sourceW = boxW * scaleX;
+        const sourceH = boxH * scaleY;
+
+        previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+        if (sourceW > 0 && sourceH > 0) {
+            previewCtx.drawImage(
+                sourceImage,
+                sourceX, sourceY, sourceW, sourceH,
+                0, 0, previewCanvas.width, previewCanvas.height
+            );
+        }
+    }
+
+    function initDefaultBox() {
+        const bounds = getImageDisplayRect();
+        const minDim = Math.min(bounds.width, bounds.height);
+        const size = Math.max(80, Math.round(minDim * 0.35));
+        boxX = Math.round(bounds.left + (bounds.width - size) / 2);
+        boxY = Math.round(bounds.top + (bounds.height - size) / 2);
+        boxW = size;
+        boxH = size;
+        updateCropBoxDOM();
+    }
+
+    if (sourceImage.complete) {
+        initDefaultBox();
+    } else {
+        sourceImage.addEventListener("load", initDefaultBox);
+    }
+
+    if (btnReset) {
+        btnReset.addEventListener("click", initDefaultBox);
+    }
+
+    // Mouse / Touch Event Handlers for Cropper
+    cropperOverlay.addEventListener("mousedown", (e) => {
+        const target = e.target;
+        const overRect = getOverlayRect();
+        const clientX = e.clientX - overRect.left;
+        const clientY = e.clientY - overRect.top;
+
+        if (target.dataset.handle) {
+            isResizing = true;
+            resizeHandle = target.dataset.handle;
+            startX = clientX;
+            startY = clientY;
+            e.stopPropagation();
+            return;
+        }
+
+        if (target === cropBox || cropBox.contains(target)) {
+            isMoving = true;
+            moveOffsetX = clientX - boxX;
+            moveOffsetY = clientY - boxY;
+            e.stopPropagation();
+            return;
+        }
+
+        // Draw new box
+        isDrawing = true;
+        startX = clientX;
+        startY = clientY;
+        boxX = startX;
+        boxY = startY;
+        boxW = 0;
+        boxH = 0;
+        updateCropBoxDOM();
+    });
+
+    window.addEventListener("mousemove", (e) => {
+        if (!isDrawing && !isMoving && !isResizing) return;
+        const overRect = getOverlayRect();
+        const curX = Math.max(0, Math.min(e.clientX - overRect.left, overRect.width));
+        const curY = Math.max(0, Math.min(e.clientY - overRect.top, overRect.height));
+
+        if (isDrawing) {
+            const rawW = curX - startX;
+            const rawH = curY - startY;
+            const side = Math.max(Math.abs(rawW), Math.abs(rawH));
+
+            boxX = rawW >= 0 ? startX : startX - side;
+            boxY = rawH >= 0 ? startY : startY - side;
+            boxW = side;
+            boxH = side;
+            updateCropBoxDOM();
+        } else if (isMoving) {
+            boxX = curX - moveOffsetX;
+            boxY = curY - moveOffsetY;
+            updateCropBoxDOM();
+        } else if (isResizing) {
+            let dx = curX - startX;
+            let dy = curY - startY;
+            let d = Math.max(Math.abs(dx), Math.abs(dy));
+
+            if (resizeHandle === "se") {
+                boxW = Math.max(40, boxW + (dx > 0 ? d : -d));
+                boxH = boxW;
+            } else if (resizeHandle === "sw") {
+                const oldRight = boxX + boxW;
+                boxW = Math.max(40, boxW - (dx < 0 ? -d : d));
+                boxH = boxW;
+                boxX = oldRight - boxW;
+            } else if (resizeHandle === "ne") {
+                const oldBottom = boxY + boxH;
+                boxW = Math.max(40, boxW + (dx > 0 ? d : -d));
+                boxH = boxW;
+                boxY = oldBottom - boxH;
+            } else if (resizeHandle === "nw") {
+                const oldRight = boxX + boxW;
+                const oldBottom = boxY + boxH;
+                boxW = Math.max(40, boxW - (dx < 0 ? -d : d));
+                boxH = boxW;
+                boxX = oldRight - boxW;
+                boxY = oldBottom - boxH;
+            }
+            startX = curX;
+            startY = curY;
+            updateCropBoxDOM();
+        }
+    });
+
+    window.addEventListener("mouseup", () => {
+        isDrawing = false;
+        isMoving = false;
+        isResizing = false;
+    });
+
+    // Assign Button Action via AJAX
+    btnAssign.addEventListener("click", function() {
+        if (!selectedMemberId) {
+            alert("Please select a member from the list to assign this photo.");
+            return;
+        }
+
+        const imgBounds = getImageDisplayRect();
+        const scaleX = sourceImage.naturalWidth / imgBounds.width;
+        const scaleY = sourceImage.naturalHeight / imgBounds.height;
+
+        const cropRelX = Math.max(0, boxX - imgBounds.left);
+        const cropRelY = Math.max(0, boxY - imgBounds.top);
+
+        const cropData = {
+            client_id: selectedMemberId,
+            source_type: "{{ source_type }}",
+            source_id: {{ source_id }},
+            crop_x: Math.round(cropRelX * scaleX),
+            crop_y: Math.round(cropRelY * scaleY),
+            crop_width: Math.round(boxW * scaleX),
+            crop_height: Math.round(boxH * scaleY),
+        };
+
+        btnAssign.disabled = true;
+        btnAssign.textContent = "⏳ Saving Cropped Photo...";
+
+        fetch("{% url 'clients:crop_assign_photo' %}", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": "{{ csrf_token }}"
+            },
+            body: JSON.stringify(cropData)
+        })
+        .then(res => res.json())
+        .then(data => {
+            btnAssign.disabled = false;
+            btnAssign.textContent = `✂️ Crop & Assign to ${document.getElementById("target-member-name").textContent}`;
+
+            if (data.success || data.status === "success") {
+                showToast(`✓ Photo assigned to ${data.client_name}!`);
+
+                // Update member data in array
+                const member = membersData.find(m => m.id === selectedMemberId);
+                if (member) {
+                    member.photo_url = data.photo_url;
+                    member.has_photo = true;
+                }
+
+                // Advance to next member without a photo if available
+                const nextUnassigned = membersData.find(m => !m.has_photo && m.id !== selectedMemberId);
+                if (nextUnassigned) {
+                    selectedMemberId = nextUnassigned.id;
+                }
+
+                renderMemberList();
+            } else {
+                alert("Error: " + (data.error || "Failed to assign photo"));
+            }
+        })
+        .catch(err => {
+            btnAssign.disabled = false;
+            btnAssign.textContent = `✂️ Crop & Assign to ${document.getElementById("target-member-name").textContent}`;
+            alert("Error saving cropped photo: " + err);
+        });
+    });
+});
+</script>
+{% endblock %}

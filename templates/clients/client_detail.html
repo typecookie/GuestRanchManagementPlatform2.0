@@ -36,7 +36,36 @@ View contact details, preferences, household connections, travel groups, and not
 <div class="detail-layout">
     <section class="panel-stack">
         <div class="detail-card">
-            <h2>Client Details</h2>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 1.5rem; margin-bottom: 1.25rem; flex-wrap: wrap;">
+                <div>
+                    <h2 style="margin: 0;">Client Details</h2>
+                    <p class="text-muted" style="margin: 2px 0 0; font-size: 0.85rem;">Profile and identification for {{ client.display_name }}</p>
+                </div>
+                
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    {% if client.photo %}
+                        <a href="{{ client.photo.url }}" target="_blank" title="View full photo">
+                            <img src="{{ client.photo.url }}" alt="{{ client.display_name }}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid #0284c7; box-shadow: var(--shadow-sm);">
+                        </a>
+                    {% else %}
+                        <div style="width: 80px; height: 80px; border-radius: 50%; background: #e2e8f0; color: #475569; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: 700; border: 2px dashed #cbd5e1;">
+                            {{ client.display_name|slice:":1"|upper }}
+                        </div>
+                    {% endif %}
+                    <div>
+                        <button type="button" class="button button-small button-secondary" onclick="document.getElementById('client-photo-modal').style.display='block';">
+                            {% if client.photo %}📷 Change Photo{% else %}📷 Upload Photo{% endif %}
+                        </button>
+                        {% if client.photo %}
+                            <form method="post" action="{% url 'clients:client_photo_upload' client.pk %}" onsubmit="return confirm('Remove photo for {{ client.display_name }}?');" style="margin-top: 4px;">
+                                {% csrf_token %}
+                                <input type="hidden" name="clear_photo" value="1">
+                                <button type="submit" class="button button-small button-danger" style="font-size: 0.75rem; padding: 2px 8px;">Remove</button>
+                            </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
 
             <div class="detail-list">
                 <div class="detail-row">
@@ -431,6 +460,27 @@ View contact details, preferences, household connections, travel groups, and not
             </div>
         </div>
     </aside>
+</div>
+
+<!-- Upload / Change Individual Photo Modal -->
+<div id="client-photo-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div style="background: #ffffff; border-radius: 12px; padding: 1.5rem; max-width: 440px; width: 90%; box-shadow: var(--shadow-lg); margin: auto; position: relative; top: 15%;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="margin: 0; font-weight: 700;">Upload Photo for {{ client.display_name }}</h3>
+            <button type="button" onclick="document.getElementById('client-photo-modal').style.display='none';" style="background: none; border: none; font-size: 1.25rem; cursor: pointer;">✕</button>
+        </div>
+        <form method="post" action="{% url 'clients:client_photo_upload' client.pk %}" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="form-field" style="margin-bottom: 1rem;">
+                <label>Select Photo Image</label>
+                <input type="file" name="photo" accept="image/*" class="form-control" required>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                <button type="button" class="button button-secondary" onclick="document.getElementById('client-photo-modal').style.display='none';">Cancel</button>
+                <button type="submit" class="button button-primary">Upload Photo</button>
+            </div>
+        </form>
+    </div>
 </div>
 {% endblock %}
 </body>

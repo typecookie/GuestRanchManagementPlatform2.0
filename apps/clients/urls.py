@@ -16,6 +16,7 @@ urlpatterns = [
     path("people/new/", views.client_create, name="client_create"),
     path("people/<int:pk>/", views.client_detail, name="client_detail"),
     path("people/<int:pk>/edit/", views.client_update, name="client_update"),
+    path("people/<int:pk>/photo/", views.client_photo_upload, name="client_photo_upload"),
     path("people/<int:pk>/delete/", views.client_delete, name="client_delete"),
     path("people/<int:pk>/toggle-archive/", views.client_toggle_archive, name="client_toggle_archive"),
     path("people/<int:pk>/notes/new/", views.client_note_create, name="client_note_create"),
@@ -24,6 +25,7 @@ urlpatterns = [
     path("households/new/", views.household_create, name="household_create"),
     path("households/<int:pk>/", views.household_detail, name="household_detail"),
     path("households/<int:pk>/edit/", views.household_update, name="household_update"),
+    path("households/<int:pk>/photos/", views.household_photos, name="household_photos"),
     path(
         "households/<int:pk>/members/new/",
         views.household_member_create,
@@ -44,6 +46,7 @@ urlpatterns = [
     path("travel-groups/new/", views.travel_group_create, name="travel_group_create"),
     path("travel-groups/<int:pk>/", views.travel_group_detail, name="travel_group_detail"),
     path("travel-groups/<int:pk>/edit/", views.travel_group_update, name="travel_group_update"),
+    path("travel-groups/<int:pk>/photos/", views.travel_group_photos, name="travel_group_photos"),
     path(
         "travel-groups/<int:pk>/members/new/",
         views.travel_group_member_create,
@@ -65,6 +68,7 @@ urlpatterns = [
         name="travel_group_member_delete",
     ),
     # API endpoints
+    path("api/photos/crop-assign/", views.crop_assign_photo, name="crop_assign_photo"),
     path("api/travel-groups/<int:pk>/", views.travel_group_detail_api, name="travel_group_detail_api"),
     path("api/households/<int:pk>/", views.household_detail_api, name="household_detail_api"),
     path("api/quick-add/client/", views.quick_add_client, name="quick_add_client"),

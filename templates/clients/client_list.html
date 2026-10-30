@@ -131,7 +131,18 @@ Manage individual guest records, contact information, riding levels, preferences
                     {% for client in clients %}
                         <tr>
                             <td>
-                                <strong>{{ client.full_name }}</strong>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    {% if client.photo %}
+                                        <img src="{{ client.photo.url }}" alt="{{ client.display_name }}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 1px solid var(--color-border); flex-shrink: 0;">
+                                    {% else %}
+                                        <div style="width: 32px; height: 32px; border-radius: 50%; background: #e2e8f0; color: #475569; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem; flex-shrink: 0;">
+                                            {{ client.display_name|slice:":1"|upper }}
+                                        </div>
+                                    {% endif %}
+                                    <a href="{% url 'clients:client_detail' client.pk %}" style="text-decoration: none; color: inherit;">
+                                        <strong>{{ client.full_name }}</strong>
+                                    </a>
+                                </div>
                             </td>
 
                             <td>

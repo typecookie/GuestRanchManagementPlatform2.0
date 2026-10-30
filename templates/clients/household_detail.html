@@ -13,12 +13,39 @@ View family members, contact information, travel group connections, and househol
 
 {% block page_actions %}
 <a href="{% url 'clients:client_list' %}" class="button button-secondary">Back to Clients</a>
-<a href="{% url 'clients:household_update' household.pk %}" class="button button-primary">Edit Household</a>
+<a href="{% url 'clients:household_photos' household.pk %}" class="button button-primary">📷 Photo Manager &amp; Crop</a>
+<a href="{% url 'clients:household_update' household.pk %}" class="button button-secondary">Edit Household</a>
 {% endblock %}
 
 {% block content %}
 <div class="detail-layout">
     <section class="panel-stack">
+        {% if household.photo %}
+        <div class="detail-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                <h2 style="margin: 0;">Family Photo</h2>
+                <a href="{% url 'clients:household_photos' household.pk %}" class="button button-small button-primary">
+                    ✂️ Open Member Face Cropper
+                </a>
+            </div>
+            <div style="max-height: 280px; overflow: hidden; border-radius: 8px; border: 1px solid var(--color-border); background: #0f172a; text-align: center;">
+                <img src="{{ household.photo.url }}" alt="{{ household.name }}" style="max-height: 280px; width: 100%; object-fit: contain;">
+            </div>
+        </div>
+        {% else %}
+        <div class="detail-card" style="background: #f8fafc; border-style: dashed;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: gap; gap: 10px;">
+                <div>
+                    <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700;">📷 No Family Photo Added</h3>
+                    <p class="text-muted" style="margin: 2px 0 0; font-size: 0.85rem;">Upload a group photo of {{ household.name }} to easily crop and assign individual photos for each family member.</p>
+                </div>
+                <a href="{% url 'clients:household_photos' household.pk %}" class="button button-small button-primary">
+                    + Upload Family Photo
+                </a>
+            </div>
+        </div>
+        {% endif %}
+
         <div class="detail-card">
             <h2>Household Details</h2>
 
@@ -177,9 +204,18 @@ View family members, contact information, travel group connections, and househol
                                 {% for membership in memberships %}
                                     <tr>
                                         <td>
-                                            <a href="{% url 'clients:client_detail' membership.client.pk %}">
-                                                <strong>{{ membership.client.display_name }}</strong>
-                                            </a>
+                                            <div style="display: flex; align-items: center; gap: 10px;">
+                                                {% if membership.client.photo %}
+                                                    <img src="{{ membership.client.photo.url }}" alt="{{ membership.client.display_name }}" style="width: 34px; height: 34px; border-radius: 50%; object-fit: cover; border: 1px solid var(--color-border); flex-shrink: 0;">
+                                                {% else %}
+                                                    <div style="width: 34px; height: 34px; border-radius: 50%; background: #e2e8f0; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem; color: #475569; flex-shrink: 0;">
+                                                        {{ membership.client.display_name|slice:":1"|upper }}
+                                                    </div>
+                                                {% endif %}
+                                                <a href="{% url 'clients:client_detail' membership.client.pk %}">
+                                                    <strong>{{ membership.client.display_name }}</strong>
+                                                </a>
+                                            </div>
                                         </td>
                                         <td>{{ membership.get_relationship_display }}</td>
                                         <td>

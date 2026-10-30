@@ -1,7 +1,12 @@
+import io
 import json
+import shutil
+import tempfile
 from datetime import date
+from PIL import Image
 from django.contrib.auth import get_user_model
-from django.test import TestCase, Client
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 
 from apps.cabins.models import Cabin
@@ -9,6 +14,14 @@ from apps.clients.models import Client as RanchClient, Household, HouseholdMembe
 from apps.reservations.models import Reservation, ReservationGuest
 
 User = get_user_model()
+
+
+def get_test_group_image(filename="group.jpg", size=(200, 200)):
+    file_obj = io.BytesIO()
+    img = Image.new("RGB", size, color=(120, 180, 220))
+    img.save(file_obj, format="JPEG")
+    file_obj.seek(0)
+    return SimpleUploadedFile(filename, file_obj.read(), content_type="image/jpeg")
 
 
 class GroupBuilderTests(TestCase):
@@ -678,3 +691,169 @@ class ClientRiderProfileTests(TestCase):
         self.assertEqual(detail_resp_dob.status_code, 200)
         self.assertContains(detail_resp_dob, "30")
         self.assertContains(detail_resp_dob, "Calculated from DOB")
+
+
+class ClientPhotoCropTests(TestCase):
+    def setUp(self):
+        self.temp_media = tempfile.mkdtemp()
+        self.user = User.objects.create_superuser(
+            username="photoadmin",
+            password="password",
+            email="photo@ranch.local"
+        )
+        self.client = Client()
+        self.client.force_login(self.user)
+
+        self.dad = RanchClient.objects.create(
+            first_name="Test",
+            last_name="Dad",
+            email="dad@testfamily.com"
+        )
+        self.son = RanchClient.objects.create(
+            first_name="Test",
+            last_name="Son",
+            email="son@testfamily.com"
+        )
+        self.solo_traveler = RanchClient.objects.create(
+            first_name="Solo",
+            last_name="Rider",
+            email="solo@rider.com"
+        )
+
+        self.household = Household.objects.create(name="Test Family")
+        HouseholdMember.objects.create(household=self.household, client=self.dad, relationship=HouseholdMember.Relationship.PARENT)
+        HouseholdMember.objects.create(household=self.household, client=self.son, relationship=HouseholdMember.Relationship.CHILD)
+
+        self.travel_group = TravelGroup.objects.create(name="Adventure Group")
+        TravelGroupMember.objects.create(travel_group=self.travel_group, household=self.household, role=TravelGroupMember.Role.FAMILY_UNIT)
+        TravelGroupMember.objects.create(travel_group=self.travel_group, client=self.solo_traveler, role=TravelGroupMember.Role.GUEST)
+
+    def tearDown(self):
+        shutil.rmtree(self.temp_media, ignore_errors=True)
+
+    def test_individual_client_photo_upload_and_detail_display(self):
+        with override_settings(MEDIA_ROOT=self.temp_media):
+            # 1. Solo traveler uploading direct photo
+            upload_url = reverse("clients:client_photo_upload", args=[self.solo_traveler.pk])
+            resp = self.client.post(upload_url, {"photo": get_test_group_image("solo.jpg")})
+            self.assertEqual(resp.status_code, 302)
+
+            self.solo_traveler.refresh_from_db()
+            self.assertTrue(self.solo_traveler.photo)
+            self.assertTrue(self.solo_traveler.photo.name.startswith("clients/photos/"))
+
+            # 2. Check client detail view contains photo URL
+            detail_resp = self.client.get(reverse("clients:client_detail", args=[self.solo_traveler.pk]))
+            self.assertEqual(detail_resp.status_code, 200)
+            self.assertContains(detail_resp, self.solo_traveler.photo.url)
+
+            # 3. Client list displays avatar
+            list_resp = self.client.get(reverse("clients:client_list"))
+            self.assertEqual(list_resp.status_code, 200)
+            self.assertContains(list_resp, self.solo_traveler.photo.url)
+
+    def test_household_photo_upload_and_member_crop_flow(self):
+        with override_settings(MEDIA_ROOT=self.temp_media):
+            # 1. Upload group photo to household
+            hh_photo_url = reverse("clients:household_photos", args=[self.household.pk])
+            upload_resp = self.client.post(hh_photo_url, {"photo": get_test_group_image("family_group.jpg", size=(400, 300))})
+            self.assertEqual(upload_resp.status_code, 302)
+
+            self.household.refresh_from_db()
+            self.assertTrue(self.household.photo)
+
+            # 2. Open household photo manager page
+            page_resp = self.client.get(hh_photo_url)
+            self.assertEqual(page_resp.status_code, 200)
+            self.assertContains(page_resp, "Test Family")
+            self.assertContains(page_resp, "Test Dad")
+            self.assertContains(page_resp, "Test Son")
+            self.assertContains(page_resp, self.household.photo.url)
+
+            # 3. Crop square for Test Dad and assign
+            crop_url = reverse("clients:crop_assign_photo")
+            crop_data_dad = {
+                "client_id": self.dad.pk,
+                "source_type": "household",
+                "source_id": self.household.pk,
+                "crop_x": 10,
+                "crop_y": 10,
+                "crop_width": 100,
+                "crop_height": 100,
+            }
+            dad_crop_resp = self.client.post(crop_url, json.dumps(crop_data_dad), content_type="application/json")
+            self.assertEqual(dad_crop_resp.status_code, 200)
+            dad_json = dad_crop_resp.json()
+            self.assertTrue(dad_json.get("success"))
+            self.assertIn("Test Dad", dad_json.get("message"))
+
+            self.dad.refresh_from_db()
+            self.assertTrue(self.dad.photo)
+
+            # 4. Crop square for Test Son and assign
+            crop_data_son = {
+                "client_id": self.son.pk,
+                "source_type": "household",
+                "source_id": self.household.pk,
+                "crop_x": 120,
+                "crop_y": 10,
+                "crop_width": 100,
+                "crop_height": 100,
+            }
+            son_crop_resp = self.client.post(crop_url, json.dumps(crop_data_son), content_type="application/json")
+            self.assertEqual(son_crop_resp.status_code, 200)
+            son_json = son_crop_resp.json()
+            self.assertTrue(son_json.get("success"))
+
+            self.son.refresh_from_db()
+            self.assertTrue(self.son.photo)
+
+            # 5. Check Household detail page displays both family photo and member avatars
+            hh_detail_resp = self.client.get(reverse("clients:household_detail", args=[self.household.pk]))
+            self.assertEqual(hh_detail_resp.status_code, 200)
+            self.assertContains(hh_detail_resp, self.household.photo.url)
+            self.assertContains(hh_detail_resp, self.dad.photo.url)
+            self.assertContains(hh_detail_resp, self.son.photo.url)
+
+    def test_travel_group_photo_upload_and_member_crop_flow(self):
+        with override_settings(MEDIA_ROOT=self.temp_media):
+            # 1. Upload travel group photo
+            tg_photo_url = reverse("clients:travel_group_photos", args=[self.travel_group.pk])
+            upload_resp = self.client.post(tg_photo_url, {"photo": get_test_group_image("adventure_group.jpg", size=(500, 300))})
+            self.assertEqual(upload_resp.status_code, 302)
+
+            self.travel_group.refresh_from_db()
+            self.assertTrue(self.travel_group.photo)
+
+            # 2. Open travel group photo manager page
+            page_resp = self.client.get(tg_photo_url)
+            self.assertEqual(page_resp.status_code, 200)
+            self.assertContains(page_resp, "Adventure Group")
+            self.assertContains(page_resp, "Solo Rider")
+            self.assertContains(page_resp, "Test Dad")
+            self.assertContains(page_resp, self.travel_group.photo.url)
+
+            # 3. Crop square for Solo Rider from travel group photo
+            crop_url = reverse("clients:crop_assign_photo")
+            crop_data_solo = {
+                "client_id": self.solo_traveler.pk,
+                "source_type": "travel_group",
+                "source_id": self.travel_group.pk,
+                "crop_x": 50,
+                "crop_y": 50,
+                "crop_width": 120,
+                "crop_height": 120,
+            }
+            solo_crop_resp = self.client.post(crop_url, json.dumps(crop_data_solo), content_type="application/json")
+            self.assertEqual(solo_crop_resp.status_code, 200)
+            solo_json = solo_crop_resp.json()
+            self.assertTrue(solo_json.get("success"))
+
+            self.solo_traveler.refresh_from_db()
+            self.assertTrue(self.solo_traveler.photo)
+
+            # 4. Check travel group detail view
+            tg_detail_resp = self.client.get(reverse("clients:travel_group_detail", args=[self.travel_group.pk]))
+            self.assertEqual(tg_detail_resp.status_code, 200)
+            self.assertContains(tg_detail_resp, self.travel_group.photo.url)
+            self.assertContains(tg_detail_resp, self.solo_traveler.photo.url)

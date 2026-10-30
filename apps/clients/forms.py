@@ -26,6 +26,7 @@ class ClientForm(forms.ModelForm):
             "date_of_birth",
             "age",
             "sex",
+            "photo",
             "client_type",
             "is_rider",
             "riding_level",
@@ -43,6 +44,7 @@ class ClientForm(forms.ModelForm):
             "date_of_birth": forms.DateInput(attrs={"type": "date", "class": "form-input js-client-dob"}),
             "age": forms.NumberInput(attrs={"class": "form-control js-client-age", "min": 0, "max": 130, "placeholder": "e.g. 35"}),
             "sex": forms.Select(attrs={"class": "form-select"}),
+            "photo": forms.FileInput(attrs={"class": "form-control", "accept": "image/*"}),
             "height": forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g. 5'8\" or 68 in"}),
             "weight": forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g. 150 lbs"}),
             "saddle_preference": forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g. 15\" Western, Youth, etc."}),
@@ -70,6 +72,7 @@ class HouseholdForm(forms.ModelForm):
             "primary_contact",
             "billing_contact",
             "years_return",
+            "photo",
             "address_line_1",
             "address_line_2",
             "city",
@@ -97,6 +100,7 @@ class HouseholdForm(forms.ModelForm):
                 }
             ),
             "years_return": forms.NumberInput(attrs={"class": "form-control", "min": 1, "placeholder": "e.g. 5"}),
+            "photo": forms.FileInput(attrs={"class": "form-control", "accept": "image/*"}),
             "notes": forms.Textarea(attrs={"rows": 4}),
         }
 
@@ -109,6 +113,7 @@ class TravelGroupForm(forms.ModelForm):
             "group_type",
             "primary_contact",
             "years_return",
+            "photo",
             "notes",
             "is_active",
         ]
@@ -122,6 +127,7 @@ class TravelGroupForm(forms.ModelForm):
                 }
             ),
             "years_return": forms.NumberInput(attrs={"class": "form-control", "min": 1, "placeholder": "e.g. 5"}),
+            "photo": forms.FileInput(attrs={"class": "form-control", "accept": "image/*"}),
             "notes": forms.Textarea(attrs={"rows": 4}),
         }
 
@@ -158,6 +164,33 @@ class HouseholdMemberForm(forms.ModelForm):
                 }
             ),
             "notes": forms.Textarea(attrs={"rows": 3}),
+        }
+
+
+class HouseholdPhotoUploadForm(forms.ModelForm):
+    class Meta:
+        model = Household
+        fields = ["photo"]
+        widgets = {
+            "photo": forms.FileInput(attrs={"class": "form-control", "accept": "image/*"}),
+        }
+
+
+class TravelGroupPhotoUploadForm(forms.ModelForm):
+    class Meta:
+        model = TravelGroup
+        fields = ["photo"]
+        widgets = {
+            "photo": forms.FileInput(attrs={"class": "form-control", "accept": "image/*"}),
+        }
+
+
+class ClientPhotoUploadForm(forms.ModelForm):
+    class Meta:
+        model = Client
+        fields = ["photo"]
+        widgets = {
+            "photo": forms.FileInput(attrs={"class": "form-control", "accept": "image/*"}),
         }
 
 

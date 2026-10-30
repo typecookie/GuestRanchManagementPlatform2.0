@@ -130,6 +130,14 @@ class Client(models.Model):
         help_text="Number of years returning/visiting Paradise Ranch",
     )
 
+    photo = models.ImageField(
+        upload_to="clients/photos/",
+        null=True,
+        blank=True,
+        verbose_name="Photo",
+        help_text="Individual client photo / avatar",
+    )
+
     is_active = models.BooleanField(default=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -261,6 +269,14 @@ class Household(models.Model):
         help_text="Default number of years returning/visiting Paradise Ranch for this household",
     )
 
+    photo = models.ImageField(
+        upload_to="households/photos/",
+        null=True,
+        blank=True,
+        verbose_name="Household Photo",
+        help_text="Family or household group photo",
+    )
+
     is_active = models.BooleanField(default=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -377,6 +393,14 @@ class TravelGroup(models.Model):
         blank=True,
         verbose_name="Years Return",
         help_text="Default number of years returning/visiting Paradise Ranch for this travel group",
+    )
+
+    photo = models.ImageField(
+        upload_to="travel_groups/photos/",
+        null=True,
+        blank=True,
+        verbose_name="Travel Group Photo",
+        help_text="Travel group photo",
     )
 
     is_active = models.BooleanField(default=True)
